@@ -6,7 +6,7 @@
 //
 // Needs the GitHub CLI, signed in: gh auth login
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -25,8 +25,13 @@ function gh() {
   }
 }
 
-function run(file, args, options = {}) {
-  return execFileSync(file, args, { cwd: root, stdio: "inherit", shell: process.platform === "win32" && file === "npx", ...options });
+function run(file, args) {
+  return execFileSync(file, args, { cwd: root, stdio: "inherit" });
+}
+
+// npx is a .cmd script on Windows, which only starts through a shell
+function npx(command) {
+  return execSync(`npx ${command}`, { cwd: root, stdio: "inherit" });
 }
 
 const cli = gh();
@@ -50,8 +55,8 @@ if (exists) {
 }
 
 console.log(`Building Encore ${version}…`);
-run("npx", ["electron-vite", "build"]);
-run("npx", ["electron-builder", "--win", "--publish", "never"]);
+npx("electron-vite build");
+npx("electron-builder --win --publish never");
 
 const files = [`Encore-Setup-${version}.exe`, `Encore-Setup-${version}.exe.blockmap`, "latest.yml"].map((f) => join(root, "release", f));
 for (const f of files) if (!existsSync(f)) throw new Error(`Missing ${f}`);
