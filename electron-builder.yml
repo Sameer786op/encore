@@ -1,0 +1,30 @@
+appId: app.encore.player
+productName: Encore
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+  - package.json
+npmRebuild: false
+win:
+  target:
+    - nsis
+  icon: build/icon.png
+  executableName: Encore
+# one click installs for the current user, with no admin prompt, and opens Encore;
+# that also lets updates go in silently
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Encore
+  uninstallDisplayName: Encore
+  artifactName: Encore-Setup-${version}.${ext}
+# where installed copies look for new versions (see "Release a new version" in the README)
+publish:
+  provider: github
+  owner: Sameer786op
+  repo: encore
+  releaseType: release

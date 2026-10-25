@@ -1,0 +1,226 @@
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { Reorder, motion } from "motion/react";
+import { Clock3, Ellipsis, GripVertical, Play } from "lucide-react";
+import type { Track } from "@shared/types";
+import { navigate } from "@/nav/store";
+import { usePlayer } from "@/player/store";
+import { currentItem, type PlayContext } from "@/player/queue";
+import { cn } from "@/lib/cn";
+import { formatTime } from "@/lib/format";
+import { openMenu, type MenuEntry } from "@/ui/menu";
+import { Artwork } from "./Artwork";
+import { ArtistLinks, LikeButton } from "./common";
+import { PlayingBars } from "./PlayingBars";
+import { trackMenu } from "./trackMenu";
+
+const ROWS_PER_PAGE = 150;
+
+interface TrackListProps {
+  tracks: Track[];
+  context: PlayContext;
+  /** stable keys when a list can hold the same song twice (playlists) */
+  keys?: string[];
+  /** album pages show track numbers instead of covers */
+  numbered?: boolean;
+  showAlbum?: boolean;
+  /** an extra column, e.g. "Date added" */
+  extra?: { title: string; render: (track: Track, index: number) => ReactNode };
+  menuExtras?: (track: Track, index: number) => MenuEntry[];
+  /** drag to reorder; called with the new key order when a drag ends */
+  onReorder?: (keys: string[]) => void;
+}
+
+function useNowPlaying() {
+  const id = usePlayer((s) => currentItem(s.queue)?.track.id ?? null);
+  const status = usePlayer((s) => s.status);
+  return { id, playing: status === "playing" || status === "loading" };
+}
+
+interface RowProps {
+  track: Track;
+  index: number;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  numbered?: boolean;
+  showAlbum?: boolean;
+  extra?: TrackListProps["extra"];
+  draggable?: boolean;
+  onPlay: (index: number) => void;
+  onMenu: (event: React.MouseEvent, track: Track, index: number) => void;
+}
+
+const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, numbered, showAlbum, extra, draggable, onPlay, onMenu }: RowProps) {
+  return (
+    <div
+      role="row"
+      tabIndex={0}
+      onDoubleClick={() => onPlay(index)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onPlay(index);
+      }}
+      onContextMenu={(e) => onMenu(e, track, index)}
+      className={cn(
+        // Apple's lists: soft zebra stripes, a brighter fill under the pointer
+        "group grid items-center gap-4 rounded-[10px] px-3 py-[5px] outline-none transition-colors duration-150 hover:bg-white/[0.07] focus-visible:bg-white/[0.07]",
+        index % 2 === 0 && "bg-white/[0.025]",
+        showAlbum ? "grid-cols-[28px_minmax(0,4fr)_minmax(0,3fr)_auto_auto_auto]" : "grid-cols-[28px_minmax(0,1fr)_auto_auto_auto]",
+      )}
+    >
+      <div className="relative grid h-10 place-items-center text-[13px] tabular-nums text-ink-3">
+        {draggable && <GripVertical className="absolute -left-3 size-3.5 cursor-grab text-ink-3 opacity-0 group-hover:opacity-100" />}
+        {isCurrent ? (
+          <span className="group-hover:hidden">
+            <PlayingBars paused={!isPlaying} />
+          </span>
+        ) : (
+          <span className="group-hover:hidden">{index + 1}</span>
+        )}
+        <button onClick={() => onPlay(index)} aria-label={`Play ${track.title}`} className="pressable hidden text-ink group-hover:block">
+          <Play className="size-[15px]" fill="currentColor" strokeWidth={0} />
+        </button>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-3">
+        {!numbered && <Artwork src={track.artwork} className="size-10 rounded-[7px] shadow-[0_2px_6px_rgb(0_0_0/0.3)]" />}
+        <div className="min-w-0">
+          <div className={cn("flex items-center gap-1.5 truncate text-[13.5px] font-medium leading-snug", isCurrent ? "text-accent" : "text-ink")}>
+            <span className="truncate">{track.title}</span>
+            {track.explicit && <span className="shrink-0 rounded-[3px] bg-white/15 px-1 text-[9px] font-bold leading-[14px] text-ink-2">E</span>}
+          </div>
+          <ArtistLinks artists={track.artists} className="block text-[12.5px] leading-snug text-ink-2" />
+        </div>
+      </div>
+
+      {showAlbum && (
+        <div className="min-w-0 truncate text-[13px] text-ink-2">
+          {track.album?.id ? (
+            <button onClick={() => navigate({ name: "album", id: track.album!.id! })} onDoubleClick={(e) => e.stopPropagation()} className="truncate transition-colors hover:text-ink hover:underline hover:decoration-white/40 hover:underline-offset-2">
+              {track.album.title}
+            </button>
+          ) : (
+            track.album?.title
+          )}
+        </div>
+      )}
+
+      {extra ? <div className="hidden w-28 truncate text-[13px] text-ink-3 xl:block">{extra.render(track, index)}</div> : <span />}
+
+      <div className="flex items-center gap-1">
+        <LikeButton track={track} className="opacity-0 group-hover:opacity-100 aria-pressed:opacity-100" />
+        <span className="w-12 text-right text-[13px] tabular-nums text-ink-3">{track.durationMs > 0 ? formatTime(track.durationMs / 1000) : ""}</span>
+      </div>
+
+      <button
+        onClick={(e) => onMenu(e, track, index)}
+        onDoubleClick={(e) => e.stopPropagation()}
+        aria-label={`More options for ${track.title}`}
+        className="pressable rounded-full p-1.5 text-ink-2 opacity-0 hover:bg-white/10 hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        <Ellipsis className="size-4" />
+      </button>
+    </div>
+  );
+});
+
+export function TrackList({ tracks, context, keys, numbered, showAlbum = true, extra, menuExtras, onReorder }: TrackListProps) {
+  const now = useNowPlaying();
+  const playTracks = usePlayer((s) => s.playTracks);
+  const rowKeys = keys ?? tracks.map((t, i) => `${t.id}#${i}`);
+
+  // local order while dragging, committed on drop
+  const [order, setOrder] = useState(rowKeys);
+  const latestOrder = useRef(order);
+  latestOrder.current = order;
+  useEffect(() => setOrder(rowKeys), [rowKeys.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const byKey = new Map(rowKeys.map((k, i) => [k, tracks[i]]));
+
+  // big lists (a music folder, years of likes) render a page at a time as you scroll
+  const [limit, setLimit] = useState(ROWS_PER_PAGE);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => entries[0]?.isIntersecting && setLimit((n) => n + ROWS_PER_PAGE), { rootMargin: "800px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [limit, order.length]);
+
+  const onPlay = (index: number) => {
+    // play the list in its on-screen order
+    const list = order.map((k) => byKey.get(k)).filter((t): t is Track => !!t);
+    playTracks(list, index, context);
+  };
+  const onMenu = (event: React.MouseEvent, track: Track, index: number) => openMenu(event, trackMenu(track, menuExtras?.(track, index)));
+
+  const header = (
+    <div
+      className={cn(
+        "mb-1.5 grid items-center gap-4 border-b border-white/[0.07] px-3 pb-2 text-[12px] font-medium text-ink-3",
+        showAlbum ? "grid-cols-[28px_minmax(0,4fr)_minmax(0,3fr)_auto_auto_auto]" : "grid-cols-[28px_minmax(0,1fr)_auto_auto_auto]",
+      )}
+    >
+      <span className="text-center">#</span>
+      <span>Song</span>
+      {showAlbum && <span>Album</span>}
+      {extra ? <span className="hidden w-28 xl:block">{extra.title}</span> : <span />}
+      <span className="flex w-[84px] justify-end pr-0">
+        <Clock3 className="size-3.5" />
+      </span>
+      <span className="w-7" />
+    </div>
+  );
+
+  const rowFor = (key: string, i: number) => {
+    const track = byKey.get(key)!;
+    const isCurrent = now.id === track.id;
+    return (
+      <TrackRow
+        track={track}
+        index={i}
+        isCurrent={isCurrent}
+        isPlaying={isCurrent && now.playing}
+        numbered={numbered}
+        showAlbum={showAlbum}
+        extra={extra}
+        draggable={!!onReorder}
+        onPlay={onPlay}
+        onMenu={onMenu}
+      />
+    );
+  };
+
+  if (onReorder) {
+    return (
+      <div role="table">
+        {header}
+        <Reorder.Group axis="y" values={order} onReorder={setOrder} className="flex flex-col">
+          {order.map((key, i) =>
+            byKey.has(key) ? (
+              <Reorder.Item key={key} value={key} onDragEnd={() => onReorder(latestOrder.current)} className="relative" whileDrag={{ scale: 1.01, zIndex: 10 }}>
+                {rowFor(key, i)}
+              </Reorder.Item>
+            ) : null,
+          )}
+        </Reorder.Group>
+      </div>
+    );
+  }
+
+  return (
+    <div role="table">
+      {header}
+      <div className="flex flex-col">
+        {order.slice(0, limit).map((key, i) =>
+          byKey.has(key) ? (
+            // only the first rows cascade in; long lists appear at once
+            <motion.div key={key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(i, 14) * 0.018, ease: [0.32, 0.72, 0, 1] }}>
+              {rowFor(key, i)}
+            </motion.div>
+          ) : null,
+        )}
+      </div>
+      {order.length > limit && <div ref={sentinel} className="h-px" />}
+    </div>
+  );
+}

@@ -1,0 +1,134 @@
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
+import type {
+  DiscordStatus,
+  EncoreApi,
+  FeedStatus,
+  HomeFeed,
+  ImportJob,
+  LibrarySnapshot,
+  LocalScanState,
+  NowPlaying,
+  PlayerCommand,
+  ScrobbleStatus,
+  UpdateStatus,
+  WindowState,
+} from "@shared/types";
+import { IPC } from "@shared/ipc";
+
+function subscribe<T>(channel: string, listener: (value: T) => void): () => void {
+  const wrapped = (_event: IpcRendererEvent, value: T) => listener(value);
+  ipcRenderer.on(channel, wrapped);
+  return () => ipcRenderer.removeListener(channel, wrapped);
+}
+
+const api: EncoreApi = {
+  catalog: {
+    search: (query) => ipcRenderer.invoke(IPC.search, query),
+    suggestions: (query) => ipcRenderer.invoke(IPC.suggestions, query),
+    album: (id) => ipcRenderer.invoke(IPC.album, id),
+    artist: (id) => ipcRenderer.invoke(IPC.artist, id),
+    home: () => ipcRenderer.invoke(IPC.home),
+    radio: (track) => ipcRenderer.invoke(IPC.radio, track),
+    prefetch: (trackId) => ipcRenderer.invoke(IPC.prefetch, trackId),
+    loudness: (trackId) => ipcRenderer.invoke(IPC.loudness, trackId),
+  },
+  library: {
+    get: () => ipcRenderer.invoke(IPC.libraryGet),
+    onChange: (listener) => subscribe<LibrarySnapshot>(IPC.libraryChanged, listener),
+    setLiked: (track, liked) => ipcRenderer.invoke(IPC.setLiked, track, liked),
+    createPlaylist: (name, tracks) => ipcRenderer.invoke(IPC.createPlaylist, name, tracks),
+    renamePlaylist: (id, name) => ipcRenderer.invoke(IPC.renamePlaylist, id, name),
+    deletePlaylist: (id) => ipcRenderer.invoke(IPC.deletePlaylist, id),
+    addToPlaylist: (id, tracks) => ipcRenderer.invoke(IPC.addToPlaylist, id, tracks),
+    removeFromPlaylist: (id, itemId) => ipcRenderer.invoke(IPC.removeFromPlaylist, id, itemId),
+    reorderPlaylist: (id, itemIds) => ipcRenderer.invoke(IPC.reorderPlaylist, id, itemIds),
+    recordPlay: (track, playedMs) => ipcRenderer.invoke(IPC.recordPlay, track, playedMs),
+    clearHistory: () => ipcRenderer.invoke(IPC.clearHistory),
+  },
+  imports: {
+    fromLink: (url) => ipcRenderer.invoke(IPC.importFromLink, url),
+    pickFile: () => ipcRenderer.invoke(IPC.importPickFile),
+    // dropped files only reveal their path through this helper
+    pathForFile: (file) => webUtils.getPathForFile(file),
+    analyzeExport: (path) => ipcRenderer.invoke(IPC.importAnalyze, path),
+    applyExport: (token, choices) => ipcRenderer.invoke(IPC.importApply, token, choices),
+    list: () => ipcRenderer.invoke(IPC.importList),
+    get: (id) => ipcRenderer.invoke(IPC.importGet, id),
+    onChange: (listener) => subscribe<ImportJob[]>(IPC.importsChanged, listener),
+    choose: (jobId, index, track) => ipcRenderer.invoke(IPC.importChoose, jobId, index, track),
+    acceptSuggestions: (jobId) => ipcRenderer.invoke(IPC.importAcceptSuggestions, jobId),
+    finish: (jobId) => ipcRenderer.invoke(IPC.importFinish, jobId),
+    remove: (jobId) => ipcRenderer.invoke(IPC.importRemove, jobId),
+    matchOne: (source) => ipcRenderer.invoke(IPC.importMatchOne, source),
+  },
+  history: {
+    insights: () => ipcRenderer.invoke(IPC.historyInsights),
+    playlistFromTopSongs: (limit) => ipcRenderer.invoke(IPC.historyTopPlaylist, limit),
+    removeImported: (origin) => ipcRenderer.invoke(IPC.historyRemoveImported, origin),
+  },
+  local: {
+    state: () => ipcRenderer.invoke(IPC.localState),
+    onState: (listener) => subscribe<LocalScanState>(IPC.localStateChanged, listener),
+    tracks: () => ipcRenderer.invoke(IPC.localTracks),
+    addFolder: () => ipcRenderer.invoke(IPC.localAddFolder),
+    removeFolder: (path) => ipcRenderer.invoke(IPC.localRemoveFolder, path),
+    rescan: () => ipcRenderer.invoke(IPC.localRescan),
+    showInFolder: (trackId) => ipcRenderer.invoke(IPC.localShowInFolder, trackId),
+  },
+  lyrics: {
+    get: (track) => ipcRenderer.invoke(IPC.lyricsGet, track),
+  },
+  nowPlaying: {
+    publish: (state) => ipcRenderer.send(IPC.nowPlayingPublish, state),
+    onUpdate: (listener) => subscribe<NowPlaying>(IPC.nowPlayingUpdate, listener),
+    command: (command) => ipcRenderer.send(IPC.playerCommand, command),
+    onCommand: (listener) => subscribe<PlayerCommand>(IPC.playerCommandForward, listener),
+  },
+  mini: {
+    open: () => ipcRenderer.invoke(IPC.miniOpen),
+    close: () => ipcRenderer.invoke(IPC.miniClose),
+    expand: () => ipcRenderer.invoke(IPC.miniExpand),
+    configure: (config) => ipcRenderer.invoke(IPC.miniConfigure, config),
+    onVisible: (listener) => subscribe<boolean>(IPC.miniVisible, listener),
+  },
+  discord: {
+    configure: (config) => ipcRenderer.invoke(IPC.discordConfigure, config),
+    status: () => ipcRenderer.invoke(IPC.discordStatus),
+    onStatus: (listener) => subscribe<DiscordStatus>(IPC.discordStatusChanged, listener),
+  },
+  feed: {
+    get: () => ipcRenderer.invoke(IPC.feedGet),
+    refresh: () => ipcRenderer.invoke(IPC.feedRefresh),
+    onChange: (listener) => subscribe<HomeFeed>(IPC.feedChanged, listener),
+    status: () => ipcRenderer.invoke(IPC.feedStatus),
+    onStatus: (listener) => subscribe<FeedStatus>(IPC.feedStatusChanged, listener),
+    isFollowing: (artistId) => ipcRenderer.invoke(IPC.feedIsFollowing, artistId),
+    follow: (artist, on) => ipcRenderer.invoke(IPC.feedFollow, artist, on),
+    onOpenAlbum: (listener) => subscribe<string>(IPC.feedOpenAlbum, listener),
+    setNotifications: (on) => ipcRenderer.invoke(IPC.feedSetNotifications, on),
+  },
+  scrobble: {
+    status: () => ipcRenderer.invoke(IPC.scrobbleStatus),
+    onStatus: (listener) => subscribe<ScrobbleStatus>(IPC.scrobbleStatusChanged, listener),
+    played: (track, startedAt, listenedMs) => ipcRenderer.send(IPC.scrobblePlayed, track, startedAt, listenedMs),
+    connectListenBrainz: (token) => ipcRenderer.invoke(IPC.scrobbleConnectListenBrainz, token),
+    connectLastfm: (apiKey, secret) => ipcRenderer.invoke(IPC.scrobbleConnectLastfm, apiKey, secret),
+    disconnect: (service) => ipcRenderer.invoke(IPC.scrobbleDisconnect, service),
+  },
+  app: {
+    openDataFolder: () => ipcRenderer.invoke(IPC.appOpenDataFolder),
+    toggleFullScreen: () => ipcRenderer.invoke(IPC.appToggleFullScreen),
+  },
+  updates: {
+    status: () => ipcRenderer.invoke(IPC.updateStatus),
+    onStatus: (listener) => subscribe<UpdateStatus>(IPC.updateStatusChanged, listener),
+    check: () => ipcRenderer.invoke(IPC.updateCheck),
+    install: () => ipcRenderer.invoke(IPC.updateInstall),
+  },
+  window: {
+    getState: () => ipcRenderer.invoke(IPC.windowGetState),
+    onState: (listener) => subscribe<WindowState>(IPC.windowState, listener),
+  },
+};
+
+contextBridge.exposeInMainWorld("encore", api);
