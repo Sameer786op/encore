@@ -1,10 +1,11 @@
 import { AnimatePresence, Reorder, motion } from "motion/react";
-import { GripVertical, LoaderCircle, X } from "lucide-react";
+import { GripVertical, ListPlus, LoaderCircle, X } from "lucide-react";
 import { usePlayer } from "@/player/store";
 import { currentItem, upcomingItems, type QueueItem } from "@/player/queue";
 import { cn } from "@/lib/cn";
 import { artistNames } from "@/lib/format";
 import { openMenu } from "@/ui/menu";
+import { openModal } from "@/ui/modal";
 import { Artwork } from "./Artwork";
 import { Toggle } from "./common";
 import { LiquidGlass } from "./LiquidGlass";
@@ -49,6 +50,11 @@ export function QueuePanel() {
   const current = currentItem(queue);
   const upcoming = upcomingItems(queue);
   const shown = upcoming.slice(0, SHOWN_UPCOMING);
+  const saveAsPlaylist = () => {
+    if (!current) return;
+    const day = new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    openModal({ kind: "create-playlist", name: `My queue, ${day}`, tracks: [current, ...upcoming].map((i) => i.track) });
+  };
 
   return (
     <AnimatePresence>
@@ -60,12 +66,23 @@ export function QueuePanel() {
           transition={{ type: "spring", stiffness: 340, damping: 34, mass: 0.9 }}
           className="absolute bottom-2 right-2 top-[52px] z-30 w-[352px]"
         >
-          <LiquidGlass as="aside" radius={22} sheen className="flex h-full flex-col">
+          <LiquidGlass as="aside" area="player" radius={22} sheen className="flex h-full flex-col">
             <div className="flex items-center justify-between pb-2 pl-5 pr-3 pt-3.5">
               <h2 className="font-display text-[17px] font-bold tracking-[-0.02em]">Playing Next</h2>
-              <button onClick={() => setQueueOpen(false)} aria-label="Close queue" className="pressable grid size-7 place-items-center rounded-full bg-white/[0.08] text-ink-2 hover:bg-white/[0.14] hover:text-ink">
-                <X className="size-3.5" strokeWidth={2.6} />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={saveAsPlaylist}
+                  disabled={!current}
+                  aria-label="Save the queue as a playlist"
+                  title="Save as playlist"
+                  className="pressable grid size-7 place-items-center rounded-full bg-white/[0.08] text-ink-2 hover:bg-white/[0.14] hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <ListPlus className="size-3.5" strokeWidth={2.4} />
+                </button>
+                <button onClick={() => setQueueOpen(false)} aria-label="Close queue" className="pressable grid size-7 place-items-center rounded-full bg-white/[0.08] text-ink-2 hover:bg-white/[0.14] hover:text-ink">
+                  <X className="size-3.5" strokeWidth={2.6} />
+                </button>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%_-_14px),transparent)]">

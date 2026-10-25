@@ -4,6 +4,8 @@ import { Clock3, Ellipsis, GripVertical, Play } from "lucide-react";
 import type { Track } from "@shared/types";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
+import { useSettings } from "@/settings/store";
+import { toast } from "@/ui/toast";
 import { currentItem, type PlayContext } from "@/player/queue";
 import { cn } from "@/lib/cn";
 import { formatTime } from "@/lib/format";
@@ -23,6 +25,8 @@ interface TrackListProps {
   /** album pages show track numbers instead of covers */
   numbered?: boolean;
   showAlbum?: boolean;
+  /** album pages: songs by exactly these artists don't repeat them under the title */
+  albumArtists?: Track["artists"];
   /** an extra column, e.g. "Date added" */
   extra?: { title: string; render: (track: Track, index: number) => ReactNode };
   menuExtras?: (track: Track, index: number) => MenuEntry[];
@@ -43,20 +47,23 @@ interface RowProps {
   isPlaying: boolean;
   numbered?: boolean;
   showAlbum?: boolean;
+  hideArtists?: boolean;
   extra?: TrackListProps["extra"];
   draggable?: boolean;
   onPlay: (index: number) => void;
+  /** double-click or Enter: play, or add to the queue, as set in Settings */
+  onActivate: (index: number) => void;
   onMenu: (event: React.MouseEvent, track: Track, index: number) => void;
 }
 
-const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, numbered, showAlbum, extra, draggable, onPlay, onMenu }: RowProps) {
+const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, numbered, showAlbum, hideArtists, extra, draggable, onPlay, onActivate, onMenu }: RowProps) {
   return (
     <div
       role="row"
       tabIndex={0}
-      onDoubleClick={() => onPlay(index)}
+      onDoubleClick={() => onActivate(index)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onPlay(index);
+        if (e.key === "Enter") onActivate(index);
       }}
       onContextMenu={(e) => onMenu(e, track, index)}
       className={cn(
@@ -87,7 +94,7 @@ const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, nu
             <span className="truncate">{track.title}</span>
             {track.explicit && <span className="shrink-0 rounded-[3px] bg-white/15 px-1 text-[9px] font-bold leading-[14px] text-ink-2">E</span>}
           </div>
-          <ArtistLinks artists={track.artists} className="block text-[12.5px] leading-snug text-ink-2" />
+          {!hideArtists && <ArtistLinks artists={track.artists} className="block text-[12.5px] leading-snug text-ink-2" />}
         </div>
       </div>
 
@@ -122,7 +129,15 @@ const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, nu
   );
 });
 
-export function TrackList({ tracks, context, keys, numbered, showAlbum = true, extra, menuExtras, onReorder }: TrackListProps) {
+function artistKey(artists: Track["artists"]): string {
+  return artists
+    .map((a) => a.name.trim().toLowerCase())
+    .sort()
+    .join("|");
+}
+
+export function TrackList({ tracks, context, keys, numbered, showAlbum = true, albumArtists, extra, menuExtras, onReorder }: TrackListProps) {
+  const albumKey = albumArtists?.length ? artistKey(albumArtists) : null;
   const now = useNowPlaying();
   const playTracks = usePlayer((s) => s.playTracks);
   const rowKeys = keys ?? tracks.map((t, i) => `${t.id}#${i}`);
@@ -150,6 +165,14 @@ export function TrackList({ tracks, context, keys, numbered, showAlbum = true, e
     // play the list in its on-screen order
     const list = order.map((k) => byKey.get(k)).filter((t): t is Track => !!t);
     playTracks(list, index, context);
+  };
+  const doubleClick = useSettings((s) => s.doubleClick);
+  const onActivate = (index: number) => {
+    if (doubleClick === "play") return onPlay(index);
+    const track = byKey.get(order[index]);
+    if (!track) return;
+    usePlayer.getState().addToQueue([track]);
+    toast(`Added "${track.title}" to the queue`);
   };
   const onMenu = (event: React.MouseEvent, track: Track, index: number) => openMenu(event, trackMenu(track, menuExtras?.(track, index)));
 
@@ -182,9 +205,11 @@ export function TrackList({ tracks, context, keys, numbered, showAlbum = true, e
         isPlaying={isCurrent && now.playing}
         numbered={numbered}
         showAlbum={showAlbum}
+        hideArtists={albumKey !== null && artistKey(track.artists) === albumKey}
         extra={extra}
         draggable={!!onReorder}
         onPlay={onPlay}
+        onActivate={onActivate}
         onMenu={onMenu}
       />
     );

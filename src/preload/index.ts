@@ -14,6 +14,7 @@ import type {
   WindowState,
 } from "@shared/types";
 import { IPC } from "@shared/ipc";
+import type { GlobalCommand } from "@shared/shortcuts";
 
 function subscribe<T>(channel: string, listener: (value: T) => void): () => void {
   const wrapped = (_event: IpcRendererEvent, value: T) => listener(value);
@@ -44,6 +45,7 @@ const api: EncoreApi = {
     reorderPlaylist: (id, itemIds) => ipcRenderer.invoke(IPC.reorderPlaylist, id, itemIds),
     recordPlay: (track, playedMs) => ipcRenderer.invoke(IPC.recordPlay, track, playedMs),
     clearHistory: () => ipcRenderer.invoke(IPC.clearHistory),
+    setAlbumSaved: (album, saved) => ipcRenderer.invoke(IPC.setAlbumSaved, album, saved),
   },
   imports: {
     fromLink: (url) => ipcRenderer.invoke(IPC.importFromLink, url),
@@ -81,6 +83,7 @@ const api: EncoreApi = {
   nowPlaying: {
     publish: (state) => ipcRenderer.send(IPC.nowPlayingPublish, state),
     onUpdate: (listener) => subscribe<NowPlaying>(IPC.nowPlayingUpdate, listener),
+    get: () => ipcRenderer.invoke(IPC.nowPlayingGet),
     command: (command) => ipcRenderer.send(IPC.playerCommand, command),
     onCommand: (listener) => subscribe<PlayerCommand>(IPC.playerCommandForward, listener),
   },
@@ -118,6 +121,14 @@ const api: EncoreApi = {
   app: {
     openDataFolder: () => ipcRenderer.invoke(IPC.appOpenDataFolder),
     toggleFullScreen: () => ipcRenderer.invoke(IPC.appToggleFullScreen),
+    configure: (config) => ipcRenderer.invoke(IPC.appConfigure, config),
+    setTheme: (theme) => ipcRenderer.invoke(IPC.appSetTheme, theme),
+    setIcon: (png) => ipcRenderer.invoke(IPC.appSetIcon, png),
+    pickWallpaper: () => ipcRenderer.invoke(IPC.appPickWallpaper),
+    clearWallpaper: () => ipcRenderer.invoke(IPC.appClearWallpaper),
+    setGlobalKeys: (config) => ipcRenderer.invoke(IPC.appSetGlobalKeys, config),
+    pauseGlobalKeys: (paused) => ipcRenderer.invoke(IPC.appPauseGlobalKeys, paused),
+    onGlobalCommand: (listener) => subscribe<GlobalCommand>(IPC.appGlobalCommand, listener),
   },
   updates: {
     status: () => ipcRenderer.invoke(IPC.updateStatus),

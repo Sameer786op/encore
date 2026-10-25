@@ -7,6 +7,7 @@ import { useCurrentTrack, usePlayer } from "@/player/store";
 import { LyricsView } from "@/lyrics/LyricsView";
 import { FlowBackground } from "@/visuals/FlowBackground";
 import { usePalette } from "@/visuals/usePalette";
+import { useHints } from "@/ui/shortcuts";
 import { useView } from "@/ui/view";
 import { cn } from "@/lib/cn";
 import { formatTime } from "@/lib/format";
@@ -129,6 +130,7 @@ function Fullscreen() {
   const showLyrics = useView((s) => s.lyrics);
   const { closeFullscreen, setLyrics } = useView.getState();
   const palette = usePalette(track?.artwork);
+  const hint = useHints();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -146,7 +148,7 @@ function Fullscreen() {
       animate={{ y: 0, borderRadius: 0 }}
       exit={{ y: "100%", borderRadius: 40, transition: { type: "spring", stiffness: 300, damping: 36 } }}
       transition={{ type: "spring", stiffness: 240, damping: 32, mass: 0.9 }}
-      className="fixed inset-0 z-30 overflow-hidden bg-black text-white"
+      className="theme-dark fixed inset-0 z-30 overflow-hidden bg-black text-white"
     >
       <FlowBackground colors={palette} className="absolute inset-0" />
       {track?.artwork && <img src={track.artwork} alt="" referrerPolicy="no-referrer" className="absolute inset-0 size-full scale-125 object-cover opacity-[0.18] mix-blend-soft-light blur-3xl" />}
@@ -169,7 +171,7 @@ function Fullscreen() {
           >
             <MicVocal className="size-4" />
           </button>
-          <button onClick={() => void window.encore.app.toggleFullScreen()} title="Full screen (F11)" className="pressable grid size-8 place-items-center rounded-full text-white/80 hover:bg-white/10 hover:text-white">
+          <button onClick={() => void window.encore.app.toggleFullScreen()} title={hint("fullScreen", "Full screen")} className="pressable grid size-8 place-items-center rounded-full text-white/80 hover:bg-white/10 hover:text-white">
             <Expand className="size-4" />
           </button>
         </div>

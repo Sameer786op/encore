@@ -154,6 +154,14 @@ const MIGRATIONS: Record<number, string> = {
       fetched_at TEXT NOT NULL
     );
   `,
+  5: `
+    -- albums saved to Your Library (followed artists live in followed_artists)
+    CREATE TABLE saved_albums (
+      album_id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+  `,
 };
 
 export const SCHEMA_VERSION = Math.max(...Object.keys(MIGRATIONS).map(Number));

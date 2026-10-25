@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell, type IpcMainInvokeEvent } from "electron";
 import type {
+  AlbumSummary,
   ArtistSummary,
   DiscordConfig,
   ExportChoices,
@@ -14,9 +15,15 @@ import type {
   Track,
   WindowState,
 } from "@shared/types";
+import { MINI_CORNERS, type MiniConfig, type MiniCorner } from "@shared/types";
 import { IPC } from "@shared/ipc";
 import { shouldScrobble } from "@shared/scrobbleRules";
+import { Appearance, WALLPAPER_TYPES } from "./appearance";
+import { GlobalKeys } from "./globalKeys";
+import { Thumbar } from "./thumbar";
 import { openDatabase } from "./db";
+import { getSetting, setSetting } from "./settings";
+import { BackgroundTray } from "./tray";
 import { DiscordRpc } from "./discord/rpc";
 import { buildActivity, presenceKey } from "./discord/presence";
 import { FeedService } from "./feed/service";
@@ -61,9 +68,20 @@ let mini: MiniPlayer;
 let feed: FeedService;
 let scrobbler: Scrobbler;
 let updates: Updater;
+let appearance: Appearance;
 const discord = new DiscordRpc();
 let discordShowWhenPaused = false;
 let nowPlaying: NowPlaying | null = null;
+let thumbar: Thumbar | null = null;
+// closing the window while music plays hides it to the tray instead of quitting
+let backgroundPlay = true;
+let quitting = false;
+const tray = new BackgroundTray({
+  icon,
+  show: () => showMainWindow(),
+  command: (command) => mainWindow?.webContents.send(IPC.playerCommandForward, command),
+  quit: () => app.quit(),
+});
 let lastPresence = "";
 let nowPlayingSentFor = "";
 
@@ -87,9 +105,17 @@ function updatePresence(force = false): void {
   discord.setActivity(buildActivity(nowPlaying, { showWhenPaused: discordShowWhenPaused }));
 }
 
+// mini and show are handled here; the rest are player actions for the main window
+const globalKeys = new GlobalKeys((command) => {
+  if (command === "show") return showMainWindow();
+  if (command === "mini") return mini.visible ? mini.close() : mini.open();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.appGlobalCommand, command);
+});
+
 /** bring the main window to the front, for notification clicks and second launches */
 function showMainWindow(): void {
   if (!mainWindow) return;
+  tray.hide();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
@@ -105,7 +131,7 @@ function notifyReleases(releases: ReleaseItem[]): void {
       releases.length === 1
         ? `${first.album.title}${first.album.kind ? ` \u00b7 ${first.album.kind}` : ""}`
         : `From ${artists.slice(0, 3).join(", ")}${artists.length > 3 ? " and more" : ""}`,
-    icon,
+    icon: appearance.iconPath,
     silent: false,
   });
   notification.on("click", () => {
@@ -119,16 +145,16 @@ function notifyReleases(releases: ReleaseItem[]): void {
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     title: "Encore",
-    icon,
+    icon: appearance.iconPath,
     width: 1320,
     height: 840,
     minWidth: 960,
     minHeight: 620,
     show: false,
-    backgroundColor: "#07070a",
+    backgroundColor: appearance.backgroundColor,
     titleBarStyle: "hidden",
     // native Windows caption buttons (with snap layouts) drawn over our UI
-    titleBarOverlay: { color: "#00000000", symbolColor: "#d4d4d8", height: 48 },
+    titleBarOverlay: appearance.titleBarOverlay,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
       sandbox: true,
@@ -142,6 +168,23 @@ function createWindow(): BrowserWindow {
   });
 
   win.once("ready-to-show", () => win.show());
+
+  win.on("close", (event) => {
+    if (quitting || !backgroundPlay || !nowPlaying?.playing) return;
+    event.preventDefault();
+    win.hide();
+    tray.show();
+    tray.update(nowPlaying);
+    // say where it went, the first time only
+    if (getSetting(db, "background.explained") !== "yes" && Notification.isSupported()) {
+      setSetting(db, "background.explained", "yes");
+      new Notification({
+        title: "Encore is still playing",
+        body: "It's in the system tray by the clock. Click it to come back, or right-click it to quit. You can turn this off in Settings.",
+        icon: appearance.iconPath,
+      }).show();
+    }
+  });
 
   const sendState = () => {
     if (!win.isDestroyed()) win.webContents.send(IPC.windowState, windowState(win));
@@ -180,6 +223,8 @@ function registerPlayerSync(): void {
   ipcMain.on(IPC.nowPlayingPublish, (event, state: NowPlaying) => {
     if (!mainWindow || event.sender !== mainWindow.webContents || !state || typeof state !== "object") return;
     nowPlaying = state;
+    tray.update(state);
+    thumbar?.update(state);
     mini.hasTrack = !!state.track;
     mini.send(IPC.nowPlayingUpdate, state);
     updatePresence();
@@ -244,6 +289,19 @@ function artistArg(value: unknown): ArtistSummary {
   return { id: a.id, name: a.name.slice(0, 200), artwork: typeof a.artwork === "string" ? a.artwork : undefined };
 }
 
+function albumArg(value: unknown): AlbumSummary {
+  const a = value as AlbumSummary;
+  if (!a || typeof a.id !== "string" || !/^[\w:.-]{1,128}$/.test(a.id) || typeof a.title !== "string") throw new Error("Expected an album");
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+  const artists = Array.isArray(a.artists)
+    ? a.artists
+        .filter((x) => x && typeof x.name === "string")
+        .slice(0, 20)
+        .map((x) => ({ name: x.name.slice(0, 200), ...(typeof x.id === "string" ? { id: x.id.slice(0, 64) } : {}) }))
+    : [];
+  return { id: a.id, title: a.title.slice(0, 300), artists, year: text(a.year, 10), kind: text(a.kind, 40), artwork: text(a.artwork, 2000) };
+}
+
 const SCROBBLE_SERVICES: ScrobbleService[] = ["lastfm", "listenbrainz"];
 
 function registerIpc(): void {
@@ -290,6 +348,7 @@ function registerIpc(): void {
     library.recordPlay(track, playedMs);
   });
   handle(IPC.clearHistory, () => library.clearHistory());
+  handle(IPC.setAlbumSaved, (album: unknown, saved: unknown) => library.setAlbumSaved(albumArg(album), saved === true));
 
   handle(IPC.importFromLink, (url: unknown) => importService.fromLink(stringArg(url, "link").slice(0, 2000)));
   handle(IPC.importPickFile, async () => {
@@ -367,6 +426,7 @@ function registerIpc(): void {
     return lyrics.get(track);
   });
 
+  handle(IPC.nowPlayingGet, () => nowPlaying, { fromMini: true });
   handle(IPC.miniOpen, () => mini.open());
   handle(IPC.miniClose, () => mini.close(), { fromMini: true });
   handle(
@@ -381,7 +441,12 @@ function registerIpc(): void {
     { fromMini: true },
   );
   handle(IPC.miniConfigure, (config: unknown) => {
-    mini.showOnMinimize = (config as { showOnMinimize?: unknown })?.showOnMinimize === true;
+    const c = config as Partial<MiniConfig> | null;
+    mini.configure({
+      showOnMinimize: c?.showOnMinimize === true,
+      alwaysOnTop: c?.alwaysOnTop !== false,
+      corner: MINI_CORNERS.includes(c?.corner as MiniCorner) ? (c!.corner as MiniCorner) : "remember",
+    });
   });
 
   handle(IPC.discordConfigure, (config: unknown) => {
@@ -397,7 +462,11 @@ function registerIpc(): void {
   handle(IPC.feedRefresh, () => feed.refresh());
   handle(IPC.feedStatus, () => feed.getStatus());
   handle(IPC.feedIsFollowing, (artistId: unknown) => feed.isFollowing(stringArg(artistId, "artist id")));
-  handle(IPC.feedFollow, (value: unknown, on: unknown) => feed.follow(artistArg(value), on === true));
+  handle(IPC.feedFollow, (value: unknown, on: unknown) => {
+    feed.follow(artistArg(value), on === true);
+    // followed artists are listed in Your Library
+    library.refresh();
+  });
   handle(IPC.feedSetNotifications, (on: unknown) => feed.setNotifications(on === true));
 
   handle(IPC.scrobbleStatus, () => scrobbler.status());
@@ -411,6 +480,15 @@ function registerIpc(): void {
   });
 
   handle(IPC.appOpenDataFolder, () => void shell.openPath(app.getPath("userData")));
+  handle(IPC.appConfigure, (config: unknown) => {
+    backgroundPlay = (config as { backgroundPlay?: unknown })?.backgroundPlay !== false;
+  });
+  handle(IPC.appSetTheme, (theme: unknown) => appearance.setTheme(theme));
+  handle(IPC.appSetIcon, (png: unknown) => appearance.setIcon(png));
+  handle(IPC.appPickWallpaper, () => (mainWindow ? appearance.pickWallpaper(mainWindow) : null));
+  handle(IPC.appClearWallpaper, () => appearance.clearWallpaper());
+  handle(IPC.appSetGlobalKeys, (config: unknown) => globalKeys.configure(config));
+  handle(IPC.appPauseGlobalKeys, (paused: unknown) => globalKeys.pause(paused === true));
   handle(IPC.appToggleFullScreen, () => {
     if (!mainWindow) return false;
     mainWindow.setFullScreen(!mainWindow.isFullScreen());
@@ -425,12 +503,33 @@ function registerIpc(): void {
 }
 
 app.on("second-instance", () => showMainWindow());
+app.on("before-quit", () => {
+  quitting = true;
+  tray.hide();
+});
+app.on("will-quit", () => globalKeys.dispose());
 
 app.whenReady().then(() => {
   app.setAppUserModelId("app.encore.player");
   const userData = app.getPath("userData");
   configureYouTube({ cacheDir: join(userData, "youtube-cache") });
   db = openDatabase(join(userData, "library.db"));
+  appearance = new Appearance({
+    db,
+    userData,
+    stockIcon: icon,
+    onIcon: (image, path) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setIcon(image);
+      mini?.setIcon(image);
+      tray.setIcon(path);
+    },
+    onTheme: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.setTitleBarOverlay(appearance.titleBarOverlay);
+      mainWindow.setBackgroundColor(appearance.backgroundColor);
+    },
+  });
+  tray.setIcon(appearance.iconPath);
   library = new Library(db);
   matcher = new Matcher(db, { searchSongs, trackById });
   imports = new ImportManager(db, library, matcher);
@@ -444,7 +543,7 @@ app.whenReady().then(() => {
   updates = new Updater(app.isPackaged && (!process.env.ENCORE_USER_DATA || process.env.ENCORE_UPDATES === "1"));
   mini = new MiniPlayer({
     preload: join(import.meta.dirname, "../preload/index.cjs"),
-    icon,
+    icon: appearance.iconPath,
     stateFile: join(userData, "mini-player.json"),
     load: (win) => loadRenderer(win, "mini"),
     onVisible: (visible) => send(IPC.miniVisible, visible),
@@ -463,13 +562,20 @@ app.whenReady().then(() => {
   scrobbler.onStatus((status) => send(IPC.scrobbleStatusChanged, status));
   updates.onStatus((status) => send(IPC.updateStatusChanged, status));
 
-  handleMediaProtocol({ localPath: (id) => local.pathOf(id), artworkDir: join(userData, "artwork") });
+  handleMediaProtocol({
+    localPath: (id) => local.pathOf(id),
+    artworkDir: join(userData, "artwork"),
+    wallpaperDir: appearance.wallpaperDir,
+    wallpaperTypes: WALLPAPER_TYPES,
+  });
   registerIpc();
   registerPlayerSync();
   mainWindow = createWindow();
+  thumbar = new Thumbar(mainWindow, (command) => mainWindow?.webContents.send(IPC.playerCommandForward, command));
   mini.follow(mainWindow);
   mainWindow.on("closed", () => {
     mainWindow = null;
+    thumbar = null;
     // the mini player can't play anything on its own
     mini.destroy();
   });

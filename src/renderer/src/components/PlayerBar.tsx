@@ -1,20 +1,23 @@
-import type { ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AudioLines, ListMusic, LoaderCircle, MicVocal, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume, Volume1, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Gauge, ListMusic, LoaderCircle, MicVocal, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume, Volume1, Volume2, VolumeX } from "lucide-react";
 import { useView } from "@/ui/view";
 import { navigate } from "@/nav/store";
 import { useCurrentTrack, usePlayer } from "@/player/store";
+import { useSettings } from "@/settings/store";
 import { cn } from "@/lib/cn";
 import { formatTime } from "@/lib/format";
 import { openMenu } from "@/ui/menu";
+import { useHints } from "@/ui/shortcuts";
 import { Artwork } from "./Artwork";
 import { ArtistLinks, LikeButton, SPRING } from "./common";
 import { LiquidGlass } from "./LiquidGlass";
 import { Slider } from "./Slider";
+import { formatSpeed, isNormalSound, SoundPanel } from "./SoundPanel";
 import { trackMenu } from "./trackMenu";
 
 /** a borderless glyph button; a soft round highlight appears under it on hover */
-function Glyph({ children, className, active, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; children: ReactNode }) {
+function Glyph({ children, className, active, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; children: ReactNode; ref?: React.Ref<HTMLButtonElement> }) {
   return (
     <motion.button
       whileTap={{ scale: 0.86 }}
@@ -40,16 +43,17 @@ function Transport() {
   const playing = status === "playing";
   const loading = status === "loading";
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
+  const hint = useHints();
 
   return (
     <div className="flex items-center gap-0.5">
-      <Glyph onClick={toggleShuffle} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title="Shuffle (Ctrl+S)" className="size-8">
+      <Glyph onClick={toggleShuffle} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title={hint("shuffle", "Shuffle")} className="size-8">
         <Shuffle className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
-      <Glyph onClick={previous} disabled={!hasTrack} aria-label="Previous" title="Previous (Ctrl+Left)">
+      <Glyph onClick={previous} disabled={!hasTrack} aria-label="Previous" title={hint("previous", "Previous")}>
         <SkipBack className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
-      <Glyph onClick={togglePlay} disabled={!hasTrack} aria-label={playing || loading ? "Pause" : "Play"} title="Play/Pause (Space)" className="size-11">
+      <Glyph onClick={togglePlay} disabled={!hasTrack} aria-label={playing || loading ? "Pause" : "Play"} title={hint("playPause", "Play/Pause")} className="size-11">
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
             key={loading ? "loading" : playing ? "pause" : "play"}
@@ -69,10 +73,10 @@ function Transport() {
           </motion.span>
         </AnimatePresence>
       </Glyph>
-      <Glyph onClick={next} disabled={!hasTrack} aria-label="Next" title="Next (Ctrl+Right)">
+      <Glyph onClick={next} disabled={!hasTrack} aria-label="Next" title={hint("next", "Next")}>
         <SkipForward className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
-      <Glyph onClick={cycleRepeat} active={repeat !== "off"} aria-label={`Repeat: ${repeat}`} title="Repeat (Ctrl+R)" className="size-8">
+      <Glyph onClick={cycleRepeat} active={repeat !== "off"} aria-label={`Repeat: ${repeat}`} title={hint("repeat", "Repeat")} className="size-8">
         <RepeatIcon className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
     </div>
@@ -81,13 +85,14 @@ function Transport() {
 
 /** the little screen in the middle: cover, song, artist and where we are in it */
 function NowPlaying() {
+  const hint = useHints();
   const track = useCurrentTrack();
   const position = usePlayer((s) => s.position);
   const duration = usePlayer((s) => s.duration);
   const seek = usePlayer((s) => s.seek);
 
   return (
-    <div className="flex h-[54px] min-w-0 flex-1 items-center rounded-[14px] bg-black/[0.22] shadow-[inset_0_0.5px_0_rgb(255_255_255/0.06),inset_0_1px_3px_rgb(0_0_0/0.25)]">
+    <div className="flex h-[54px] min-w-0 flex-1 items-center rounded-[14px] bg-[var(--well)] shadow-[inset_0_0.5px_0_rgb(255_255_255/0.06),inset_0_1px_3px_rgb(0_0_0/calc(0.25*var(--shadow-k)))]">
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.button
           key={track?.id ?? "none"}
@@ -97,7 +102,7 @@ function NowPlaying() {
           transition={{ type: "spring", stiffness: 420, damping: 32 }}
           onClick={() => track && useView.getState().openFullscreen()}
           aria-label="Open the full-screen player"
-          title="Full-screen player (F)"
+          title={hint("nowPlaying", "Full-screen player")}
           className="group/art relative block shrink-0 p-[5px]"
         >
           {track ? (
@@ -144,15 +149,42 @@ function NowPlaying() {
   );
 }
 
+/** opens speed, key lock and reverb; shows the speed while it isn't normal */
+function SoundButton() {
+  const sound = useSettings((s) => s.sound);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const changed = !isNormalSound(sound);
+  return (
+    <>
+      <Glyph
+        ref={setAnchor}
+        onClick={() => setOpen(!open)}
+        active={changed || open}
+        aria-label={`Speed and sound${changed ? `: ${formatSpeed(sound.speed)}` : ""}`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title="Speed & sound"
+        className={sound.speed !== 1 ? "w-auto px-2" : undefined}
+      >
+        {sound.speed !== 1 ? <span className="text-[11.5px] font-semibold tabular-nums">{formatSpeed(sound.speed)}</span> : <Gauge className="size-[17px]" />}
+      </Glyph>
+      <SoundPanel anchor={anchor} open={open} onClose={close} />
+    </>
+  );
+}
+
 function VolumeControl() {
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
   const { setVolume, toggleMute } = usePlayer.getState();
   const shown = muted ? 0 : volume;
   const Icon = shown === 0 ? VolumeX : shown < 0.34 ? Volume : shown < 0.67 ? Volume1 : Volume2;
+  const hint = useHints();
   return (
     <div className="flex items-center gap-1">
-      <Glyph onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} title="Mute (M)" className="size-8">
+      <Glyph onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} title={hint("mute", "Mute")} className="size-8">
         <Icon className="size-[17px]" />
       </Glyph>
       <Slider value={shown * 100} max={100} label="Volume" onChange={(v) => setVolume(v / 100)} step={5} formatValue={(v) => `${Math.round(v)}%`} className="hidden w-[88px] @min-[760px]:flex" />
@@ -167,13 +199,15 @@ export function PlayerBar({ right }: { right: number }) {
   const lyricsOpen = useView((s) => s.fullscreen && s.lyrics);
   const miniOpen = useView((s) => s.miniOpen);
   const inset = { left: "calc(var(--sidebar-w) + 8px)", right };
+  const hint = useHints();
 
   return (
     <>
       {/* the page darkens a little as it slides under the player */}
-      <div aria-hidden className="pointer-events-none absolute bottom-0 z-20 h-28 bg-gradient-to-t from-[#060609]/75 via-[#060609]/30 to-transparent" style={inset} />
+      <div aria-hidden className="pointer-events-none absolute bottom-0 z-20 h-28 bg-gradient-to-t from-[rgb(var(--backdrop-tint)/0.75)] via-[rgb(var(--backdrop-tint)/0.3)] to-transparent" style={inset} />
       <div className="pointer-events-none absolute bottom-3 z-30 flex justify-center px-3" style={inset}>
         <LiquidGlass
+          area="player"
           as="footer"
           radius={24}
           sheen
@@ -182,13 +216,14 @@ export function PlayerBar({ right }: { right: number }) {
           <Transport />
           <NowPlaying />
           <div className="flex shrink-0 items-center gap-0.5">
+            <SoundButton />
             <Glyph
               onClick={() => (lyricsOpen ? useView.getState().closeFullscreen() : useView.getState().openFullscreen(true))}
               disabled={!hasTrack}
               active={lyricsOpen}
               aria-label="Lyrics"
               aria-pressed={lyricsOpen}
-              title="Lyrics (L)"
+              title={hint("lyrics", "Lyrics")}
               className="size-8"
             >
               <MicVocal className="size-[17px]" />
@@ -198,12 +233,12 @@ export function PlayerBar({ right }: { right: number }) {
               active={miniOpen}
               aria-label="Mini player"
               aria-pressed={miniOpen}
-              title="Mini player"
+              title={hint("mini", "Mini player")}
               className="size-8"
             >
               <PictureInPicture2 className="size-[17px]" />
             </Glyph>
-            <Glyph onClick={() => setQueueOpen(!queueOpen)} active={queueOpen} aria-label="Queue" aria-pressed={queueOpen} title="Queue (Q)" className="size-8">
+            <Glyph onClick={() => setQueueOpen(!queueOpen)} active={queueOpen} aria-label="Queue" aria-pressed={queueOpen} title={hint("queue", "Queue")} className="size-8">
               <ListMusic className="size-[17px]" />
             </Glyph>
             <VolumeControl />

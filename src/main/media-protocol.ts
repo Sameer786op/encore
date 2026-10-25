@@ -127,6 +127,9 @@ export interface MediaSources {
   /** the file behind an indexed local track, or null */
   localPath(id: string): string | null;
   artworkDir: string;
+  /** where Settings → Appearance keeps the wallpaper */
+  wallpaperDir: string;
+  wallpaperTypes: Record<string, string>;
 }
 
 export function handleMediaProtocol(sources: MediaSources): void {
@@ -147,6 +150,9 @@ export function handleMediaProtocol(sources: MediaSources): void {
       }
       if (url.hostname === "art" && /^[a-f0-9]{40}\.(jpg|png|webp)$/.test(id)) {
         return await serveFile(request, join(sources.artworkDir, id), IMAGE_TYPES[extname(id)]);
+      }
+      if (url.hostname === "wallpaper" && /^[a-f0-9]{40}\.[a-z]{3,4}$/.test(id) && sources.wallpaperTypes[extname(id)]) {
+        return await serveFile(request, join(sources.wallpaperDir, id), sources.wallpaperTypes[extname(id)]);
       }
       return new Response(null, { status: 404 });
     } catch (error) {

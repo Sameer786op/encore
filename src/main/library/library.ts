@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, Track } from "@shared/types";
+import type { AlbumSummary, HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, SavedAlbum, SavedArtist, Track } from "@shared/types";
 import { transaction } from "../db";
 
-// Likes, playlists and plays. Tracks are stored once and referenced by all three.
+// Likes, playlists, plays and saved albums. Tracks are stored once and
+// referenced by the first three. Followed artists belong to the feed, which
+// watches them for new releases; they're listed here so Your Library shows them.
 
 const HISTORY_IN_SNAPSHOT = 300;
 
@@ -77,7 +79,40 @@ export class Library {
         .all(HISTORY_IN_SNAPSHOT) as unknown as (TrackRow & { played_at: string; played_ms: number })[]
     ).map((r): HistoryEntry => ({ track: JSON.parse(r.data), playedAt: r.played_at, playedMs: r.played_ms }));
 
-    return { liked, playlists, history };
+    const albums = (this.db.prepare("SELECT data, saved_at FROM saved_albums ORDER BY saved_at DESC").all() as unknown as (TrackRow & { saved_at: string })[]).map(
+      (r): SavedAlbum => ({ album: JSON.parse(r.data), savedAt: r.saved_at }),
+    );
+
+    const artists = (
+      this.db.prepare("SELECT artist_id, name, artwork, followed_at FROM followed_artists ORDER BY followed_at DESC").all() as unknown as {
+        artist_id: string;
+        name: string;
+        artwork: string | null;
+        followed_at: string;
+      }[]
+    ).map((r): SavedArtist => ({ artist: { id: r.artist_id, name: r.name, ...(r.artwork ? { artwork: r.artwork } : {}) }, savedAt: r.followed_at }));
+
+    return { liked, playlists, history, albums, artists };
+  }
+
+  setAlbumSaved(album: AlbumSummary, saved: boolean): void {
+    if (saved) {
+      // saving again refreshes the details but keeps when it was first saved
+      this.db
+        .prepare(
+          `INSERT INTO saved_albums (album_id, data, saved_at) VALUES (?, ?, ?)
+           ON CONFLICT(album_id) DO UPDATE SET data = excluded.data`,
+        )
+        .run(album.id, JSON.stringify(album), new Date().toISOString());
+    } else {
+      this.db.prepare("DELETE FROM saved_albums WHERE album_id = ?").run(album.id);
+    }
+    this.changed();
+  }
+
+  /** tell listeners about a change made elsewhere, like following an artist */
+  refresh(): void {
+    this.changed();
   }
 
   /** like many songs at once, keeping their order (the first ends up newest) */

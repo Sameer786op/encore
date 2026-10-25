@@ -112,4 +112,26 @@ describe("Library", () => {
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener.mock.calls[1][0].playlists).toHaveLength(1);
   });
+
+  it("saves albums newest first and keeps the first save date", () => {
+    const album = (id: string, title: string) => ({ id, title, artists: [{ name: "Daft Punk", id: "UCdaft" }], year: "2013" });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    library.setAlbumSaved(album("MPREb_ram", "Random Access Memories"), true);
+    vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+    library.setAlbumSaved(album("MPREb_disc", "Discovery"), true);
+    library.setAlbumSaved(album("MPREb_ram", "Random Access Memories (Deluxe)"), true);
+    vi.useRealTimers();
+
+    const albums = library.snapshot().albums;
+    expect(albums.map((a) => a.album.title)).toEqual(["Discovery", "Random Access Memories (Deluxe)"]);
+    expect(albums[1].savedAt).toBe("2026-01-01T00:00:00.000Z");
+    library.setAlbumSaved(album("MPREb_disc", "Discovery"), false);
+    expect(library.snapshot().albums).toHaveLength(1);
+  });
+
+  it("lists followed artists", () => {
+    db.prepare("INSERT INTO followed_artists (artist_id, name, artwork, followed_at) VALUES (?, ?, ?, ?)").run("UCdua", "Dua Lipa", null, "2026-01-01T00:00:00Z");
+    expect(library.snapshot().artists).toEqual([{ artist: { id: "UCdua", name: "Dua Lipa" }, savedAt: "2026-01-01T00:00:00Z" }]);
+  });
 });

@@ -4,9 +4,9 @@ import { dbToGain, fadeCurve } from "./transitions";
 
 // Two <audio> "decks" feed one Web Audio graph:
 //
-//   deck A ─ level ─ fade ─┐
-//                          ├─ preamp ─ 10 EQ bands ─ limiter ─ analyser ─ volume ─ speakers
-//   deck B ─ level ─ fade ─┘
+//   deck A ─ level ─ fade ─┐                    ┌─ dry ──────────────┐
+//                          ├─ preamp ─ 10 EQ ───┤                    ├─ limiter ─ analyser ─ volume ─ speakers
+//   deck B ─ level ─ fade ─┘                    └─ reverb ─ wet ─────┘
 //
 // One deck plays while the other gets the next song ready, so songs can
 // follow each other without a gap or cross-fade into each other.
@@ -26,6 +26,29 @@ export interface EngineEvents {
 const SWITCH_FADE_S = 0.04;
 /** until we know how loud a streamed song is, start it this much quieter */
 const UNKNOWN_LEVEL_DB = -6;
+/** how long the reverb rings on; also how long to wait before switching it off */
+const REVERB_SECONDS = 3.2;
+
+/**
+ * A made-up room for the reverb: stereo noise that dies away and gets darker
+ * as it does, the way sound fades in a big hall.
+ */
+function roomImpulse(ctx: BaseAudioContext): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * REVERB_SECONDS);
+  const predelay = Math.floor(rate * 0.025);
+  const buffer = ctx.createBuffer(2, length, rate);
+  for (let channel = 0; channel < 2; channel++) {
+    const data = buffer.getChannelData(channel);
+    let smoothed = 0;
+    for (let i = predelay; i < length; i++) {
+      const t = (i - predelay) / (length - predelay);
+      smoothed += (Math.random() * 2 - 1 - smoothed) * (0.9 - 0.75 * t);
+      data[i] = smoothed * (1 - t) ** 2.4;
+    }
+  }
+  return buffer;
+}
 
 class Deck {
   readonly audio: HTMLAudioElement;
@@ -74,6 +97,11 @@ export class AudioEngine {
   private crossfade: { from: Deck; timer: ReturnType<typeof setTimeout> } | null = null;
   private readonly levels = new Map<string, number>();
   private levelling = true;
+  private readonly eqOut: AudioNode;
+  private readonly dry: GainNode;
+  private readonly wet: GainNode;
+  private reverb: { node: ConvolverNode; connected: boolean; offTimer?: ReturnType<typeof setTimeout> } | null = null;
+  private rate = 1;
 
   constructor(private readonly events: EngineEvents) {
     const ctx = new AudioContext({ latencyHint: "playback" });
@@ -98,10 +126,15 @@ export class AudioEngine {
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.8;
     this.master = ctx.createGain();
+    this.dry = ctx.createGain();
+    this.wet = ctx.createGain();
+    this.wet.gain.value = 0;
 
     let node: AudioNode = this.preamp;
     for (const band of this.bands) node = node.connect(band);
-    node.connect(limiter).connect(this.analyser).connect(this.master).connect(ctx.destination);
+    this.eqOut = node;
+    node.connect(this.dry).connect(limiter).connect(this.analyser).connect(this.master).connect(ctx.destination);
+    this.wet.connect(limiter);
 
     this.decks = [new Deck(ctx, this.preamp), new Deck(ctx, this.preamp)];
     this.decks.forEach((deck) => this.listen(deck));
@@ -300,6 +333,51 @@ export class AudioEngine {
 
   hasTrackLevel(trackId: string): boolean {
     return this.levels.has(trackId);
+  }
+
+  /** playback speed; with keepPitch the key stays put, without it the song goes up or down like a record */
+  setSpeed(rate: number, keepPitch: boolean): void {
+    this.rate = Math.min(4, Math.max(0.25, rate || 1));
+    for (const { audio } of this.decks) {
+      audio.preservesPitch = keepPitch;
+      // a new song resets the speed to the default one, so both are set
+      audio.defaultPlaybackRate = this.rate;
+      audio.playbackRate = this.rate;
+    }
+  }
+
+  get speed(): number {
+    return this.rate;
+  }
+
+  /** 0 is dry, 1 is drenched; the reverb only runs while it's turned up */
+  setReverb(amount: number): void {
+    const mix = Math.min(1, Math.max(0, amount));
+    const now = this.ctx.currentTime;
+    if (mix > 0) {
+      if (!this.reverb) {
+        const node = this.ctx.createConvolver();
+        node.buffer = roomImpulse(this.ctx);
+        node.connect(this.wet);
+        this.reverb = { node, connected: false };
+      }
+      clearTimeout(this.reverb.offTimer);
+      if (!this.reverb.connected) {
+        this.eqOut.connect(this.reverb.node);
+        this.reverb.connected = true;
+      }
+    } else if (this.reverb?.connected) {
+      // let the tail ring out, then stop spending time on it
+      const reverb = this.reverb;
+      clearTimeout(reverb.offTimer);
+      reverb.offTimer = setTimeout(() => {
+        this.eqOut.disconnect(reverb.node);
+        reverb.connected = false;
+      }, REVERB_SECONDS * 1000);
+    }
+    // the dry signal dips a little as the room fills in, so turning it up doesn't just make it louder
+    this.wet.gain.setTargetAtTime(mix * 1.1, now, 0.05);
+    this.dry.gain.setTargetAtTime(1 - mix * 0.45, now, 0.05);
   }
 
   setEq(eq: EqSettings): void {

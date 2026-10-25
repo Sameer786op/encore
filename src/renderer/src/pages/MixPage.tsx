@@ -4,6 +4,7 @@ import { ArtistCard, CardRow } from "@/components/Cards";
 import { CollectionHeader, Dot } from "@/components/CollectionHeader";
 import { BigPlayButton, EmptyState, IconButton, SectionTitle, ShuffleButton } from "@/components/common";
 import { MixCover } from "@/components/MixCover";
+import { useTrackFinder } from "@/components/ListTools";
 import { TrackList } from "@/components/TrackList";
 import { addToPlaylistEntries, queueEntries } from "@/components/trackMenu";
 import { useFeed } from "@/feed/store";
@@ -20,6 +21,7 @@ export function MixPage({ id }: { id: string }) {
   const tracks = mix?.tracks ?? [];
   const context = { kind: "mix" as const, label: mix?.title ?? "Daily mix", id };
   const { play, shuffle, playing, loading } = usePlayCollection(tracks, context);
+  const finder = useTrackFinder(tracks, "mix", "Mix order");
 
   if (!mix) {
     if (!loaded) return null;
@@ -77,9 +79,8 @@ export function MixPage({ id }: { id: string }) {
             </>
           }
         />
-        <div className="mt-8">
-          <TrackList tracks={tracks} context={context} numbered />
-        </div>
+        {finder.toolbar}
+        <div className="mt-3">{finder.noMatches ?? <TrackList tracks={finder.tracks} context={context} numbered />}</div>
         {mix.artists.length > 0 && (
           <section className="mt-12">
             <SectionTitle>Built around</SectionTitle>

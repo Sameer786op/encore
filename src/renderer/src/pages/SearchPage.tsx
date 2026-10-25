@@ -10,6 +10,7 @@ import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
 import { useSearch } from "@/search/store";
 import { artistNames } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 function TopResult({ results }: { results: SearchResults }) {
   const top = results.top;
@@ -30,14 +31,17 @@ function TopResult({ results }: { results: SearchResults }) {
       onKeyDown={(e) => e.key === "Enter" && open()}
       whileTap={{ scale: 0.985 }}
       transition={{ type: "spring", stiffness: 500, damping: 34 }}
-      className="glass group relative flex flex-1 items-center gap-6 overflow-hidden rounded-[24px] p-6 transition-[filter] duration-300 hover:brightness-110 @5xl:min-h-[236px] @5xl:flex-col @5xl:items-start @5xl:justify-end @5xl:gap-0"
+      className="glass group relative flex flex-1 items-center gap-5 overflow-hidden rounded-[22px] p-4 pr-20 transition-[filter] duration-300 hover:brightness-110 @3xl:flex-col @3xl:items-start @3xl:justify-end @3xl:gap-0 @3xl:p-5"
     >
-      <Artwork src={art} className={top.kind === "artist" ? "size-28 rounded-full shadow-xl shadow-black/40 @5xl:mb-auto" : "size-28 rounded-[12px] shadow-xl shadow-black/40 @5xl:mb-auto"} />
-      <div className="min-w-0 @5xl:mt-5 @5xl:w-full">
-        <div className="line-clamp-2 font-display text-[30px] font-bold leading-tight tracking-[-0.03em]">{title}</div>
-        <div className="mt-1 truncate text-[14px] text-ink-2">{subtitle}</div>
+      <Artwork
+        src={art}
+        className={cn("size-20 shadow-[0_10px_28px_-8px_rgb(0_0_0/0.6)] @3xl:mb-auto @3xl:size-24", top.kind === "artist" ? "rounded-full" : "rounded-[10px]")}
+      />
+      <div className="min-w-0 @3xl:mt-4 @3xl:w-full">
+        <div className="line-clamp-2 font-display text-[24px] font-bold leading-tight tracking-[-0.03em] @3xl:text-[26px]">{title}</div>
+        <div className="mt-0.5 truncate text-[13.5px] text-ink-2">{subtitle}</div>
       </div>
-      <div className="absolute bottom-6 right-6 grid size-12 scale-75 place-items-center rounded-full bg-accent text-white opacity-0 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4),0_8px_22px_-8px_rgb(250_45_72/0.7)] transition-[opacity,scale] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-100 group-hover:opacity-100">
+      <div className="absolute bottom-1/2 right-5 grid size-11 translate-y-1/2 scale-90 place-items-center rounded-full bg-accent text-on-accent opacity-0 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4),0_8px_22px_-8px_rgb(var(--accent-rgb)/0.7)] transition-[opacity,scale] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-100 group-hover:opacity-100 @3xl:bottom-5 @3xl:translate-y-0">
         <Play className="ml-0.5 size-5" fill="currentColor" strokeWidth={0} />
       </div>
     </motion.div>
@@ -46,8 +50,8 @@ function TopResult({ results }: { results: SearchResults }) {
 
 function SearchSkeleton() {
   return (
-    <div className="mt-2 grid grid-cols-[2fr_3fr] gap-6">
-      <div className="skeleton h-[236px] rounded-[24px]" />
+    <div className="mt-2 grid grid-cols-1 gap-6 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="skeleton h-[112px] rounded-[22px] @3xl:h-[236px]" />
       <div className="flex flex-col gap-3">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
@@ -110,6 +114,26 @@ export function SearchPage() {
   const context = { kind: "search" as const, label: `"${results?.query ?? query}"` };
   const hasAnything = results && (results.tracks.length || results.albums.length || results.artists.length || results.videos.length);
 
+  // with a top result, the first four songs sit beside it and the rest come after albums;
+  // without one, all the songs lead
+  const skip = results?.top ? 4 : 0;
+  const moreSongs = results && results.tracks.length > skip && (
+    <section className="mt-9">
+      <SectionTitle
+        action={
+          results.tracks.length > skip + 10 && (
+            <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+              {showAllSongs ? "Show less" : "Show all"}
+            </button>
+          )
+        }
+      >
+        {skip ? "More songs" : "Songs"}
+      </SectionTitle>
+      <TrackList tracks={results.tracks.slice(skip, showAllSongs ? undefined : skip + 10)} context={context} />
+    </section>
+  );
+
   return (
     <div className="@container px-8 pb-16 pt-[68px]">
       {!query.trim() && <RecentSearches />}
@@ -136,7 +160,7 @@ export function SearchPage() {
       {query.trim() && results && hasAnything ? (
         <motion.div key={results.query} initial={{ opacity: 0 }} animate={{ opacity: loading ? 0.6 : 1 }} transition={{ duration: 0.2 }}>
           {results.top && (
-            <div className="grid grid-cols-1 gap-6 @5xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-8 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
               <section className="flex flex-col">
                 <SectionTitle>Top result</SectionTitle>
                 <TopResult results={results} />
@@ -148,22 +172,7 @@ export function SearchPage() {
             </div>
           )}
 
-          {results.tracks.length > (results.top ? 4 : 0) && (
-            <section className="mt-9">
-              <SectionTitle
-                action={
-                  results.tracks.length > 10 && (
-                    <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
-                      {showAllSongs ? "Show less" : "Show all"}
-                    </button>
-                  )
-                }
-              >
-                {results.top ? "More songs" : "Songs"}
-              </SectionTitle>
-              <TrackList tracks={results.tracks.slice(results.top ? 4 : 0, showAllSongs ? undefined : (results.top ? 4 : 0) + 10)} context={context} />
-            </section>
-          )}
+          {!results.top && moreSongs}
 
           {results.artists.length > 0 && (
             <section className="mt-9">
@@ -178,6 +187,8 @@ export function SearchPage() {
               <CardRow>{results.albums.map((a) => <AlbumCard key={a.id} album={a} />)}</CardRow>
             </section>
           )}
+
+          {results.top && moreSongs}
 
           {results.videos.length > 0 && (
             <section className="mt-9">

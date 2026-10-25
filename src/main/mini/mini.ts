@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { BrowserWindow, screen, type WebContents } from "electron";
+import { BrowserWindow, screen, type NativeImage, type WebContents } from "electron";
+import type { MiniConfig, MiniCorner } from "@shared/types";
 
 // The floating mini player: a small, frameless, always-on-top window that
 // shows what's playing. It holds no audio itself; it mirrors the main window
@@ -8,6 +9,8 @@ import { BrowserWindow, screen, type WebContents } from "electron";
 const WIDTH = 380;
 const HEIGHT = 120;
 const MARGIN = 24;
+
+const xy = (point: { x: number; y: number }): [number, number] => [point.x, point.y];
 
 interface MiniOptions {
   preload: string;
@@ -18,14 +21,35 @@ interface MiniOptions {
   onReady(win: BrowserWindow): void;
 }
 
+/** the top-left point that puts the mini player in a corner of the main screen */
+function cornerPosition(corner: Exclude<MiniCorner, "remember">): { x: number; y: number } {
+  const area = screen.getPrimaryDisplay().workArea;
+  return {
+    x: corner.endsWith("left") ? area.x + MARGIN : area.x + area.width - WIDTH - MARGIN,
+    y: corner.startsWith("top") ? area.y + MARGIN : area.y + area.height - HEIGHT - MARGIN,
+  };
+}
+
 export class MiniPlayer {
   private win: BrowserWindow | null = null;
   private autoShown = false;
   showOnMinimize = false;
+  private alwaysOnTop = true;
+  private corner: MiniCorner = "remember";
   /** whether a song is loaded; no point floating an empty player */
   hasTrack = false;
 
-  constructor(private readonly options: MiniOptions) {}
+  private icon: NativeImage | string;
+
+  constructor(private readonly options: MiniOptions) {
+    this.icon = options.icon;
+  }
+
+  /** the icon follows the accent colour */
+  setIcon(icon: NativeImage): void {
+    this.icon = icon;
+    if (this.win && !this.win.isDestroyed()) this.win.setIcon(icon);
+  }
 
   owns(sender: WebContents): boolean {
     return !!this.win && !this.win.isDestroyed() && this.win.webContents === sender;
@@ -54,15 +78,34 @@ export class MiniPlayer {
     }
   }
 
+  /** settings from the main window */
+  configure(config: MiniConfig): void {
+    this.showOnMinimize = config.showOnMinimize;
+    const win = this.win && !this.win.isDestroyed() ? this.win : null;
+    if (config.alwaysOnTop !== this.alwaysOnTop) {
+      this.alwaysOnTop = config.alwaysOnTop;
+      win?.setAlwaysOnTop(config.alwaysOnTop, "floating");
+    }
+    if (config.corner !== this.corner) {
+      this.corner = config.corner;
+      // picking a corner moves it there now, so you can see the choice
+      if (win && config.corner !== "remember") win.setPosition(...xy(cornerPosition(config.corner)));
+    }
+  }
+
+  private startPosition(): { x: number; y: number } {
+    if (this.corner !== "remember") return cornerPosition(this.corner);
+    return this.savedPosition() ?? cornerPosition("bottom-right");
+  }
+
   private create(): BrowserWindow {
-    const area = screen.getPrimaryDisplay().workArea;
-    const position = this.savedPosition() ?? { x: area.x + area.width - WIDTH - MARGIN, y: area.y + area.height - HEIGHT - MARGIN };
+    const position = this.startPosition();
     const win = new BrowserWindow({
       ...position,
       width: WIDTH,
       height: HEIGHT,
       title: "Encore mini player",
-      icon: this.options.icon,
+      icon: this.icon,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
@@ -72,7 +115,7 @@ export class MiniPlayer {
       minimizable: false,
       fullscreenable: false,
       skipTaskbar: true,
-      alwaysOnTop: true,
+      alwaysOnTop: this.alwaysOnTop,
       show: false,
       webPreferences: {
         preload: this.options.preload,
@@ -81,7 +124,7 @@ export class MiniPlayer {
         nodeIntegration: false,
       },
     });
-    win.setAlwaysOnTop(true, "floating");
+    if (this.alwaysOnTop) win.setAlwaysOnTop(true, "floating");
     win.on("moved", () => {
       const [x, y] = win.getPosition();
       try {
@@ -107,7 +150,11 @@ export class MiniPlayer {
     if (!this.win || this.win.isDestroyed()) {
       this.win = this.create();
       this.win.once("ready-to-show", () => this.win?.showInactive());
-    } else this.win.showInactive();
+      return;
+    }
+    // with a corner picked, it goes back there each time it opens
+    if (!this.win.isVisible() && this.corner !== "remember") this.win.setPosition(...xy(cornerPosition(this.corner)));
+    this.win.showInactive();
   }
 
   close(): void {

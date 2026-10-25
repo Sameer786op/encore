@@ -74,7 +74,7 @@ function LinkCard() {
           )}
         </AnimatePresence>
       </div>
-      {error && <p className="mt-2 text-[13px] text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
       <button
         type="submit"
         disabled={!url.trim() || busy}
@@ -154,7 +154,7 @@ function ExportCard({ onSummary }: { onSummary: (summary: ExportSummary) => void
           </div>
         )}
       </div>
-      {error && <p className="mt-3 text-[13px] text-red-300">{error}</p>}
+      {error && <p className="mt-3 text-[13px] text-bad">{error}</p>}
       <p className="pt-4 text-[12px] leading-relaxed text-ink-3">Works with Spotify, Google Takeout and Apple exports, and CSVs from Exportify, TuneMyMusic or Soundiiz.</p>
     </div>
   );
@@ -237,7 +237,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={cn("grid size-5 shrink-0 place-items-center rounded-md border transition-colors", checked ? "border-accent bg-accent text-white" : "border-white/25")}
+      className={cn("grid size-5 shrink-0 place-items-center rounded-md border transition-colors", checked ? "border-accent bg-accent text-on-accent" : "border-white/25")}
     >
       {checked && <Check className="size-3.5" strokeWidth={3} />}
     </button>
@@ -330,7 +330,7 @@ function ExportChooser({ summary, onClose }: { summary: ExportSummary; onClose: 
           ))}
           {!summary.history && summary.collections.length === 0 && <p className="p-4 text-sm text-ink-2">We couldn't find songs in this file.</p>}
           {summary.warnings.map((w, i) => (
-            <p key={i} className="flex gap-2 px-1 pt-1 text-[12px] leading-relaxed text-amber-300/90">
+            <p key={i} className="flex gap-2 px-1 pt-1 text-[12px] leading-relaxed text-warn">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" /> {w}
             </p>
           ))}
@@ -346,7 +346,7 @@ function ExportChooser({ summary, onClose }: { summary: ExportSummary; onClose: 
           <button
             onClick={apply}
             disabled={busy || (!history && chosen.size === 0)}
-            className="inline-flex items-center gap-2 pressable rounded-full bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40"
+            className="inline-flex items-center gap-2 pressable rounded-full bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-on-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40"
           >
             {busy && <LoaderCircle className="size-4 animate-spin" />}
             Import
@@ -387,7 +387,7 @@ export function JobCard({ job }: { job: ImportJob }) {
         {job.status === "matching" ? (
           <div className="mt-2 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-accent to-[#ff6b81]" animate={{ width: `${percent}%` }} transition={{ ease: "easeOut" }} />
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2" animate={{ width: `${percent}%` }} transition={{ ease: "easeOut" }} />
             </div>
             <span className="shrink-0 text-[12px] tabular-nums text-ink-3">
               {done} of {job.total}
@@ -409,7 +409,7 @@ export function JobCard({ job }: { job: ImportJob }) {
           Open
         </button>
       ) : (
-        <button onClick={() => navigate({ name: "import-job", id: job.id })} className="pressable rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-white hover:brightness-110">
+        <button onClick={() => navigate({ name: "import-job", id: job.id })} className="pressable rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent hover:brightness-110">
           {job.status === "matching" ? "View" : "Review"}
         </button>
       )}

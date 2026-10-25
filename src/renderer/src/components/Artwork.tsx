@@ -18,7 +18,8 @@ export function Artwork({ src, alt = "", className, fallback }: ArtworkProps) {
   const failed = !!src && failedSrc === src;
 
   return (
-    <div className={cn("relative shrink-0 overflow-hidden bg-surface-3", className)}>
+    // a soft shimmer while the cover is on its way, then it settles in
+    <div className={cn("relative shrink-0 overflow-hidden bg-surface-3", src && !loaded && !failed && "skeleton", className)}>
       {src && !failed ? (
         <img
           src={src}
@@ -31,7 +32,10 @@ export function Artwork({ src, alt = "", className, fallback }: ArtworkProps) {
           }}
           onLoad={() => setLoadedSrc(src)}
           onError={() => setFailedSrc(src)}
-          className={cn("size-full object-cover transition-opacity duration-500", loaded ? "opacity-100" : "opacity-0")}
+          className={cn(
+            "size-full object-cover transition-[opacity,scale] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            loaded ? "scale-100 opacity-100" : "scale-[1.04] opacity-0",
+          )}
         />
       ) : (
         <div className="grid size-full place-items-center bg-gradient-to-br from-surface-3 to-surface-2 text-ink-3">

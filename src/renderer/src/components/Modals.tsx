@@ -52,8 +52,8 @@ function Buttons({ onCancel, confirmLabel, danger, disabled }: { onCancel: () =>
         type="submit"
         disabled={disabled}
         className={cn(
-          "pressable h-10 rounded-full text-[14px] font-semibold text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40",
-          danger ? "bg-[#ff453a]" : "bg-accent",
+          "pressable h-10 rounded-full text-[14px] font-semibold shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40",
+          danger ? "bg-[#ff453a] text-snow" : "bg-accent text-on-accent",
         )}
       >
         {confirmLabel}
@@ -156,7 +156,7 @@ function ModalBody({ modal, close }: { modal: ModalState; close: () => void }) {
       return (
         <Dialog title="New playlist" onClose={close}>
           <NameForm
-            initial={`My playlist #${library.snapshot.playlists.length + 1}`}
+            initial={modal.name ?? `My playlist #${library.snapshot.playlists.length + 1}`}
             confirmLabel="Create"
             onCancel={close}
             onSubmit={async (name) => {

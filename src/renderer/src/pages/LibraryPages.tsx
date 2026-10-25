@@ -1,22 +1,146 @@
-import { useMemo } from "react";
-import { Ellipsis, Heart, History, ListMusic, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { Disc3, Ellipsis, Heart, History, ListMusic, MicVocal, Plus, Trash2 } from "lucide-react";
 import type { HistoryEntry, Track } from "@shared/types";
 import { Mosaic } from "@/components/Artwork";
 import { AmbientBackground } from "@/components/AmbientBackground";
-import { CardGrid, LikedSongsCard, PlaylistCard } from "@/components/Cards";
+import { AlbumCard, ArtistCard, CardGrid, LikedSongsCard, PlaylistCard } from "@/components/Cards";
 import { CollectionHeader, Dot } from "@/components/CollectionHeader";
-import { BigPlayButton, EmptyState, IconButton, PillButton, SectionTitle, ShuffleButton } from "@/components/common";
+import { BigPlayButton, EmptyState, IconButton, PillButton, SectionTitle, Segmented, ShuffleButton } from "@/components/common";
+import { FindField, SortButton, useListPref, useTrackFinder, type SortOption } from "@/components/ListTools";
 import { TrackList } from "@/components/TrackList";
 import { playlistMenu } from "@/components/playlistMenu";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
-import { formatTotal, plural, relativeDate } from "@/lib/format";
+import { artistNames, formatTotal, plural, relativeDate } from "@/lib/format";
+import { byText, matchesQuery } from "@/lib/search";
 import { openMenu } from "@/ui/menu";
 import { openModal } from "@/ui/modal";
 import { usePlayCollection } from "./usePlayCollection";
 
+type LibraryTab = "playlists" | "albums" | "artists";
+const TABS: { value: LibraryTab; label: string }[] = [
+  { value: "playlists", label: "Playlists" },
+  { value: "albums", label: "Albums" },
+  { value: "artists", label: "Artists" },
+];
+
+type PlaylistSort = "recent" | "added" | "name";
+const PLAYLIST_SORTS: SortOption<PlaylistSort>[] = [
+  { value: "recent", label: "Recently updated" },
+  { value: "added", label: "Recently added" },
+  { value: "name", label: "Name" },
+];
+type AlbumSort = "recent" | "title" | "artist" | "year";
+const ALBUM_SORTS: SortOption<AlbumSort>[] = [
+  { value: "recent", label: "Recently saved" },
+  { value: "title", label: "Title" },
+  { value: "artist", label: "Artist" },
+  { value: "year", label: "Release year" },
+];
+type ArtistSort = "recent" | "name";
+const ARTIST_SORTS: SortOption<ArtistSort>[] = [
+  { value: "recent", label: "Recently followed" },
+  { value: "name", label: "Name" },
+];
+const values = <T extends string>(options: SortOption<T>[]) => options.map((o) => o.value);
+
+function NoMatches({ query }: { query: string }) {
+  return <p className="py-16 text-center text-[13.5px] text-ink-3">Nothing in your library matches “{query.trim()}”.</p>;
+}
+
+function PlaylistsTab({ query, sort }: { query: string; sort: PlaylistSort }) {
+  const snapshot = useLibrary((s) => s.snapshot);
+  const playlists = useMemo(() => {
+    const found = snapshot.playlists.filter((p) => matchesQuery(query, p.name));
+    if (sort === "name") return found.sort((a, b) => byText(a.name, b.name));
+    if (sort === "added") return found.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return found;
+  }, [snapshot.playlists, query, sort]);
+  const showLiked = matchesQuery(query, "Liked Songs");
+
+  if (!showLiked && playlists.length === 0) return <NoMatches query={query} />;
+  return (
+    <CardGrid>
+      {showLiked && <LikedSongsCard count={snapshot.liked.length} tracks={snapshot.liked.map((l) => l.track)} />}
+      {playlists.map((p) => (
+        <PlaylistCard key={p.id} playlist={p} />
+      ))}
+      {!query.trim() && (
+        <button
+          onClick={() => openModal({ kind: "create-playlist" })}
+          className="pressable m-2.5 grid aspect-square place-items-center rounded-[10px] border border-dashed border-white/15 text-ink-2 transition-colors hover:border-white/30 hover:bg-white/[0.03] hover:text-ink"
+        >
+          <span className="flex flex-col items-center gap-2 text-[13px] font-medium">
+            <Plus className="size-7" strokeWidth={1.5} />
+            New playlist
+          </span>
+        </button>
+      )}
+    </CardGrid>
+  );
+}
+
+function AlbumsTab({ query, sort }: { query: string; sort: AlbumSort }) {
+  const saved = useLibrary((s) => s.snapshot.albums);
+  const albums = useMemo(() => {
+    const found = saved.map((a) => a.album).filter((a) => matchesQuery(query, a.title, artistNames(a.artists), a.year));
+    if (sort === "title") return found.sort((a, b) => byText(a.title, b.title));
+    if (sort === "artist") return found.sort((a, b) => byText(artistNames(a.artists), artistNames(b.artists)) || byText(a.title, b.title));
+    // newest first; albums without a year go last
+    if (sort === "year") return found.sort((a, b) => (b.year ?? "").localeCompare(a.year ?? "") || byText(a.title, b.title));
+    return found;
+  }, [saved, query, sort]);
+
+  if (saved.length === 0) {
+    return <EmptyState icon={<Disc3 className="size-7" />} title="Albums you save show up here" body="Open any album and press + to keep it in Your Library." />;
+  }
+  if (albums.length === 0) return <NoMatches query={query} />;
+  return (
+    <CardGrid>
+      {albums.map((album) => (
+        <AlbumCard key={album.id} album={album} />
+      ))}
+    </CardGrid>
+  );
+}
+
+function ArtistsTab({ query, sort }: { query: string; sort: ArtistSort }) {
+  const followed = useLibrary((s) => s.snapshot.artists);
+  const artists = useMemo(() => {
+    const found = followed.map((a) => a.artist).filter((a) => matchesQuery(query, a.name));
+    return sort === "name" ? found.sort((a, b) => byText(a.name, b.name)) : found;
+  }, [followed, query, sort]);
+
+  if (followed.length === 0) {
+    return (
+      <EmptyState
+        icon={<MicVocal className="size-7" />}
+        title="Artists you follow show up here"
+        body="Press Follow on an artist's page to keep them here and hear about their new releases."
+      />
+    );
+  }
+  if (artists.length === 0) return <NoMatches query={query} />;
+  return (
+    <CardGrid>
+      {artists.map((artist) => (
+        <ArtistCard key={artist.id} artist={artist} subtitle="Following" />
+      ))}
+    </CardGrid>
+  );
+}
+
 export function LibraryPage() {
   const snapshot = useLibrary((s) => s.snapshot);
+  const [tab, setTab] = useListPref<LibraryTab>("library.tab", "playlists", values(TABS));
+  const [query, setQuery] = useState("");
+  const [playlistSort, setPlaylistSort] = useListPref<PlaylistSort>("library.playlists", "recent", values(PLAYLIST_SORTS));
+  const [albumSort, setAlbumSort] = useListPref<AlbumSort>("library.albums", "recent", values(ALBUM_SORTS));
+  const [artistSort, setArtistSort] = useListPref<ArtistSort>("library.artists", "recent", values(ARTIST_SORTS));
+  // nothing to find or sort in an empty tab
+  const empty = (tab === "albums" && snapshot.albums.length === 0) || (tab === "artists" && snapshot.artists.length === 0);
+
   return (
     <div className="px-8 pb-16 pt-[68px]">
       <div className="flex items-end justify-between">
@@ -25,24 +149,40 @@ export function LibraryPage() {
           New playlist
         </PillButton>
       </div>
-      <div className="mt-8">
-        <CardGrid>
-          <LikedSongsCard count={snapshot.liked.length} tracks={snapshot.liked.map((l) => l.track)} />
-          {snapshot.playlists.map((p) => (
-            <PlaylistCard key={p.id} playlist={p} />
-          ))}
-          <button
-            onClick={() => openModal({ kind: "create-playlist" })}
-            className="pressable m-2.5 grid aspect-square place-items-center rounded-[10px] border border-dashed border-white/15 text-ink-2 transition-colors hover:border-white/30 hover:bg-white/[0.03] hover:text-ink"
-          >
-            <span className="flex flex-col items-center gap-2 text-[13px] font-medium">
-              <Plus className="size-7" strokeWidth={1.5} />
-              New playlist
-            </span>
-          </button>
-        </CardGrid>
+      <div className="mt-6 flex min-h-9 flex-wrap items-center gap-3">
+        <Segmented label="Your Library sections" value={tab} options={TABS} onChange={setTab} />
+        {!empty && (
+          <div className="ml-auto flex items-center gap-2">
+            <FindField value={query} onChange={setQuery} placeholder={`Find in ${tab}`} />
+            {tab === "playlists" ? (
+              <SortButton value={playlistSort} options={PLAYLIST_SORTS} onChange={setPlaylistSort} />
+            ) : tab === "albums" ? (
+              <SortButton value={albumSort} options={ALBUM_SORTS} onChange={setAlbumSort} />
+            ) : (
+              <SortButton value={artistSort} options={ARTIST_SORTS} onChange={setArtistSort} />
+            )}
+          </div>
+        )}
       </div>
-      {snapshot.history.length > 0 && (
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+          className="mt-6"
+        >
+          {tab === "playlists" ? (
+            <PlaylistsTab query={query} sort={playlistSort} />
+          ) : tab === "albums" ? (
+            <AlbumsTab query={query} sort={albumSort} />
+          ) : (
+            <ArtistsTab query={query} sort={artistSort} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+      {tab === "playlists" && !query.trim() && snapshot.history.length > 0 && (
         <section className="mt-12">
           <SectionTitle
             action={
@@ -71,14 +211,15 @@ export function LikedPage() {
   const likedAt = useMemo(() => new Map(liked.map((l) => [l.track.id, l.likedAt])), [liked]);
   const context = { kind: "liked" as const, label: "Liked Songs", id: "liked" };
   const { play, shuffle, playing, loading } = usePlayCollection(tracks, context);
+  const finder = useTrackFinder(tracks, "liked", "Recently added");
 
   return (
     <div className="relative">
       <div className="relative px-8 pb-16 pt-[72px]">
         <CollectionHeader
           art={
-            <div className="grid size-full place-items-center bg-gradient-to-br from-[#ff6b81] via-[#fa2d48] to-[#a3122d]">
-              <Heart className="size-20 text-white drop-shadow-lg" fill="currentColor" strokeWidth={0} />
+            <div className="grid size-full place-items-center bg-gradient-to-br from-accent-2 via-accent to-accent-deep">
+              <Heart className="size-20 text-snow drop-shadow-lg" fill="currentColor" strokeWidth={0} />
             </div>
           }
           kind="Collection"
@@ -98,13 +239,18 @@ export function LikedPage() {
             )
           }
         />
-        <div className="mt-8">
-          {tracks.length === 0 ? (
+        {tracks.length === 0 ? (
+          <div className="mt-8">
             <EmptyState icon={<Heart className="size-7" />} title="Songs you like will show up here" body="Tap the heart next to any song to save it here." />
-          ) : (
-            <TrackList tracks={tracks} context={context} extra={{ title: "Date added", render: (t) => relativeDate(likedAt.get(t.id) ?? "") }} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            {finder.toolbar}
+            <div className="mt-3">
+              {finder.noMatches ?? <TrackList tracks={finder.tracks} context={context} extra={{ title: "Date added", render: (t) => relativeDate(likedAt.get(t.id) ?? "") }} />}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -116,6 +262,7 @@ export function PlaylistPage({ id }: { id: string }) {
   const tracks = useMemo(() => playlist?.items.map((i) => i.track) ?? [], [playlist]);
   const context = { kind: "playlist" as const, label: playlist?.name ?? "Playlist", id };
   const { play, shuffle, playing, loading } = usePlayCollection(tracks, context);
+  const finder = useTrackFinder(tracks, `playlist.${id}`);
 
   if (!playlist) {
     return loaded ? <EmptyState icon={<ListMusic className="size-7" />} title="This playlist doesn't exist" body="It may have been deleted." /> : null;
@@ -158,7 +305,8 @@ export function PlaylistPage({ id }: { id: string }) {
             </>
           }
         />
-        <div className="mt-8">
+        {tracks.length > 0 && finder.toolbar}
+        <div className={tracks.length > 0 ? "mt-3" : "mt-8"}>
           {tracks.length === 0 ? (
             <EmptyState
               icon={<ListMusic className="size-7" />}
@@ -171,23 +319,30 @@ export function PlaylistPage({ id }: { id: string }) {
               }
             />
           ) : (
-            <TrackList
-              tracks={tracks}
-              keys={itemIds}
-              context={context}
-              extra={{ title: "Date added", render: (_t, i) => relativeDate(playlist.items[i]?.addedAt ?? "") }}
-              menuExtras={(_t, i) => [
-                {
-                  label: "Remove from this playlist",
-                  icon: Trash2,
-                  danger: true,
-                  onSelect: () => void useLibrary.getState().removeFromPlaylist(playlist.id, playlist.items[i].itemId),
-                },
-              ]}
-              onReorder={(keys) => {
-                if (keys.join("|") !== itemIds.join("|")) void useLibrary.getState().reorderPlaylist(playlist.id, keys);
-              }}
-            />
+            (finder.noMatches ?? (
+              <TrackList
+                tracks={finder.tracks}
+                keys={finder.indexes.map((i) => itemIds[i])}
+                context={context}
+                extra={{ title: "Date added", render: (_t, i) => relativeDate(playlist.items[finder.indexes[i]]?.addedAt ?? "") }}
+                menuExtras={(_t, i) => [
+                  {
+                    label: "Remove from this playlist",
+                    icon: Trash2,
+                    danger: true,
+                    onSelect: () => void useLibrary.getState().removeFromPlaylist(playlist.id, playlist.items[finder.indexes[i]].itemId),
+                  },
+                ]}
+                // dragging only makes sense in the playlist's own order
+                onReorder={
+                  finder.changed
+                    ? undefined
+                    : (keys) => {
+                        if (keys.join("|") !== itemIds.join("|")) void useLibrary.getState().reorderPlaylist(playlist.id, keys);
+                      }
+                }
+              />
+            ))
           )}
         </div>
       </div>

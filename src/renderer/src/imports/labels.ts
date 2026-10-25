@@ -14,7 +14,7 @@ export const ORIGIN_COLOR: Record<ImportOrigin, string> = {
   apple: "#fa586a",
   youtube: "#ff4e45",
   csv: "#a1a1aa",
-  encore: "#fa2d48",
+  encore: "var(--color-accent)",
 };
 
 export function destinationLabel(destination: ImportDestination): string {

@@ -1,10 +1,12 @@
-import { Disc3, Ellipsis, ListPlus } from "lucide-react";
+import { Check, Disc3, Ellipsis, ListPlus, Plus } from "lucide-react";
 import { Artwork } from "@/components/Artwork";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { CollectionHeader, Dot } from "@/components/CollectionHeader";
 import { ArtistLinks, BigPlayButton, EmptyState, IconButton, ShuffleButton } from "@/components/common";
+import { useTrackFinder } from "@/components/ListTools";
 import { TrackList } from "@/components/TrackList";
 import { addToPlaylistEntries, queueEntries } from "@/components/trackMenu";
+import { useLibrary } from "@/library/store";
 import { formatTotal, plural } from "@/lib/format";
 import { openMenu } from "@/ui/menu";
 import { albumCache } from "./albumCache";
@@ -29,6 +31,8 @@ export function AlbumPage({ id }: { id: string }) {
   const tracks = album?.tracks ?? [];
   const context = { kind: "album" as const, label: album?.title ?? "Album", id };
   const { play, shuffle, playing, loading } = usePlayCollection(tracks, context);
+  const saved = useLibrary((s) => s.savedAlbumIds.has(id));
+  const finder = useTrackFinder(tracks, "album", "Album order");
 
   return (
     <div className="relative">
@@ -73,6 +77,13 @@ export function AlbumPage({ id }: { id: string }) {
                   <>
                     <BigPlayButton playing={playing} loading={loading} onClick={play} label={`Play ${album.title}`} />
                     <ShuffleButton onClick={shuffle} />
+                    <IconButton
+                      label={saved ? "Remove from Your Library" : "Save to Your Library"}
+                      active={saved}
+                      onClick={() => void useLibrary.getState().setAlbumSaved({ ...album, id }, !saved)}
+                    >
+                      {saved ? <Check className="size-6" /> : <Plus className="size-6" />}
+                    </IconButton>
                     <IconButton label="Add to playlist" onClick={(e) => openMenu(e, addToPlaylistEntries(tracks))}>
                       <ListPlus className="size-6" />
                     </IconButton>
@@ -83,8 +94,9 @@ export function AlbumPage({ id }: { id: string }) {
                 )
               }
             />
-            <div className="mt-8">
-              <TrackList tracks={tracks} context={context} numbered showAlbum={false} />
+            {tracks.length > 1 && finder.toolbar}
+            <div className={tracks.length > 1 ? "mt-3" : "mt-8"}>
+              {finder.noMatches ?? <TrackList tracks={finder.tracks} context={context} numbered showAlbum={false} albumArtists={album.artists} />}
             </div>
             {album.description && <p className="mt-10 max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-ink-3">{album.description}</p>}
           </>

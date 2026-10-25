@@ -12,6 +12,7 @@ export const IPC = {
   libraryGet: "library:get",
   libraryChanged: "library:changed",
   setLiked: "library:set-liked",
+  setAlbumSaved: "library:set-album-saved",
   createPlaylist: "library:create-playlist",
   renamePlaylist: "library:rename-playlist",
   deletePlaylist: "library:delete-playlist",
@@ -50,6 +51,7 @@ export const IPC = {
 
   nowPlayingPublish: "now-playing:publish",
   nowPlayingUpdate: "now-playing:update",
+  nowPlayingGet: "now-playing:get",
   playerCommand: "player:command",
   playerCommandForward: "player:command-forward",
 
@@ -82,6 +84,14 @@ export const IPC = {
 
   appOpenDataFolder: "app:open-data-folder",
   appToggleFullScreen: "app:toggle-full-screen",
+  appConfigure: "app:configure",
+  appSetTheme: "app:set-theme",
+  appSetIcon: "app:set-icon",
+  appPickWallpaper: "app:pick-wallpaper",
+  appClearWallpaper: "app:clear-wallpaper",
+  appSetGlobalKeys: "app:set-global-keys",
+  appPauseGlobalKeys: "app:pause-global-keys",
+  appGlobalCommand: "app:global-command",
 
   updateStatus: "update:status",
   updateStatusChanged: "update:status-changed",

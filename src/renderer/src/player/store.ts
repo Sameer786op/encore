@@ -203,7 +203,8 @@ export const usePlayer = create<PlayerStore>((set, get) => {
         if (status !== "playing" || duration <= 0) return;
 
         const current = currentItem(queue);
-        const remaining = duration - seconds;
+        // in real seconds: a sped-up song reaches its end sooner
+        const remaining = (duration - seconds) / getEngine().speed;
         const settings = useSettings.getState();
         let next = upcomingAuto();
 
@@ -263,9 +264,15 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     const settings = useSettings.getState();
     engine.setEq(settings.eq);
     engine.setLevelling(settings.levelling);
+    engine.setSpeed(settings.sound.speed, settings.sound.keepPitch);
+    engine.setReverb(settings.sound.reverb);
     useSettings.subscribe((s, before) => {
       if (s.eq !== before.eq) engine?.setEq(s.eq);
       if (s.levelling !== before.levelling) engine?.setLevelling(s.levelling);
+      if (s.sound !== before.sound) {
+        engine?.setSpeed(s.sound.speed, s.sound.keepPitch);
+        engine?.setReverb(s.sound.reverb);
+      }
     });
     return engine;
   }

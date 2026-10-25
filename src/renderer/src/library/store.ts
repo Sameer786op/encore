@@ -1,11 +1,13 @@
 import { create } from "zustand";
-import type { LibrarySnapshot, Playlist, Track } from "@shared/types";
+import type { AlbumSummary, ArtistSummary, LibrarySnapshot, Playlist, Track } from "@shared/types";
 import { toast } from "@/ui/toast";
 import { plural } from "@/lib/format";
 
 interface LibraryStore {
   snapshot: LibrarySnapshot;
   likedIds: Set<string>;
+  savedAlbumIds: Set<string>;
+  followedIds: Set<string>;
   loaded: boolean;
   init(): void;
   setLiked(track: Track, liked: boolean): Promise<void>;
@@ -18,12 +20,29 @@ interface LibraryStore {
   reorderPlaylist(id: string, itemIds: string[]): Promise<void>;
   recordPlay(track: Track, playedMs: number): void;
   clearHistory(): Promise<void>;
+  setAlbumSaved(album: AlbumSummary, saved: boolean): Promise<void>;
+  /** follow an artist: they show in Your Library and you hear about their new releases */
+  setFollowing(artist: ArtistSummary, on: boolean): Promise<void>;
 }
 
-const empty: LibrarySnapshot = { liked: [], playlists: [], history: [] };
+const empty: LibrarySnapshot = { liked: [], playlists: [], history: [], albums: [], artists: [] };
 
 function withSnapshot(snapshot: LibrarySnapshot) {
-  return { snapshot, likedIds: new Set(snapshot.liked.map((l) => l.track.id)), loaded: true };
+  return {
+    snapshot,
+    likedIds: new Set(snapshot.liked.map((l) => l.track.id)),
+    savedAlbumIds: new Set(snapshot.albums.map((a) => a.album.id)),
+    followedIds: new Set(snapshot.artists.map((a) => a.artist.id)),
+    loaded: true,
+  };
+}
+
+/** a copy of a set with one id added or taken out */
+function toggled(ids: Set<string>, id: string, on: boolean): Set<string> {
+  const next = new Set(ids);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
 }
 
 let initialized = false;
@@ -31,6 +50,8 @@ let initialized = false;
 export const useLibrary = create<LibraryStore>((set, get) => ({
   snapshot: empty,
   likedIds: new Set(),
+  savedAlbumIds: new Set(),
+  followedIds: new Set(),
   loaded: false,
 
   init() {
@@ -85,4 +106,28 @@ export const useLibrary = create<LibraryStore>((set, get) => ({
   },
 
   clearHistory: () => window.encore.library.clearHistory(),
+
+  async setAlbumSaved(album, saved) {
+    set({ savedAlbumIds: toggled(get().savedAlbumIds, album.id, saved) });
+    try {
+      // just the summary: the songs are fetched again when the album is opened
+      const { id, title, artists, year, kind, artwork } = album;
+      await window.encore.library.setAlbumSaved({ id, title, artists, year, kind, artwork }, saved);
+      toast(saved ? `Saved "${title}" to Your Library` : `Removed "${title}" from Your Library`);
+    } catch {
+      toast("Couldn't update Your Library", { kind: "error" });
+      void window.encore.library.get().then((s) => set(withSnapshot(s)));
+    }
+  },
+
+  async setFollowing(artist, on) {
+    set({ followedIds: toggled(get().followedIds, artist.id, on) });
+    try {
+      await window.encore.feed.follow({ id: artist.id, name: artist.name, artwork: artist.artwork }, on);
+      toast(on ? `Following ${artist.name}. You'll hear about their new releases.` : `Unfollowed ${artist.name}`);
+    } catch {
+      toast("Couldn't update who you follow", { kind: "error" });
+      void window.encore.library.get().then((s) => set(withSnapshot(s)));
+    }
+  },
 }));

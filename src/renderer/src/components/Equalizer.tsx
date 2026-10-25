@@ -25,15 +25,15 @@ function Curve({ bands, preamp, enabled }: { bands: number[]; preamp: number; en
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-28 w-full" aria-hidden>
       <defs>
         <linearGradient id="eq-stroke" x1="0" x2="1">
-          <stop offset="0" stopColor="#ff6b81" />
-          <stop offset="1" stopColor="#fa2d48" />
+          <stop offset="0" style={{ stopColor: "var(--color-accent-2)" }} />
+          <stop offset="1" style={{ stopColor: "var(--color-accent)" }} />
         </linearGradient>
         <linearGradient id="eq-fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#fa2d48" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#fa2d48" stopOpacity="0" />
+          <stop offset="0" stopOpacity="0.28" style={{ stopColor: "var(--color-accent)" }} />
+          <stop offset="1" stopOpacity="0" style={{ stopColor: "var(--color-accent)" }} />
         </linearGradient>
       </defs>
-      <line x1="0" x2="100" y1="50" y2="50" stroke="rgba(255,255,255,0.12)" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
+      <line x1="0" x2="100" y1="50" y2="50" style={{ stroke: "color-mix(in srgb, var(--color-white) 12%, transparent)" }} strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
       <path d={`${path} L100,100 L0,100 Z`} fill="url(#eq-fill)" opacity={enabled ? 1 : 0.3} />
       <path d={path} fill="none" stroke="url(#eq-stroke)" strokeWidth="2" vectorEffect="non-scaling-stroke" opacity={enabled ? 1 : 0.35} />
     </svg>
@@ -84,7 +84,7 @@ export function Equalizer() {
             onClick={() => choosePreset(name)}
             className={cn(
               "relative rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors",
-              eq.enabled && eq.preset === name ? "text-white" : "bg-white/[0.07] text-ink-2 hover:bg-white/[0.11] hover:text-ink",
+              eq.enabled && eq.preset === name ? "text-on-accent" : "bg-white/[0.07] text-ink-2 hover:bg-white/[0.11] hover:text-ink",
             )}
           >
             {eq.enabled && eq.preset === name && <motion.span layoutId="eq-preset" className="absolute inset-0 rounded-full bg-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}

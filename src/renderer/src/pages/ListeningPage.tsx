@@ -55,7 +55,7 @@ function YearChart({ years }: { years: ListeningInsights["years"] }) {
             initial={{ height: 0 }}
             animate={{ height: `${Math.max(3, (y.plays / max) * 100)}%` }}
             transition={{ duration: 0.9, delay: 0.15 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-14 rounded-t-lg bg-gradient-to-t from-accent/55 to-[#ff6b81]/85 transition-[filter] group-hover:brightness-125"
+            className="w-full max-w-14 rounded-t-lg bg-gradient-to-t from-accent/55 to-accent-2/85 transition-[filter] group-hover:brightness-125"
             title={`${y.year}: ${plural(y.plays, "play")}${y.ms ? `, ${Math.round(hours(y.ms))} hours` : ""}`}
           />
           <span className="text-[12px] tabular-nums text-ink-2">{y.year}</span>
@@ -80,7 +80,7 @@ function TopSongRow({ song, rank, onPlay, busy }: { song: TopSong; rank: number;
         <button onClick={onPlay} aria-label={`Play ${song.title}`} className="relative shrink-0">
           <Artwork src={song.track?.artwork} className="size-10 rounded-md" fallback={<Music className="size-4" />} />
           <span className="absolute inset-0 grid place-items-center rounded-md bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            {busy ? <LoaderCircle className="size-4 animate-spin text-white" /> : <Play className="size-4 text-white" fill="currentColor" strokeWidth={0} />}
+            {busy ? <LoaderCircle className="size-4 animate-spin text-snow" /> : <Play className="size-4 text-snow" fill="currentColor" strokeWidth={0} />}
           </span>
         </button>
         <div className="min-w-0">

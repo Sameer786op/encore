@@ -51,7 +51,7 @@ export function LocalFilesPage() {
             transition={{ type: "spring", stiffness: 240, damping: 28 }}
             className="grid size-[200px] shrink-0 place-items-center rounded-[14px] bg-gradient-to-br from-[#64d2ff] to-[#0a64d8] shadow-[0_24px_60px_-18px_rgb(0_0_0/0.75)]"
           >
-            <HardDrive className="size-16 text-white drop-shadow-lg" strokeWidth={1.5} />
+            <HardDrive className="size-16 text-snow drop-shadow-lg" strokeWidth={1.5} />
           </motion.div>
           <div className="min-w-0 pb-2">
             <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">On this computer</div>
@@ -138,7 +138,7 @@ export function LocalFilesPage() {
                   value={sort}
                   onChange={(e) => setSort(e.target.value as Sort)}
                   aria-label="Sort by"
-                  className="h-9 rounded-full bg-white/[0.06] px-3 text-[13px] text-ink outline-none [&>option]:bg-[#1e1e22]"
+                  className="h-9 rounded-full bg-white/[0.06] px-3 text-[13px] text-ink outline-none [&>option]:bg-surface-2"
                 >
                   <option value="artist">Artist</option>
                   <option value="album">Album</option>

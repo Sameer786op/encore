@@ -3,21 +3,26 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Clock3, Search, X } from "lucide-react";
 import { navigate, useNav } from "@/nav/store";
 import { useSearch } from "@/search/store";
+import { useSettings } from "@/settings/store";
+import { comboParts, keysFor } from "@/ui/shortcuts";
 import { cn } from "@/lib/cn";
 import { LiquidGlass } from "./LiquidGlass";
 
 export const SEARCH_INPUT_ID = "encore-search";
 
 function SearchBox() {
-  const query = useSearch((s) => s.query);
+  const route = useNav((s) => s.route);
+  // the box only shows the search while you're on Search; going back there brings it back
+  const stored = useSearch((s) => s.query);
+  const query = route.name === "search" ? stored : "";
   const recent = useSearch((s) => s.recent);
   const setQuery = useSearch((s) => s.setQuery);
   const submit = useSearch((s) => s.submit);
-  const route = useNav((s) => s.route);
   const input = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [highlight, setHighlight] = useState(-1);
+  const searchKeys = keysFor(useSettings((s) => s.shortcuts)).search[0];
 
   // fetch suggestions as the user types
   useEffect(() => {
@@ -96,7 +101,7 @@ function SearchBox() {
             <X className="size-4" />
           </button>
         )}
-        <kbd className={cn("hidden rounded-md bg-white/[0.07] px-1.5 py-px font-sans text-[10.5px] text-ink-3 lg:block", (focused || query) && "lg:hidden")}>Ctrl K</kbd>
+        {searchKeys && <kbd className={cn("hidden rounded-md bg-white/[0.07] px-1.5 py-px font-sans text-[10.5px] text-ink-3 lg:block", (focused || query) && "lg:hidden")}>{comboParts(searchKeys).join(" ")}</kbd>}
       </LiquidGlass>
       <AnimatePresence>
         {open && (
@@ -145,7 +150,7 @@ export function TopBar({ scrolled, right }: { scrolled: boolean; right: number }
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-[84px] bg-gradient-to-b from-[#08080b]/70 via-[#08080b]/30 to-transparent backdrop-blur-[10px] transition-opacity duration-500 [mask-image:linear-gradient(to_bottom,black_45%,transparent)]",
+          "pointer-events-none absolute inset-x-0 top-0 h-[84px] bg-gradient-to-b from-[rgb(var(--backdrop-tint)/0.7)] via-[rgb(var(--backdrop-tint)/0.3)] to-transparent backdrop-blur-[10px] transition-opacity duration-500 [mask-image:linear-gradient(to_bottom,black_45%,transparent)]",
           scrolled ? "opacity-100" : "opacity-0",
         )}
       />

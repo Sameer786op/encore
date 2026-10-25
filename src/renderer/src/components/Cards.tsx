@@ -1,13 +1,14 @@
 import { useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { ChevronLeft, ChevronRight, Heart, ListMusic, Play } from "lucide-react";
+import { BellOff, BellRing, Check, ChevronLeft, ChevronRight, Heart, ListMusic, Play, Plus, Shuffle } from "lucide-react";
 import type { AlbumSummary, ArtistSummary, DailyMix, Playlist, Track } from "@shared/types";
+import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
 import type { PlayContext } from "@/player/queue";
 import { cn } from "@/lib/cn";
 import { artistNames, plural } from "@/lib/format";
-import { openMenu } from "@/ui/menu";
+import { openMenu, type MenuEntry } from "@/ui/menu";
 import { toast } from "@/ui/toast";
 import { Artwork, Mosaic } from "./Artwork";
 import { MixCover } from "./MixCover";
@@ -26,7 +27,7 @@ function HoverPlay({ onClick, label }: { onClick: () => void; label: string }) {
       initial={false}
       whileTap={{ scale: 0.88 }}
       transition={{ type: "spring", stiffness: 520, damping: 30 }}
-      className="glass-clear absolute bottom-2.5 left-2.5 grid size-9 scale-75 place-items-center rounded-full text-white opacity-0 transition-[opacity,scale,background-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"
+      className="glass-clear absolute bottom-2.5 left-2.5 grid size-9 scale-75 place-items-center rounded-full text-snow opacity-0 transition-[opacity,scale,background-color,color] hover:text-on-accent duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"
     >
       <Play className="ml-px size-4" fill="currentColor" strokeWidth={0} />
     </motion.button>
@@ -67,22 +68,46 @@ export function TrackCard({ track, list, index, context }: { track: Track; list:
   );
 }
 
-async function playAlbum(album: AlbumSummary): Promise<void> {
+async function playAlbum(album: AlbumSummary, shuffle = false): Promise<void> {
   try {
     const details = await albumCache.get(album.id);
-    usePlayer.getState().playTracks(details.tracks, 0, { kind: "album", label: details.title, id: details.id });
+    const player = usePlayer.getState();
+    if (shuffle && !player.queue.shuffle) player.toggleShuffle();
+    const start = shuffle ? Math.floor(Math.random() * details.tracks.length) : 0;
+    player.playTracks(details.tracks, start, { kind: "album", label: details.title, id: details.id });
   } catch {
     toast(`Couldn't load "${album.title}"`, { kind: "error" });
   }
 }
 
+function albumMenu(album: AlbumSummary): MenuEntry[] {
+  const saved = useLibrary.getState().savedAlbumIds.has(album.id);
+  return [
+    { label: "Play", icon: Play, onSelect: () => void playAlbum(album) },
+    { label: "Shuffle play", icon: Shuffle, onSelect: () => void playAlbum(album, true) },
+    "divider",
+    saved
+      ? { label: "Remove from Your Library", icon: Check, onSelect: () => void useLibrary.getState().setAlbumSaved(album, false) }
+      : { label: "Save to Your Library", icon: Plus, onSelect: () => void useLibrary.getState().setAlbumSaved(album, true) },
+  ];
+}
+
+function artistMenu(artist: ArtistSummary): MenuEntry[] {
+  const following = useLibrary.getState().followedIds.has(artist.id);
+  return [
+    following
+      ? { label: "Unfollow", icon: BellOff, onSelect: () => void useLibrary.getState().setFollowing(artist, false) }
+      : { label: "Follow", icon: BellRing, onSelect: () => void useLibrary.getState().setFollowing(artist, true) },
+  ];
+}
+
 export function AlbumCard({ album, subtitle, badge }: { album: AlbumSummary; subtitle?: string; badge?: string }) {
   const line = subtitle ?? [album.kind ?? (album.year ? undefined : "Album"), album.year, artistNames(album.artists)].filter(Boolean).join(" • ");
   return (
-    <CardShell onClick={() => navigate({ name: "album", id: album.id })}>
+    <CardShell onClick={() => navigate({ name: "album", id: album.id })} onContextMenu={(e) => openMenu(e, albumMenu(album))}>
       <div className="relative">
         <Artwork src={album.artwork} className={ART} />
-        {badge && <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-[3px] text-[10px] font-bold uppercase tracking-[0.06em] text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4),0_4px_10px_-2px_rgb(0_0_0/0.4)]">{badge}</span>}
+        {badge && <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-[3px] text-[10px] font-bold uppercase tracking-[0.06em] text-on-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4),0_4px_10px_-2px_rgb(0_0_0/0.4)]">{badge}</span>}
         <HoverPlay onClick={() => void playAlbum(album)} label={`Play ${album.title}`} />
       </div>
       <div className="mt-2.5 truncate text-[13px] font-medium leading-tight">{album.title}</div>
@@ -105,12 +130,12 @@ export function MixCard({ mix }: { mix: DailyMix }) {
   );
 }
 
-export function ArtistCard({ artist }: { artist: ArtistSummary }) {
+export function ArtistCard({ artist, subtitle = "Artist" }: { artist: ArtistSummary; subtitle?: string }) {
   return (
-    <CardShell onClick={() => navigate({ name: "artist", id: artist.id })}>
+    <CardShell onClick={() => navigate({ name: "artist", id: artist.id })} onContextMenu={(e) => openMenu(e, artistMenu(artist))}>
       <Artwork src={artist.artwork} className={cn(ART, "rounded-full")} />
       <div className="mt-2.5 truncate text-center text-[13px] font-medium leading-tight">{artist.name}</div>
-      <div className="mt-0.5 truncate text-center text-[12.5px] leading-tight text-ink-2">Artist</div>
+      <div className="mt-0.5 truncate text-center text-[12.5px] leading-tight text-ink-2">{subtitle}</div>
     </CardShell>
   );
 }
@@ -138,8 +163,8 @@ export function LikedSongsCard({ count, tracks }: { count: number; tracks: Track
   return (
     <CardShell onClick={() => navigate({ name: "liked" })}>
       <div className="relative">
-        <div className={cn(ART, "grid place-items-center bg-gradient-to-br from-[#ff6b81] via-[#fa2d48] to-[#a3122d]")}>
-          <Heart className="size-1/3 text-white drop-shadow" fill="currentColor" strokeWidth={0} />
+        <div className={cn(ART, "grid place-items-center bg-gradient-to-br from-accent-2 via-accent to-accent-deep")}>
+          <Heart className="size-1/3 text-snow drop-shadow" fill="currentColor" strokeWidth={0} />
         </div>
         {count > 0 && <HoverPlay onClick={play} label="Play Liked Songs" />}
       </div>

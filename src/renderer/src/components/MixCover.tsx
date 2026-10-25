@@ -37,8 +37,8 @@ export function MixCover({ mix, className }: { mix: DailyMix; className?: string
         />
       )}
       <div className="absolute inset-0" style={{ background: `linear-gradient(to top, hsl(${hue} 70% 18% / 0.92), hsl(${hue} 70% 30% / 0.15) 55%, transparent)` }} />
-      <div className="absolute left-[7cqw] top-[7cqw] text-[6.5cqw] font-bold uppercase tracking-[0.22em] text-white/90">Daily mix</div>
-      <div className="absolute bottom-[4cqw] left-[6cqw] font-display text-[34cqw] font-extrabold leading-[0.85] tracking-tight text-white drop-shadow-lg">{number}</div>
+      <div className="absolute left-[7cqw] top-[7cqw] text-[6.5cqw] font-bold uppercase tracking-[0.22em] text-snow/90">Daily mix</div>
+      <div className="absolute bottom-[4cqw] left-[6cqw] font-display text-[34cqw] font-extrabold leading-[0.85] tracking-tight text-snow drop-shadow-lg">{number}</div>
     </div>
   );
 }

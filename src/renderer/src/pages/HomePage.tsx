@@ -118,7 +118,7 @@ export function HomePage() {
               navigate({ name: "search" });
               requestAnimationFrame(() => document.getElementById(SEARCH_INPUT_ID)?.focus());
             }}
-            className="pressable relative mt-7 inline-flex h-10 items-center gap-2 rounded-full bg-accent px-6 text-[14px] font-semibold text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.45),0_8px_22px_-8px_rgb(250_45_72/0.7)] hover:brightness-110"
+            className="pressable relative mt-7 inline-flex h-10 items-center gap-2 rounded-full bg-accent px-6 text-[14px] font-semibold text-on-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.45),0_8px_22px_-8px_rgb(var(--accent-rgb)/0.7)] hover:brightness-110"
           >
             <Search className="size-4" /> Start searching
           </button>

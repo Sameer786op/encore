@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { ExternalLink, FolderOpen, LoaderCircle, PictureInPicture2, RefreshCw } from "lucide-react";
+import { ExternalLink, FolderOpen, LoaderCircle, RefreshCw } from "lucide-react";
 import type { DiscordStatus, ScrobbleService, ScrobbleStatus, UpdateStatus } from "@shared/types";
 import { Equalizer } from "@/components/Equalizer";
 import { Segmented, Toggle } from "@/components/common";
@@ -8,35 +8,10 @@ import { usePlayer } from "@/player/store";
 import { useSettings } from "@/settings/store";
 import { useUpdates } from "@/ui/updates";
 import { cn } from "@/lib/cn";
-
-function Row({ title, body, children }: { title: string; body?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex min-h-[52px] items-center gap-6 border-b border-white/[0.07] py-3 last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-medium">{title}</div>
-        {body && <div className="mt-0.5 text-[12.5px] leading-relaxed text-ink-3">{body}</div>}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  );
-}
-
-/** a titled group of settings, the way iOS Settings lays them out */
-function Group({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="mt-8">
-      <div className="mb-2 flex items-center justify-between px-4">
-        <h2 className="text-[13px] font-semibold text-ink-2">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Card({ children }: { children: ReactNode }) {
-  return <div className="fill-group rounded-[20px] px-5">{children}</div>;
-}
+import { AppearanceSettings } from "./settings/AppearanceSettings";
+import { MiniPlayerSettings } from "./settings/MiniPlayerSettings";
+import { Card, Group, Row } from "./settings/parts";
+import { GlobalShortcutSettings, ShortcutSettings } from "./settings/ShortcutSettings";
 
 function updateBody(status: UpdateStatus): string {
   switch (status.state) {
@@ -63,7 +38,7 @@ function UpdateRow() {
   return (
     <Row title={status.current ? `Version ${status.current}` : "Version"} body={updateBody(status)}>
       {status.state === "ready" ? (
-        <button onClick={() => void window.encore.updates.install()} className="pressable rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-white hover:brightness-110">
+        <button onClick={() => void window.encore.updates.install()} className="pressable rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent hover:brightness-110">
           Restart to update
         </button>
       ) : status.state !== "off" ? (
@@ -247,14 +222,14 @@ function ScrobbleSettings() {
             <button
               disabled={!token || busy === "listenbrainz"}
               onClick={() => void run("listenbrainz", () => window.encore.scrobble.connectListenBrainz(token))}
-              className="inline-flex h-9 items-center gap-2 pressable rounded-full bg-accent px-4 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-2 pressable rounded-full bg-accent px-4 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
             >
               {busy === "listenbrainz" && <LoaderCircle className="size-3.5 animate-spin" />} Connect
             </button>
           </div>
         )}
       </Row>
-      {lbError && <div className="-mt-2 pb-3 text-[12.5px] text-red-300">ListenBrainz: {lbError}</div>}
+      {lbError && <div className="-mt-2 pb-3 text-[12.5px] text-bad">ListenBrainz: {lbError}</div>}
 
       <Row
         title="Last.fm"
@@ -290,7 +265,7 @@ function ScrobbleSettings() {
               <button
                 disabled={!apiKey || !secret || busy === "lastfm"}
                 onClick={() => void run("lastfm", () => window.encore.scrobble.connectLastfm(apiKey, secret))}
-                className="inline-flex h-9 items-center gap-2 pressable rounded-full bg-accent px-4 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                className="inline-flex h-9 items-center gap-2 pressable rounded-full bg-accent px-4 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-40"
               >
                 {busy === "lastfm" && <LoaderCircle className="size-3.5 animate-spin" />} Connect
               </button>
@@ -298,7 +273,7 @@ function ScrobbleSettings() {
           </div>
         )}
       </Row>
-      {fmError && <div className="-mt-2 pb-3 text-[12.5px] text-red-300">Last.fm: {fmError}</div>}
+      {fmError && <div className="-mt-2 pb-3 text-[12.5px] text-bad">Last.fm: {fmError}</div>}
 
       {(lb.connected || fm.connected) && (
         <div className="border-t border-white/[0.07] py-3 text-[12.5px] text-ink-3">
@@ -330,19 +305,7 @@ export function SettingsPage() {
       </motion.h1>
 
       <Group title="Appearance">
-        <Card>
-          <Row title="Glass" body="Clear lets more of the artwork show through. Tinted is darker and easier to read.">
-            <Segmented
-              label="Glass"
-              value={settings.glass}
-              onChange={(glass) => settings.update({ glass })}
-              options={[
-                { value: "clear", label: "Clear" },
-                { value: "tinted", label: "Tinted" },
-              ]}
-            />
-          </Row>
-        </Card>
+        <AppearanceSettings />
       </Group>
 
       <Group title="Playback">
@@ -375,6 +338,23 @@ export function SettingsPage() {
           <Row title="Autoplay" body="Keep playing similar songs when your queue ends.">
             <Toggle checked={autoplay} onChange={setAutoplay} label="Autoplay" />
           </Row>
+          <Row title="Keep playing when the window is closed" body="Closing Encore while music plays moves it to the system tray by the clock. Right-click its icon there to quit.">
+            <Toggle checked={settings.backgroundPlay} onChange={(backgroundPlay) => settings.update({ backgroundPlay })} label="Keep playing when the window is closed" />
+          </Row>
+          <Row title="Pause when headphones are unplugged" body="Also when Bluetooth headphones or speakers disconnect, so the music doesn't carry on out loud.">
+            <Toggle checked={settings.pauseOnUnplug} onChange={(pauseOnUnplug) => settings.update({ pauseOnUnplug })} label="Pause when headphones are unplugged" />
+          </Row>
+          <Row title="Double-click a song" body={settings.doubleClick === "play" ? "Plays it now, followed by the rest of the list." : "Adds it to the end of your queue, without stopping what's playing."}>
+            <Segmented
+              label="Double-click a song"
+              value={settings.doubleClick}
+              options={[
+                { value: "play", label: "Play" },
+                { value: "queue", label: "Add to queue" },
+              ]}
+              onChange={(doubleClick) => settings.update({ doubleClick })}
+            />
+          </Row>
         </Card>
       </Group>
 
@@ -400,20 +380,7 @@ export function SettingsPage() {
       </Group>
 
       <Group title="Mini player">
-        <Card>
-          <Row title="Open the mini player when Encore is minimized" body="A small always-on-top player you can drag anywhere.">
-            <Toggle
-              checked={settings.miniPlayer.showOnMinimize}
-              onChange={(showOnMinimize) => settings.update({ miniPlayer: { ...settings.miniPlayer, showOnMinimize } })}
-              label="Mini player on minimize"
-            />
-          </Row>
-          <Row title="Open it now">
-            <button onClick={() => void window.encore.mini.open()} className="glass-control pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium hover:brightness-125">
-              <PictureInPicture2 className="size-4" /> Mini player
-            </button>
-          </Row>
-        </Card>
+        <MiniPlayerSettings />
       </Group>
 
       <Group title="New releases">
@@ -426,6 +393,9 @@ export function SettingsPage() {
           </Row>
         </Card>
       </Group>
+
+      <ShortcutSettings />
+      <GlobalShortcutSettings />
 
       <Group title="Scrobbling">
         <ScrobbleSettings />

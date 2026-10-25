@@ -1,4 +1,5 @@
 import { artistNames } from "@/lib/format";
+import { useSettings } from "@/settings/store";
 import { usePlayer } from "./store";
 import { currentItem } from "./queue";
 
@@ -43,7 +44,7 @@ export function connectMediaSession(): () => void {
     if (track && state.duration > 0 && now - lastPositionUpdate > 1000) {
       lastPositionUpdate = now;
       try {
-        session.setPositionState({ duration: state.duration, position: Math.min(state.position, state.duration), playbackRate: 1 });
+        session.setPositionState({ duration: state.duration, position: Math.min(state.position, state.duration), playbackRate: useSettings.getState().sound.speed });
       } catch {
         // position briefly past duration while switching songs
       }

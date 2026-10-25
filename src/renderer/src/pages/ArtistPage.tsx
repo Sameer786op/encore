@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { BellRing, Check, MicVocal, Radio } from "lucide-react";
 import type { ArtistSummary } from "@shared/types";
@@ -6,34 +6,21 @@ import { AmbientBackground } from "@/components/AmbientBackground";
 import { AlbumCard, ArtistCard, CardRow } from "@/components/Cards";
 import { BigPlayButton, EmptyState, PillButton, SectionTitle } from "@/components/common";
 import { TrackList } from "@/components/TrackList";
+import { useLibrary } from "@/library/store";
 import { usePlayer } from "@/player/store";
 import { cn } from "@/lib/cn";
-import { toast } from "@/ui/toast";
 import { artistCache } from "./albumCache";
 import { useAsync } from "./useAsync";
 import { usePlayCollection } from "./usePlayCollection";
 
-/** following an artist means hearing about their new releases */
+/** following an artist keeps them in Your Library and means hearing about their new releases */
 function FollowButton({ artist }: { artist: ArtistSummary }) {
-  const [following, setFollowing] = useState<boolean | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void window.encore.feed.isFollowing(artist.id).then((on) => alive && setFollowing(on));
-    return () => {
-      alive = false;
-    };
-  }, [artist.id]);
-  if (following === null) return null;
-
-  const toggle = () => {
-    const on = !following;
-    setFollowing(on);
-    void window.encore.feed.follow(artist, on);
-    if (on) toast(`You'll hear about new releases from ${artist.name}`);
-  };
+  const following = useLibrary((s) => s.followedIds.has(artist.id));
+  const loaded = useLibrary((s) => s.loaded);
+  if (!loaded) return null;
   return (
     <button
-      onClick={toggle}
+      onClick={() => void useLibrary.getState().setFollowing(artist, !following)}
       aria-pressed={following}
       className={cn(
         "glass-control pressable inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold hover:brightness-125",

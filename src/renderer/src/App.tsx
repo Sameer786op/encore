@@ -8,17 +8,17 @@ import { PlayerBar } from "@/components/PlayerBar";
 import { QueuePanel } from "@/components/QueuePanel";
 import { Sidebar } from "@/components/Sidebar";
 import { Toasts } from "@/components/Toasts";
-import { SEARCH_INPUT_ID, TopBar } from "@/components/TopBar";
+import { TopBar } from "@/components/TopBar";
 import { useLibrary } from "@/library/store";
 import { navigate, useNav, type Route } from "@/nav/store";
 import { connectMediaSession } from "@/player/mediaSession";
+import { connectOutputWatch } from "@/player/outputWatch";
 import { connectPlayerSync } from "@/player/sync";
 import { useView } from "@/ui/view";
 import { connectAppearance } from "@/ui/appearance";
 import { connectUpdates } from "@/ui/updates";
+import { connectGlobalKeys, connectShortcuts } from "@/ui/shortcuts";
 import { usePlayer } from "@/player/store";
-import { isTyping } from "@/lib/cn";
-import { openModal } from "@/ui/modal";
 import { AlbumPage } from "@/pages/AlbumPage";
 import { ArtistPage } from "@/pages/ArtistPage";
 import { HomePage } from "@/pages/HomePage";
@@ -69,92 +69,6 @@ function Page({ route }: { route: Route }) {
 /** the queue panel's width, plus the gap on each side of it */
 export const QUEUE_SPACE = 352 + 8;
 
-function useShortcuts() {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const player = usePlayer.getState();
-      const ctrl = e.ctrlKey || e.metaKey;
-
-      if (ctrl && (e.key === "k" || e.key === "l")) {
-        e.preventDefault();
-        // the search box lives in the top bar, so it is always there to focus
-        const input = document.getElementById(SEARCH_INPUT_ID) as HTMLInputElement | null;
-        input?.focus();
-        input?.select();
-        navigate({ name: "search" });
-        return;
-      }
-      if (e.key === "F11") {
-        e.preventDefault();
-        void window.encore.app.toggleFullScreen();
-        return;
-      }
-      if (ctrl && e.key === ",") {
-        e.preventDefault();
-        useView.getState().closeFullscreen();
-        navigate({ name: "settings" });
-        return;
-      }
-      if (e.altKey && e.key === "ArrowLeft") return useNav.getState().back();
-      if (e.altKey && e.key === "ArrowRight") return useNav.getState().forward();
-      if (isTyping(e.target)) return;
-
-      if (e.key === " " && !ctrl) {
-        e.preventDefault();
-        player.togglePlay();
-      } else if (ctrl && e.key === "ArrowRight") {
-        e.preventDefault();
-        player.next();
-      } else if (ctrl && e.key === "ArrowLeft") {
-        e.preventDefault();
-        player.previous();
-      } else if (ctrl && e.key === "ArrowUp") {
-        e.preventDefault();
-        player.setVolume(player.volume + 0.05);
-      } else if (ctrl && e.key === "ArrowDown") {
-        e.preventDefault();
-        player.setVolume(player.volume - 0.05);
-      } else if (!ctrl && e.key === "ArrowRight" && (e.target as HTMLElement).getAttribute("role") !== "slider") {
-        player.seek(player.position + 5);
-      } else if (!ctrl && e.key === "ArrowLeft" && (e.target as HTMLElement).getAttribute("role") !== "slider") {
-        player.seek(player.position - 5);
-      } else if (ctrl && e.key === "s") {
-        e.preventDefault();
-        player.toggleShuffle();
-      } else if (ctrl && e.key === "r") {
-        e.preventDefault();
-        player.cycleRepeat();
-      } else if (ctrl && e.key === "n") {
-        e.preventDefault();
-        openModal({ kind: "create-playlist" });
-      } else if (!ctrl && (e.key === "m" || e.key === "M")) {
-        player.toggleMute();
-      } else if (!ctrl && (e.key === "q" || e.key === "Q")) {
-        player.setQueueOpen(!player.queueOpen);
-      } else if (!ctrl && (e.key === "l" || e.key === "L")) {
-        const view = useView.getState();
-        if (view.fullscreen && view.lyrics) view.closeFullscreen();
-        else view.openFullscreen(true);
-      } else if (!ctrl && (e.key === "f" || e.key === "F")) {
-        const view = useView.getState();
-        if (view.fullscreen) view.closeFullscreen();
-        else view.openFullscreen();
-      }
-    };
-    // mouse back / forward buttons
-    const onMouse = (e: MouseEvent) => {
-      if (e.button === 3) useNav.getState().back();
-      if (e.button === 4) useNav.getState().forward();
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mouseup", onMouse);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mouseup", onMouse);
-    };
-  }, []);
-}
-
 export default function App() {
   const route = useNav((s) => s.route);
   const index = useNav((s) => s.index);
@@ -171,6 +85,9 @@ export default function App() {
     const stopUpdates = connectUpdates();
     const stopSync = connectPlayerSync();
     const stopMedia = connectMediaSession();
+    const stopOutputWatch = connectOutputWatch();
+    const stopShortcuts = connectShortcuts();
+    const stopGlobalKeys = connectGlobalKeys();
     const stopMini = window.encore.mini.onVisible((miniOpen) => useView.setState({ miniOpen }));
     // a new-release notification was clicked
     const stopReleases = window.encore.feed.onOpenAlbum((albumId) => {
@@ -182,11 +99,13 @@ export default function App() {
       stopUpdates();
       stopSync();
       stopMedia();
+      stopOutputWatch();
+      stopShortcuts();
+      stopGlobalKeys();
       stopMini();
       stopReleases();
     };
   }, []);
-  useShortcuts();
 
   // each visit to a page starts at the top
   useEffect(() => {

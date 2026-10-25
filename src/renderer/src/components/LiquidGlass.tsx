@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import type { GlassArea } from "@/settings/store";
 import { refractionMap } from "@/visuals/refraction";
 
 // A pane of Liquid Glass: the `glass` material plus real refraction along
@@ -18,13 +19,15 @@ interface LiquidGlassProps extends HTMLAttributes<HTMLDivElement> {
   sheen?: boolean;
   /** the material underneath: the default pane, or the lighter one for controls */
   material?: "glass" | "glass-control";
+  /** which of Settings → Appearance's glass areas this pane belongs to; the rest use the general one */
+  area?: Exclude<GlassArea, "panels">;
   as?: "div" | "aside" | "footer" | "nav" | "header";
   children?: ReactNode;
 }
 
 const supportsRefraction = typeof CSS !== "undefined" && CSS.supports("backdrop-filter", "url(#x)");
 
-export function LiquidGlass({ radius, bezel = 16, strength = 18, sheen = false, material = "glass", as: Tag = "div", className, style, children, onPointerMove, onPointerLeave, ...rest }: LiquidGlassProps) {
+export function LiquidGlass({ radius, bezel = 16, strength = 18, sheen = false, material = "glass", area, as: Tag = "div", className, style, children, onPointerMove, onPointerLeave, ...rest }: LiquidGlassProps) {
   const ref = useRef<HTMLDivElement>(null);
   const id = `lg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
@@ -61,6 +64,7 @@ export function LiquidGlass({ radius, bezel = 16, strength = 18, sheen = false, 
   return (
     <Tag
       ref={ref as never}
+      data-glass-area={area}
       // the rim and sheen are laid over the pane, so it needs a position of its own
       className={cn(!/\b(absolute|fixed|sticky)\b/.test(className ?? "") && "relative", "isolate", material, className)}
       style={glassStyle}

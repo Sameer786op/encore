@@ -19,6 +19,7 @@ function snapshot(): NowPlaying {
     duration: s.duration,
     liked: track ? useLibrary.getState().likedIds.has(track.id) : false,
     at: Date.now(),
+    rate: useSettings.getState().sound.speed,
   };
 }
 
@@ -45,11 +46,12 @@ export function connectPlayerSync(): () => void {
   const changed = () => {
     const next = snapshot();
     if (!last) return publish();
-    const expected = last.playing ? last.position + (next.at - last.at) / 1000 : last.position;
+    const expected = last.playing ? last.position + ((next.at - last.at) / 1000) * (last.rate ?? 1) : last.position;
     if (
       next.track?.id !== last.track?.id ||
       next.playing !== last.playing ||
       next.liked !== last.liked ||
+      next.rate !== last.rate ||
       Math.abs(next.duration - last.duration) > 1 ||
       Math.abs(next.position - expected) > 2
     ) {
@@ -64,14 +66,15 @@ export function connectPlayerSync(): () => void {
 
   // the main process needs these settings even before the Settings page is opened
   const pushSettings = () => {
-    const { discord, miniPlayer, releaseAlerts } = useSettings.getState();
+    const { discord, miniPlayer, releaseAlerts, backgroundPlay } = useSettings.getState();
+    void window.encore.app.configure({ backgroundPlay });
     void window.encore.discord.configure(discord);
     void window.encore.mini.configure(miniPlayer);
     void window.encore.feed.setNotifications(releaseAlerts);
   };
   pushSettings();
   const stopSettings = useSettings.subscribe((s, before) => {
-    if (s.discord !== before.discord || s.miniPlayer !== before.miniPlayer || s.releaseAlerts !== before.releaseAlerts) pushSettings();
+    if (s.discord !== before.discord || s.miniPlayer !== before.miniPlayer || s.releaseAlerts !== before.releaseAlerts || s.backgroundPlay !== before.backgroundPlay) pushSettings();
   });
 
   publish();

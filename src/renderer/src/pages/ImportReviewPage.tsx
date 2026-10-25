@@ -33,10 +33,10 @@ function StatusPill({ item }: { item: ImportItem }) {
   const score = item.candidates[0] ? Math.round(item.candidates[0].score * 100) : 0;
   const map: Record<ImportItemStatus, [string, string]> = {
     pending: ["Matching…", "bg-white/10 text-ink-2"],
-    matched: [`Found · ${score}%`, "bg-switch/15 text-[#63e6a0]"],
-    accepted: [item.chosen && item.chosen.id !== item.candidates[0]?.track.id ? "Your pick" : `Accepted · ${score}%`, "bg-accent/15 text-[#ff8a9b]"],
-    review: [`Check · ${score}%`, "bg-[#ff9f0a]/15 text-[#ffc46b]"],
-    missing: ["Not found", "bg-red-400/15 text-red-300"],
+    matched: [`Found · ${score}%`, "bg-switch/15 text-good"],
+    accepted: [item.chosen && item.chosen.id !== item.candidates[0]?.track.id ? "Your pick" : `Accepted · ${score}%`, "bg-accent/15 text-accent"],
+    review: [`Check · ${score}%`, "bg-[#ff9f0a]/15 text-warn"],
+    missing: ["Not found", "bg-red-400/15 text-bad"],
     skipped: ["Left out", "bg-white/10 text-ink-3"],
   };
   const [label, style] = map[item.status];
@@ -96,7 +96,7 @@ function ItemRow({ job, item, onChange }: { job: ImportJobDetails; item: ImportI
             >
               <Artwork src={track.artwork} className="size-10 rounded-md" />
               <span className="absolute inset-0 grid place-items-center rounded-md bg-black/50 opacity-0 transition-opacity group-hover/art:opacity-100">
-                <Play className="size-4 text-white" fill="currentColor" strokeWidth={0} />
+                <Play className="size-4 text-snow" fill="currentColor" strokeWidth={0} />
               </span>
             </button>
           }
@@ -238,12 +238,12 @@ export function ImportReviewPage({ id }: { id: string }) {
         </p>
         {matching && (
           <div className="mt-4 h-1.5 max-w-xl overflow-hidden rounded-full bg-white/10">
-            <motion.div className="h-full rounded-full bg-gradient-to-r from-accent to-[#ff6b81]" animate={{ width: `${job.total ? (processed / job.total) * 100 : 0}%` }} />
+            <motion.div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2" animate={{ width: `${job.total ? (processed / job.total) * 100 : 0}%` }} />
           </div>
         )}
         {job.note && (
           <p className="mt-4 flex max-w-3xl gap-2 rounded-xl bg-amber-400/10 px-4 py-3 text-[13px] leading-relaxed text-amber-100/90">
-            <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-300" /> {job.note}
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-warn" /> {job.note}
           </p>
         )}
 
@@ -255,7 +255,7 @@ export function ImportReviewPage({ id }: { id: string }) {
                 setTab(key);
                 setShown(PAGE);
               }}
-              className={cn("relative rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors", activeTab === key ? "text-white" : "bg-white/[0.07] text-ink-2 hover:bg-white/[0.11] hover:text-ink")}
+              className={cn("relative rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors", activeTab === key ? "text-on-accent" : "bg-white/[0.07] text-ink-2 hover:bg-white/[0.11] hover:text-ink")}
             >
               {activeTab === key && <motion.span layoutId="review-tab" className="absolute inset-0 rounded-full bg-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)]" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
               <span className="relative">
@@ -303,7 +303,7 @@ export function ImportReviewPage({ id }: { id: string }) {
           <button
             onClick={finish}
             disabled={matching || busy || adding === 0}
-            className="inline-flex items-center gap-2 pressable rounded-full bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40"
+            className="inline-flex items-center gap-2 pressable rounded-full bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-on-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40"
           >
             {busy && <LoaderCircle className="size-4 animate-spin" />}
             {job.destination.kind === "liked" ? "Add to Liked Songs" : "Create playlist"}

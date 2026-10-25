@@ -30,9 +30,11 @@ export function buildActivity(state: NowPlaying, options: { showWhenPaused: bool
   };
 
   if (state.playing && state.duration > 0) {
-    const position = state.position + Math.max(0, (now - state.at) / 1000);
-    const start = Math.round(now - position * 1000);
-    activity.timestamps = { start, end: Math.round(start + state.duration * 1000) };
+    // Discord counts in real time, so a sped-up or slowed song is stretched to match
+    const rate = state.rate || 1;
+    const position = state.position + Math.max(0, (now - state.at) / 1000) * rate;
+    const start = Math.round(now - (position / rate) * 1000);
+    activity.timestamps = { start, end: Math.round(start + (state.duration / rate) * 1000) };
   }
   if (track.source === "youtube") {
     activity.buttons = [{ label: "Listen on YouTube Music", url: `https://music.youtube.com/watch?v=${encodeURIComponent(track.sourceId)}` }];
@@ -43,8 +45,9 @@ export function buildActivity(state: NowPlaying, options: { showWhenPaused: bool
 /** only talk to Discord when something a person would notice changed */
 export function presenceKey(state: NowPlaying, now = Date.now()): string {
   if (!state.track) return "none";
-  const position = state.playing ? state.position + (now - state.at) / 1000 : state.position;
+  const rate = state.rate || 1;
+  const position = state.playing ? state.position + ((now - state.at) / 1000) * rate : state.position;
   // the start time, to the nearest few seconds, catches seeks without reacting to drift
-  const start = state.playing ? Math.round((now / 1000 - position) / 3) : "paused";
+  const start = state.playing ? Math.round((now / 1000 - position / rate) / 3) : "paused";
   return `${state.track.id}|${state.playing}|${start}`;
 }

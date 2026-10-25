@@ -1,5 +1,7 @@
 // Data shapes shared by the main process and the UI.
 
+import type { GlobalCommand, GlobalKeysConfig, GlobalKeyState } from "./shortcuts";
+
 export type TrackSource = "youtube" | "local";
 
 export interface ArtistRef {
@@ -97,10 +99,23 @@ export interface HistoryEntry {
   playedMs: number;
 }
 
+export interface SavedAlbum {
+  album: AlbumSummary;
+  savedAt: string;
+}
+
+/** an artist you follow; they show in Your Library and you hear about their new releases */
+export interface SavedArtist {
+  artist: ArtistSummary;
+  savedAt: string;
+}
+
 export interface LibrarySnapshot {
   liked: LikedTrack[];
   playlists: Playlist[];
   history: HistoryEntry[];
+  albums: SavedAlbum[];
+  artists: SavedArtist[];
 }
 
 
@@ -244,6 +259,8 @@ export interface NowPlaying {
   liked: boolean;
   /** Date.now() when position was read */
   at: number;
+  /** playback speed; 1 when missing */
+  rate?: number;
 }
 
 export type PlayerCommand = { kind: "toggle" } | { kind: "next" } | { kind: "previous" } | { kind: "seek"; seconds: number } | { kind: "like" };
@@ -263,6 +280,17 @@ export interface UpdateStatus {
   /** download progress, 0 to 100 */
   progress?: number;
   error?: string;
+}
+
+/** where the mini player opens: where it was last left, or a corner of the main screen */
+export type MiniCorner = "remember" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export const MINI_CORNERS: MiniCorner[] = ["remember", "top-left", "top-right", "bottom-left", "bottom-right"];
+
+export interface MiniConfig {
+  showOnMinimize: boolean;
+  /** float above other windows */
+  alwaysOnTop: boolean;
+  corner: MiniCorner;
 }
 
 export interface DiscordConfig {
@@ -358,6 +386,7 @@ export interface EncoreApi {
     reorderPlaylist(id: string, itemIds: string[]): Promise<void>;
     recordPlay(track: Track, playedMs: number): Promise<void>;
     clearHistory(): Promise<void>;
+    setAlbumSaved(album: AlbumSummary, saved: boolean): Promise<void>;
   };
   imports: {
     /** read a Spotify, Apple Music or YouTube link and start matching it */
@@ -400,6 +429,8 @@ export interface EncoreApi {
     /** the main window shares what's playing */
     publish(state: NowPlaying): void;
     onUpdate(listener: (state: NowPlaying) => void): () => void;
+    /** what's playing right now, for a window that just opened; null before anything plays */
+    get(): Promise<NowPlaying | null>;
     /** the mini player asks the main window to do something */
     command(command: PlayerCommand): void;
     onCommand(listener: (command: PlayerCommand) => void): () => void;
@@ -409,7 +440,7 @@ export interface EncoreApi {
     close(): Promise<void>;
     /** close the mini player and bring the main window back */
     expand(): Promise<void>;
-    configure(config: { showOnMinimize: boolean }): Promise<void>;
+    configure(config: MiniConfig): Promise<void>;
     onVisible(listener: (visible: boolean) => void): () => void;
   };
   discord: {
@@ -444,6 +475,20 @@ export interface EncoreApi {
     openDataFolder(): Promise<void>;
     /** true when the window is now full screen */
     toggleFullScreen(): Promise<boolean>;
+    /** backgroundPlay: closing the window while music plays keeps it going from the system tray */
+    configure(config: { backgroundPlay: boolean }): Promise<void>;
+    /** the window frame, title bar buttons and native dialogs follow this */
+    setTheme(theme: ThemeSetting): Promise<void>;
+    /** a PNG data URL of the app icon in the accent colour; null puts the stock icon back */
+    setIcon(png: string | null): Promise<void>;
+    /** asks for a picture and keeps a copy; resolves to its address, or null if none was picked */
+    pickWallpaper(): Promise<string | null>;
+    clearWallpaper(): Promise<void>;
+    /** register shortcuts that work while Encore is in the background; says which ones Windows accepted */
+    setGlobalKeys(config: GlobalKeysConfig): Promise<Partial<Record<GlobalCommand, GlobalKeyState>>>;
+    /** while true, the global shortcuts let their keys through, so a new one can be recorded */
+    pauseGlobalKeys(paused: boolean): Promise<Partial<Record<GlobalCommand, GlobalKeyState>>>;
+    onGlobalCommand(listener: (command: GlobalCommand) => void): () => void;
   };
   updates: {
     status(): Promise<UpdateStatus>;
@@ -460,6 +505,8 @@ export interface EncoreApi {
 }
 
 export const MEDIA_SCHEME = "encore-media";
+
+export type ThemeSetting = "dark" | "light" | "system";
 
 /** the URL the audio element plays; the main process proxies it to the real stream */
 export function mediaUrl(track: Pick<Track, "source" | "sourceId">, attempt = 0): string {

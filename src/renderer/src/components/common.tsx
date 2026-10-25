@@ -68,9 +68,9 @@ export function BigPlayButton({ playing, loading, onClick, label = "Play", class
       onClick={onClick}
       aria-label={playing ? "Pause" : label}
       className={cn(
-        "relative inline-flex h-10 min-w-[118px] items-center justify-center gap-2 rounded-full bg-accent px-6 text-[14.5px] font-semibold text-white",
+        "relative inline-flex h-10 min-w-[118px] items-center justify-center gap-2 rounded-full bg-accent px-6 text-[14.5px] font-semibold text-on-accent",
         // tinted glass: a bright lip on top, a darker one below, a soft red glow
-        "shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.45),inset_0_-1px_1px_rgb(0_0_0/0.18),0_8px_22px_-8px_rgb(250_45_72/0.7)] transition-[filter] duration-200 hover:brightness-110",
+        "shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.45),inset_0_-1px_1px_rgb(0_0_0/0.18),0_8px_22px_-8px_rgb(var(--accent-rgb)/0.7)] transition-[filter] duration-200 hover:brightness-110",
         className,
       )}
     >
@@ -152,7 +152,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
         initial={false}
         animate={{ width, x: checked ? 44 - width : 0 }}
         transition={{ type: "spring", stiffness: 700, damping: 40 }}
-        className="block h-6 rounded-full bg-white shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)]"
+        className="block h-6 rounded-full bg-snow shadow-[0_3px_8px_rgb(0_0_0/0.15),0_3px_1px_rgb(0_0_0/0.06)]"
       />
     </button>
   );
@@ -174,7 +174,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
             <motion.span
               layoutId={`seg-${label}`}
               transition={{ type: "spring", stiffness: 520, damping: 40 }}
-              className="absolute inset-0 rounded-[8px] bg-[rgb(99_99_102)] shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04),inset_0_0.5px_0_rgb(255_255_255/0.12)]"
+              className="absolute inset-0 rounded-[8px] bg-[var(--segment-on)] shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04),inset_0_0.5px_0_rgb(255_255_255/0.12)]"
             />
           )}
           <span className="relative">{o.label}</span>

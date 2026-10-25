@@ -14,20 +14,134 @@
   --color-ink: #ffffff;
   --color-ink-2: rgb(235 235 245 / 0.64);
   --color-ink-3: rgb(235 235 245 / 0.4);
+  /* the accent and its partners; ui/appearance.ts swaps them for the chosen colour */
   --color-accent: #fa2d48;
   --color-accent-2: #ff6b81;
+  --color-accent-deep: #a3122d;
+  --color-on-accent: #ffffff;
+  /* white that stays white in the light theme: over artwork, on switches */
+  --color-snow: #ffffff;
   --color-switch: #30d158;
+  /* status text: matched, needs a look, failed */
+  --color-good: #63e6a0;
+  --color-warn: #ffc46b;
+  --color-bad: #ff8a9b;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   /* the curve iOS uses for sheets and most system motion */
   --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* registered so the sidebar can glide between its two widths */
+@property --sidebar-w {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 252px;
+}
+
 :root {
-  /* how see-through the glass is; Settings → Appearance moves it */
-  --glass-alpha: 0.42;
+  /* how see-through the glass is; Settings → Appearance moves it, per area when custom */
+  --glass-alpha: 0.3;
   --glass-blur: 22px;
+  --sidebar-alpha: 0.3;
+  --sidebar-blur: 22px;
+  --player-alpha: 0.3;
+  --player-blur: 22px;
+  --accent-rgb: 250 45 72;
   --sidebar-w: 252px;
+  transition: --sidebar-w 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-glass-area="sidebar"] {
+  --glass-alpha: var(--sidebar-alpha);
+  --glass-blur: var(--sidebar-blur);
+}
+
+[data-glass-area="player"] {
+  --glass-alpha: var(--player-alpha);
+  --glass-blur: var(--player-blur);
+}
+
+/* ---- Themes ----
+   Dark is the default. The light theme swaps the ink and fill colours, and
+   turns "white" into near-black, so every white tint (hover fills, tracks,
+   hairlines) becomes a dark tint without touching the components. Anything
+   that must stay white uses snow or on-accent instead. */
+
+:root,
+.theme-dark {
+  color-scheme: dark;
+  --glass-rgb: 28 28 32;
+  --glass-control-rgb: 40 40 46;
+  --glass-rim: rgb(255 255 255 / 0.13);
+  --menu-rgb: 32 32 37;
+  --menu-alpha: 0.74;
+  --fill-group: rgb(255 255 255 / 0.055);
+  --fill-group-edge: rgb(255 255 255 / 0.06);
+  /* shadows are softer on a light window */
+  --shadow-k: 1;
+  --segment-on: rgb(99 99 102);
+  /* the recessed well in the middle of the player */
+  --well: rgb(0 0 0 / 0.22);
+  --backdrop-tint: 8 8 11;
+  --backdrop-edge: 0 0 0;
+}
+
+.theme-dark {
+  --color-bg: #07070a;
+  --color-surface: rgb(118 118 128 / 0.2);
+  --color-surface-2: rgb(30 30 34 / 0.96);
+  --color-surface-3: rgb(255 255 255 / 0.08);
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-ink: #ffffff;
+  --color-ink-2: rgb(235 235 245 / 0.64);
+  --color-ink-3: rgb(235 235 245 / 0.4);
+  --color-white: #ffffff;
+  --color-good: #63e6a0;
+  --color-warn: #ffc46b;
+  --color-bad: #ff8a9b;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f2f2f7;
+  --color-surface: rgb(118 118 128 / 0.12);
+  --color-surface-2: rgb(250 250 252 / 0.97);
+  --color-surface-3: rgb(0 0 0 / 0.05);
+  --color-line: rgb(0 0 0 / 0.1);
+  --color-ink: #1d1d1f;
+  --color-ink-2: rgb(60 60 67 / 0.74);
+  --color-ink-3: rgb(60 60 67 / 0.5);
+  --color-white: #0b0b0f;
+  --glass-rgb: 250 250 253;
+  --glass-control-rgb: 255 255 255;
+  --glass-rim: rgb(0 0 0 / 0.08);
+  --menu-rgb: 250 250 252;
+  --menu-alpha: 0.82;
+  --fill-group: rgb(255 255 255 / 0.6);
+  --fill-group-edge: rgb(0 0 0 / 0.05);
+  --shadow-k: 0.32;
+  --segment-on: #ffffff;
+  --well: rgb(0 0 0 / 0.045);
+  --color-good: #138a48;
+  --color-warn: #a35f00;
+  --color-bad: #d1123a;
+  --backdrop-tint: 246 246 250;
+  --backdrop-edge: 255 255 255;
+}
+
+/* the theme switch spreads out in a circle from where you clicked (ui/appearance.ts) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* narrow windows: the sidebar keeps only its icons (Sidebar.tsx uses the same width) */
+@media (max-width: 1099px) {
+  :root {
+    --sidebar-w: 68px;
+  }
 }
 
 @layer base {
@@ -61,11 +175,11 @@
   }
 
   ::selection {
-    background: rgb(250 45 72 / 0.35);
+    background: rgb(var(--accent-rgb) / 0.35);
   }
 
   :focus-visible {
-    outline: 2px solid rgb(250 45 72 / 0.8);
+    outline: 2px solid rgb(var(--accent-rgb) / 0.8);
     outline-offset: 2px;
   }
 
@@ -74,13 +188,13 @@
     height: 12px;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgb(255 255 255 / 0.14);
+    background: color-mix(in srgb, var(--color-white) 14%, transparent);
     border: 4px solid transparent;
     background-clip: padding-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgb(255 255 255 / 0.26);
+    background: color-mix(in srgb, var(--color-white) 26%, transparent);
     border: 4px solid transparent;
     background-clip: padding-box;
   }
@@ -118,30 +232,30 @@
    refraction at the edges for the big panes. */
 
 @utility glass {
-  background-color: rgb(28 28 32 / var(--glass-alpha));
+  background-color: rgb(var(--glass-rgb) / var(--glass-alpha));
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.015) 42%, rgb(255 255 255 / 0.035));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%);
   backdrop-filter: blur(var(--glass-blur)) saturate(190%);
   box-shadow:
     inset 0 1px 0.5px rgb(255 255 255 / 0.3),
     inset 0 -1px 0.5px rgb(255 255 255 / 0.07),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.13),
+    inset 0 0 0 0.5px var(--glass-rim),
     inset 0 0 20px rgb(255 255 255 / 0.025),
-    0 14px 36px -14px rgb(0 0 0 / 0.6),
-    0 2px 8px -2px rgb(0 0 0 / 0.25);
+    0 14px 36px -14px rgb(0 0 0 / calc(0.6 * var(--shadow-k))),
+    0 2px 8px -2px rgb(0 0 0 / calc(0.25 * var(--shadow-k)));
 }
 
 /* for small controls: lighter shadow, a little more see-through */
 @utility glass-control {
-  background-color: rgb(40 40 46 / calc(var(--glass-alpha) * 0.85));
+  background-color: rgb(var(--glass-control-rgb) / calc(var(--glass-alpha) * 0.85));
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
   -webkit-backdrop-filter: blur(16px) saturate(190%);
   backdrop-filter: blur(16px) saturate(190%);
   box-shadow:
     inset 0 1px 0.5px rgb(255 255 255 / 0.32),
     inset 0 -0.5px 0.5px rgb(255 255 255 / 0.08),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.14),
-    0 6px 16px -8px rgb(0 0 0 / 0.55);
+    inset 0 0 0 0.5px var(--glass-rim),
+    0 6px 16px -8px rgb(0 0 0 / calc(0.55 * var(--shadow-k)));
 }
 
 /* over artwork and photos: clear glass that lets the picture through */
@@ -160,22 +274,22 @@
 /* menus, popovers, dialogs and toasts: they float over busy content, so they
    are always tinted enough to read, whatever the glass setting */
 @utility glass-menu {
-  background-color: rgb(32 32 37 / 0.74);
+  background-color: rgb(var(--menu-rgb) / var(--menu-alpha));
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.02) 40%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   box-shadow:
     inset 0 1px 0.5px rgb(255 255 255 / 0.26),
     inset 0 -0.5px 0.5px rgb(255 255 255 / 0.06),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.12),
-    0 24px 60px -16px rgb(0 0 0 / 0.7),
-    0 4px 14px -4px rgb(0 0 0 / 0.35);
+    inset 0 0 0 0.5px var(--glass-rim),
+    0 24px 60px -16px rgb(0 0 0 / calc(0.7 * var(--shadow-k))),
+    0 4px 14px -4px rgb(0 0 0 / calc(0.35 * var(--shadow-k)));
 }
 
 /* grouped rows, the way iOS Settings and Apple Music lists sit on the page */
 @utility fill-group {
-  background-color: rgb(255 255 255 / 0.055);
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+  background-color: var(--fill-group);
+  box-shadow: inset 0 0 0 0.5px var(--fill-group-edge);
 }
 
 /* press feedback for anything tappable: a quick, springy dip */
@@ -250,7 +364,7 @@
   width: 4px;
   margin: 0 auto;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.18);
+  background: color-mix(in srgb, var(--color-white) 18%, transparent);
 }
 .eq-range::-webkit-slider-thumb {
   appearance: none;
@@ -278,7 +392,7 @@
 .range::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(to right, #fff var(--fill, 0%), rgb(255 255 255 / 0.18) var(--fill, 0%));
+  background: linear-gradient(to right, var(--color-ink) var(--fill, 0%), color-mix(in srgb, var(--color-white) 18%, transparent) var(--fill, 0%));
 }
 .range::-webkit-slider-thumb {
   appearance: none;

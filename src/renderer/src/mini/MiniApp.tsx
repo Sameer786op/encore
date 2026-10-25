@@ -4,6 +4,7 @@ import { Heart, Maximize2, Pause, Play, SkipBack, SkipForward, X } from "lucide-
 import type { NowPlaying } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
 import { cn } from "@/lib/cn";
+import { connectAppearance } from "@/ui/appearance";
 
 // The floating mini player. It mirrors what the main window plays and sends
 // button presses back; all the audio stays in the main window.
@@ -16,7 +17,7 @@ function Progress({ state }: { state: NowPlaying }) {
     let frame = 0;
     const tick = () => {
       frame = requestAnimationFrame(tick);
-      const position = state.playing ? state.position + (Date.now() - state.at) / 1000 : state.position;
+      const position = state.playing ? state.position + ((Date.now() - state.at) / 1000) * (state.rate ?? 1) : state.position;
       const ratio = state.duration > 0 ? Math.min(1, position / state.duration) : 0;
       if (bar.current) bar.current.style.transform = `scaleX(${ratio.toFixed(4)})`;
     };
@@ -43,12 +44,21 @@ export function MiniApp() {
   useEffect(() => {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
-    return window.encore.nowPlaying.onUpdate(setState);
+    const stop = window.encore.nowPlaying.onUpdate(setState);
+    // ask once on open too: the first update can arrive before this page is listening,
+    // and nothing more comes while the music is paused
+    void window.encore.nowPlaying.get().then((now) => now && setState((current) => (now.at >= current.at ? now : current)));
+    // the mini player stays dark but wears the accent picked in Settings
+    const stopAppearance = connectAppearance({ mini: true });
+    return () => {
+      stop();
+      stopAppearance();
+    };
   }, []);
 
   const track = state.track;
   return (
-    <div className="h-screen w-screen p-2">
+    <div className="theme-dark h-screen w-screen p-2">
       {/* the window can't see the desktop behind it, so the glass is lit by the song's own cover */}
       <div className="drag group relative flex h-full items-center gap-3 overflow-hidden rounded-[22px] bg-[#101014] pr-3 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.3),inset_0_0_0_0.5px_rgb(255_255_255/0.14),0_8px_30px_rgb(0_0_0/0.6)]">
         <AnimatePresence initial={false}>
