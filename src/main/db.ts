@@ -162,6 +162,35 @@ const MIGRATIONS: Record<number, string> = {
       saved_at TEXT NOT NULL
     );
   `,
+  6: `
+    -- Spotify, YouTube Music and Apple Music accounts connected to bring their playlists over
+    CREATE TABLE accounts (
+      service TEXT PRIMARY KEY,
+      name TEXT,
+      connected_at TEXT NOT NULL,
+      last_sync TEXT,
+      last_error TEXT,
+      -- the service stopped accepting the sign-in; syncing waits until it's connected again
+      signed_out INTEGER NOT NULL DEFAULT 0
+    );
+    -- their playlists, and the playlist in the library that mirrors each one;
+    -- version is what the service says changes when the playlist does, when it says
+    CREATE TABLE synced_playlists (
+      service TEXT NOT NULL,
+      remote_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      liked INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      position INTEGER NOT NULL DEFAULT 0,
+      playlist_id TEXT REFERENCES playlists(id) ON DELETE SET NULL,
+      version TEXT,
+      songs INTEGER NOT NULL DEFAULT 0,
+      missing INTEGER NOT NULL DEFAULT 0,
+      synced_at TEXT,
+      PRIMARY KEY (service, remote_id)
+    );
+    CREATE INDEX synced_playlists_mirror ON synced_playlists(playlist_id);
+  `,
 };
 
 export const SCHEMA_VERSION = Math.max(...Object.keys(MIGRATIONS).map(Number));

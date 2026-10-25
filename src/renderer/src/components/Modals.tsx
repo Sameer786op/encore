@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { LoaderCircle, Search } from "lucide-react";
-import type { Track } from "@shared/types";
+import type { AccountService, Track } from "@shared/types";
+import { ACCOUNT_NAMES } from "@shared/types";
 import { artistNames, formatTime } from "@/lib/format";
 import { Artwork } from "./Artwork";
+import { Toggle } from "./common";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { cn } from "@/lib/cn";
@@ -199,7 +201,37 @@ function ModalBody({ modal, close }: { modal: ModalState; close: () => void }) {
           </form>
         </Dialog>
       );
+    case "disconnect-account":
+      return <DisconnectAccount service={modal.service} playlists={modal.playlists} close={close} />;
   }
+}
+
+function DisconnectAccount({ service, playlists, close }: { service: AccountService; playlists: number; close: () => void }) {
+  const [keep, setKeep] = useState(true);
+  const name = ACCOUNT_NAMES[service];
+  return (
+    <Dialog title={`Disconnect ${name}?`} onClose={close}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          close();
+          void window.encore.accounts.disconnect(service, keep);
+        }}
+      >
+        <p className="mt-2 text-sm leading-relaxed text-ink-2">Vyse Music signs out of {name} and stops syncing. Nothing changes on {name} itself.</p>
+        {playlists > 0 && (
+          <div className="mt-4 flex items-center gap-4 rounded-[14px] bg-white/[0.05] px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] font-medium">Keep {playlists === 1 ? "its playlist" : `its ${playlists} playlists`}</div>
+              <div className="mt-0.5 text-[12px] leading-snug text-ink-3">{keep ? "They stay in Your Library as your own, and stop updating." : "They're removed from Your Library."}</div>
+            </div>
+            <Toggle checked={keep} onChange={setKeep} label="Keep the playlists" />
+          </div>
+        )}
+        <Buttons onCancel={close} confirmLabel="Disconnect" danger />
+      </form>
+    </Dialog>
+  );
 }
 
 export function Modals() {

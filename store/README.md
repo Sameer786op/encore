@@ -31,7 +31,7 @@ In the reserved app, **Start your submission**:
 
 ### Notes for certification
 
-> Vyse Music is a free desktop music player. No account or sign-in is needed. Search for a song from Search or open a song on Home and press play. Everything the user saves stays on their device; Vyse Music has no server. Optional features in Settings (Last.fm, ListenBrainz, Discord) need the tester's own accounts and can be skipped.
+> Vyse Music is a free desktop music player. No account or sign-in is needed. Search for a song from Search or open a song on Home and press play. Everything the user saves stays on their device; Vyse Music has no server. Optional features in Settings (Connected accounts for Spotify, YouTube Music and Apple Music; Last.fm, ListenBrainz, Discord) need the tester's own accounts and can be skipped.
 
 ## Store listing
 

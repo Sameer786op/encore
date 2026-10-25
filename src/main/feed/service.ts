@@ -120,6 +120,27 @@ export class FeedService {
     } else this.db.prepare("DELETE FROM followed_artists WHERE artist_id = ?").run(artist.id);
   }
 
+  /**
+   * Follow artists followed on a connected account. Names are looked up on YouTube Music
+   * (a few per call; the rest wait for the next one). Returns the names handled.
+   */
+  async followFromAccount(artists: { name: string; id?: string; artwork?: string }[], lookups = 30): Promise<string[]> {
+    const budget = { left: lookups };
+    const handled: string[] = [];
+    const found: ArtistSummary[] = [];
+    for (const a of artists) {
+      if (!a.id && budget.left <= 0) break;
+      const artist = a.id ? { id: a.id, name: a.name, artwork: a.artwork } : await this.resolveArtist(a.name, undefined, budget);
+      handled.push(a.name);
+      if (artist && !this.isFollowing(artist.id)) found.push(artist);
+    }
+    const insert = this.db.prepare("INSERT OR IGNORE INTO followed_artists (artist_id, name, artwork, followed_at) VALUES (?, ?, ?, ?)");
+    for (const artist of found) insert.run(artist.id, artist.name, artist.artwork ?? null, new Date().toISOString());
+    // what they've already put out becomes the baseline, so only later releases count as new
+    if (found.length > 0) void this.checkReleases(found);
+    return handled;
+  }
+
   private followed(): ArtistSummary[] {
     return (this.db.prepare("SELECT artist_id, name, artwork FROM followed_artists").all() as unknown as { artist_id: string; name: string; artwork: string | null }[]).map(
       (r) => ({ id: r.artist_id, name: r.name, artwork: r.artwork ?? undefined }),

@@ -115,6 +115,48 @@ export interface Playlist {
   createdAt: string;
   updatedAt: string;
   items: PlaylistItem[];
+  /** set when it mirrors a playlist on a connected account; it then changes only when that one does */
+  synced?: { service: AccountService; remoteId: string };
+}
+
+// ---- connected accounts: playlists brought over from Spotify, YouTube Music and Apple Music ----
+
+export type AccountService = "spotify" | "youtube" | "apple";
+
+export const ACCOUNT_SERVICES: AccountService[] = ["spotify", "youtube", "apple"];
+
+export const ACCOUNT_NAMES: Record<AccountService, string> = {
+  spotify: "Spotify",
+  youtube: "YouTube Music",
+  apple: "Apple Music",
+};
+
+export interface SyncedPlaylistInfo {
+  remoteId: string;
+  name: string;
+  /** the service's liked songs, kept as a playlist of their own */
+  liked: boolean;
+  enabled: boolean;
+  /** the playlist in Your Library that mirrors it, once it has synced */
+  playlistId?: string;
+  songs: number;
+  /** songs that couldn't be found on YouTube Music */
+  missing: number;
+}
+
+export interface AccountStatus {
+  service: AccountService;
+  connected: boolean;
+  /** who is signed in, when the service says */
+  name?: string;
+  state: "idle" | "connecting" | "syncing" | "signed-out" | "error";
+  /** while syncing: the playlist being read and how far along its songs are */
+  progress?: { playlist: string; done: number; total: number; step: number; steps: number };
+  /** while connecting through the browser: the code to enter there, and the page to enter it on */
+  signIn?: { code: string; url: string };
+  lastSync?: string;
+  error?: string;
+  playlists: SyncedPlaylistInfo[];
 }
 
 export interface HistoryEntry {
@@ -493,6 +535,20 @@ export interface EncoreApi {
     /** a release Vyse Music told you about was clicked in a notification */
     onOpenAlbum(listener: (albumId: string) => void): () => void;
     setNotifications(on: boolean): Promise<void>;
+  };
+  accounts: {
+    list(): Promise<AccountStatus[]>;
+    onChange(listener: (accounts: AccountStatus[]) => void): () => void;
+    /** opens the service's own sign-in page (a window, or Google's page in the browser for YouTube Music); true once signed in */
+    connect(service: AccountService): Promise<boolean>;
+    /** stops waiting for a sign-in under way */
+    cancelConnect(service: AccountService): Promise<void>;
+    /** opens the sign-in page again */
+    reopenSignIn(service: AccountService): Promise<void>;
+    /** signs out; its playlists are removed, or kept as ordinary playlists */
+    disconnect(service: AccountService, keepPlaylists: boolean): Promise<void>;
+    sync(service: AccountService): Promise<void>;
+    setPlaylistEnabled(service: AccountService, remoteId: string, enabled: boolean): Promise<void>;
   };
   scrobble: {
     status(): Promise<ScrobbleStatus>;

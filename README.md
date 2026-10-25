@@ -4,7 +4,7 @@
 
 Vyse Music used to be called Encore. Updating keeps everything you had.
 
-A free, ad-free desktop music player for Windows. Search the whole YouTube Music catalog, play anything, bring in your playlists and history from Spotify, YouTube Music and Apple Music, and play the music files on your computer. Everything stays on your own machine. No account, no server, no tracking.
+A free, ad-free desktop music player for Windows. Search the whole YouTube Music catalog, play anything, connect Spotify, YouTube Music or Apple Music to keep your playlists here and up to date, bring in your history, and play the music files on your computer. Everything stays on your own machine. No server, no tracking, and no account needed.
 
 ## Download
 
@@ -26,8 +26,10 @@ Vyse Music keeps itself up to date: it checks every time you open it and every h
 
 ### Bring your music in (Phase 2)
 
-Vyse Music never signs in to your other accounts. Your music comes in three ways:
+Your music comes in four ways:
 
+- **Connected accounts** (Settings, Connected accounts): connect Spotify, YouTube Music or Apple Music and every playlist you have there shows up in Vyse Music, kept up to date. Songs you add or remove there change here too, on opening Vyse Music and every 15 minutes while it's open (or straight away with Sync now). Liked songs come over as their own playlist, like *Liked on Spotify*, and the artists you follow there are followed here, so their new releases show up. Any playlist can be switched off. Synced playlists change only where they come from; *Make a copy* gives you one of your own to change. You sign in to Spotify and Apple Music on their own page in a window from Vyse Music, so your password goes only to them. YouTube Music signs in with the Google account already in your browser: Vyse Music shows a code, you enter it on Google's page (google.com/device), pick your account and click Allow, with nothing to type. Nothing is ever changed on your account. Songs still play free from YouTube Music, with no Premium needed. Nothing changes until you connect an account.
+  - These services don't officially offer this to apps like Vyse Music (Spotify's official route needs Premium since 2026), so Vyse Music reads with the same sign-in their own web players use. A change on their side can stop a connection working until Vyse Music is updated. Spotify only lists the songs of playlists you made or collaborate on; for playlists you follow, the first 100 songs come over.
 - **Playlist and album links** from Spotify (up to 100 songs, all Spotify shares without an account), Apple Music and YouTube / YouTube Music (whole playlists, exact songs).
 - **Your data exports**, which every service gives you for free:
   - Spotify, from *spotify.com/account/privacy*: the full streaming history (extended or last year), your liked songs and all your playlists.
@@ -139,6 +141,7 @@ src/
     discord/   a small Discord RPC client and the "Listening to" activity
     mini/      the floating mini player window
     feed/      your taste profile, daily mixes, the release watcher and the home feed
+    accounts/  connected Spotify, YouTube Music and Apple Music accounts: sign-in windows, readers and the sync
     scrobble/  Last.fm and ListenBrainz clients and the offline scrobble queue
     updates/   finds, downloads and installs new versions from GitHub releases
     db.ts      the SQLite file and its migrations
@@ -160,6 +163,7 @@ src/
 - **Audio**: when a song plays, the main process finds its audio stream, checks that the whole file is reachable, and forwards it to the player in 4 MB pieces through a private `encore-media://` address. The UI never sees YouTube URLs and seeking works. Songs are never stored on a server.
 - **Sound**: two `<audio>` decks feed one Web Audio graph (levelling and fade per deck, then preamp, 10 EQ bands, a limiter, an analyser for the visuals, and the volume). One deck plays while the other gets the next song ready, which is what makes gapless playback and crossfades possible.
 - **Library**: one SQLite file in your user folder (`%APPDATA%\encore\library.db`), with cover art from your music files next to it. Nothing leaves your computer.
+- **Connected accounts**: Spotify and Apple Music sign in inside their own window with its own browser storage (`persist:account-…`), which Vyse Music never reads the password from. A hidden window opens the service's web app now and then, so its sign-in stays fresh the way a browser tab's would, and Vyse Music reads with the token that web app uses. YouTube Music uses Google's "sign in on a TV" flow in the person's own browser instead (`accounts/google.ts`); YouTube takes that sign-in only from its TV app, so the library is read the way the TV app reads it, and its songs are YouTube videos already, with nothing to match. Playlists are mirrored into the library and matched like imports, so later syncs only look up new songs; a sync that can't reach a service, or YouTube Music, changes nothing.
 - **Imports**: exports are read on your computer and only song names are used for matching. Sensitive fields in exports (like the IP addresses in Spotify's extended history) are never stored. Import jobs live in the database, so a half-matched import carries on after a restart.
 - **Local files**: the UI can only play files Vyse Music indexed from folders you chose; it never gets to ask for arbitrary paths.
 - **Feed**: built once a day in the main process from the plays in the database. Artist names are matched to YouTube Music artists once and remembered, so later builds are quick. The only thing asked of YouTube Music is what any search would ask: artist pages and similar songs.

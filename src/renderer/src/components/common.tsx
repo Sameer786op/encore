@@ -139,6 +139,8 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   const width = pressed ? 31 : 24;
   return (
     <button
+      // inside a form (the Disconnect dialog) a plain button would submit it
+      type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}

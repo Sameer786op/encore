@@ -477,7 +477,12 @@ export function ImportPage() {
         Bring your music
       </motion.h1>
       <p className="mt-1 max-w-2xl text-[15px] text-ink-2">
-        Import playlists from a link, or everything you've listened to from your data export. Vyse Music never signs in to your accounts.
+        Import playlists from a link, or everything you've listened to from your data export. To keep your playlists up to date by themselves,{" "}
+        {/* Connected accounts is the first thing in Settings */}
+        <button onClick={() => navigate({ name: "settings" })} className="font-semibold text-accent hover:underline">
+          connect your account
+        </button>{" "}
+        instead.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 @4xl:grid-cols-2">

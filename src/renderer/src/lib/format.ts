@@ -44,6 +44,15 @@ export function relativeDate(iso: string, now = Date.now()): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** "just now", "5 minutes ago", "2 hours ago", then the day */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${plural(minutes, "minute")} ago`;
+  if (minutes < 24 * 60) return `${plural(Math.floor(minutes / 60), "hour")} ago`;
+  return relativeDate(iso, now).toLowerCase();
+}
+
 export function youtubeMusicLink(track: Track): string {
   return `https://music.youtube.com/watch?v=${encodeURIComponent(track.sourceId)}`;
 }

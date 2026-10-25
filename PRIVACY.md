@@ -2,7 +2,7 @@
 
 *Last updated: October 25, 2026*
 
-Vyse Music is a free music player that runs on your own computer. It has no accounts, no servers of its own, no ads and no analytics. Nobody behind Vyse Music can see what you listen to.
+Vyse Music is a free music player that runs on your own computer. It has no accounts of its own, no servers, no ads and no analytics. Nobody behind Vyse Music can see what you listen to.
 
 ## What stays on your computer
 
@@ -12,13 +12,14 @@ Your library, playlists, liked songs, listening history, settings and anything y
 
 To work, Vyse Music asks these services for things, the same way a web browser would. They see your IP address and what was asked for, under their own privacy policies.
 
-- **YouTube Music**, to search, show artwork and play songs. Vyse Music never signs in to your Google account.
+- **YouTube Music**, to search, show artwork and play songs. Playback never uses your Google account, even if you connect it below.
 - **LRCLIB** (lrclib.net), to find lyrics for the song that's playing. It is sent the song's title, artist, album and length.
 - **Playlist links you paste** from Spotify, YouTube Music or Apple Music, to read the list of songs on that public page.
 - **GitHub**, to look for new versions of Vyse Music. The Microsoft Store version doesn't do this; the Store updates it.
 
 Only if you turn them on in Settings:
 
+- **Spotify, YouTube Music or Apple Music**, if you connect them under Connected accounts. You sign in on their own page, in a window from Vyse Music (Spotify and Apple Music) or in your own browser (YouTube Music, on Google's page for signing in a TV, where Google calls it "YouTube on TV"); your password goes only to them. The sign-in is kept on your computer, separately for each service (YouTube Music's encrypted with your Windows account), and Vyse Music uses it only to read your playlists, liked songs and the artists you follow. It never changes anything on your account. Disconnecting deletes that sign-in from your computer; for YouTube Music you can also remove "YouTube on TV" under Security in your Google account, though that may sign out a TV you watch YouTube on too. Song titles from Spotify and Apple Music playlists are searched on YouTube Music to find each song, as with imports.
 - **Last.fm** or **ListenBrainz**, which are sent the songs you play, using the account you connect.
 - **Discord**, which shows what you're playing on your Discord profile. This goes to the Discord app on your computer.
 

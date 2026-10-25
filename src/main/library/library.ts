@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { AlbumSummary, HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, SavedAlbum, SavedArtist, Track } from "@shared/types";
+import type { AccountService, AlbumSummary, HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, SavedAlbum, SavedArtist, Track } from "@shared/types";
+import { ACCOUNT_NAMES } from "@shared/types";
 import { transaction } from "../db";
 
 // Likes, playlists, plays and saved albums. Tracks are stored once and
@@ -12,6 +13,15 @@ const HISTORY_IN_SNAPSHOT = 300;
 interface TrackRow {
   data: string;
 }
+
+/** a song in a playlist mirrored from a connected account, with when it was added there if the service says */
+export interface MirroredSong {
+  track: Track;
+  addedAt?: string;
+}
+
+/** changing a mirrored playlist here would be undone by the next sync, so it's refused */
+export class SyncedPlaylistError extends Error {}
 
 export class Library {
   private listeners = new Set<(snapshot: LibrarySnapshot) => void>();
@@ -61,6 +71,15 @@ export class Library {
       list.push({ itemId: r.item_id, track: JSON.parse(r.data), addedAt: r.added_at });
       itemsByPlaylist.set(r.playlist_id, list);
     }
+    const synced = new Map(
+      (
+        this.db.prepare("SELECT playlist_id, service, remote_id FROM synced_playlists WHERE playlist_id IS NOT NULL").all() as unknown as {
+          playlist_id: string;
+          service: AccountService;
+          remote_id: string;
+        }[]
+      ).map((r) => [r.playlist_id, { service: r.service, remoteId: r.remote_id }]),
+    );
     const playlists = (
       this.db.prepare("SELECT id, name, created_at, updated_at FROM playlists ORDER BY updated_at DESC").all() as unknown as {
         id: string;
@@ -68,7 +87,16 @@ export class Library {
         created_at: string;
         updated_at: string;
       }[]
-    ).map((p): Playlist => ({ id: p.id, name: p.name, createdAt: p.created_at, updatedAt: p.updated_at, items: itemsByPlaylist.get(p.id) ?? [] }));
+    ).map(
+      (p): Playlist => ({
+        id: p.id,
+        name: p.name,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+        items: itemsByPlaylist.get(p.id) ?? [],
+        ...(synced.has(p.id) ? { synced: synced.get(p.id) } : {}),
+      }),
+    );
 
     const history = (
       this.db
@@ -154,16 +182,93 @@ export class Library {
     return this.snapshot().playlists.find((p) => p.id === id)!;
   }
 
+  /** refuse to change a playlist that mirrors one on a connected account */
+  private assertEditable(id: string): void {
+    const row = this.db.prepare("SELECT service FROM synced_playlists WHERE playlist_id = ?").get(id) as { service: AccountService } | undefined;
+    if (row) throw new SyncedPlaylistError(`This playlist comes from ${ACCOUNT_NAMES[row.service] ?? row.service}. Change it there and it updates here.`);
+  }
+
   renamePlaylist(id: string, name: string): void {
     const trimmed = name.trim();
     if (!trimmed) return;
+    this.assertEditable(id);
     this.db.prepare("UPDATE playlists SET name = ?, updated_at = ? WHERE id = ?").run(trimmed, new Date().toISOString(), id);
     this.changed();
   }
 
   deletePlaylist(id: string): void {
-    this.db.prepare("DELETE FROM playlists WHERE id = ?").run(id);
+    this.deletePlaylists([id]);
+  }
+
+  deletePlaylists(ids: string[]): void {
+    if (ids.length === 0) return;
+    this.transaction(() => {
+      for (const id of ids) {
+        // deleting a mirrored playlist switches its sync off, so the next sync doesn't bring it back
+        this.db.prepare("UPDATE synced_playlists SET enabled = 0, playlist_id = NULL WHERE playlist_id = ?").run(id);
+        this.db.prepare("DELETE FROM playlists WHERE id = ?").run(id);
+      }
+    });
     this.changed();
+  }
+
+  /**
+   * Make a playlist hold exactly these songs, in this order: the mirror of a playlist on a
+   * connected account. Songs still there keep their place in the table and their date added.
+   * Creates the playlist when `id` is missing or gone, and links it to the playlist it mirrors
+   * in the same step, so nobody is ever told about it as an ordinary playlist. Returns its id.
+   */
+  mirrorPlaylist(id: string | undefined, name: string, songs: MirroredSong[], source: { service: AccountService; remoteId: string }): string {
+    let changed = false;
+    const playlistId = this.transaction(() => {
+      const now = new Date().toISOString();
+      const existing = id ? (this.db.prepare("SELECT name FROM playlists WHERE id = ?").get(id) as { name: string } | undefined) : undefined;
+      const playlistId = existing ? id! : randomUUID();
+      if (!existing) {
+        this.db.prepare("INSERT INTO playlists (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)").run(playlistId, name, now, now);
+        this.db.prepare("UPDATE synced_playlists SET playlist_id = ? WHERE service = ? AND remote_id = ?").run(playlistId, source.service, source.remoteId);
+        changed = true;
+      } else if (existing.name !== name) {
+        this.db.prepare("UPDATE playlists SET name = ? WHERE id = ?").run(name, playlistId);
+        changed = true;
+      }
+
+      const rows = this.db.prepare("SELECT item_id, track_id, position FROM playlist_items WHERE playlist_id = ? ORDER BY position").all(playlistId) as unknown as {
+        item_id: string;
+        track_id: string;
+        position: number;
+      }[];
+      const byTrack = new Map<string, { item_id: string; position: number }[]>();
+      for (const row of rows) byTrack.set(row.track_id, [...(byTrack.get(row.track_id) ?? []), row]);
+
+      const move = this.db.prepare("UPDATE playlist_items SET position = ? WHERE item_id = ?");
+      const insert = this.db.prepare("INSERT INTO playlist_items (item_id, playlist_id, track_id, position, added_at) VALUES (?, ?, ?, ?, ?)");
+      songs.forEach((song, position) => {
+        const reuse = byTrack.get(song.track.id)?.shift();
+        if (reuse) {
+          if (reuse.position !== position) {
+            move.run(position, reuse.item_id);
+            changed = true;
+          }
+          return;
+        }
+        this.saveTrack(song.track);
+        insert.run(randomUUID(), playlistId, song.track.id, position, song.addedAt ?? now);
+        changed = true;
+      });
+
+      const remove = this.db.prepare("DELETE FROM playlist_items WHERE item_id = ?");
+      for (const left of byTrack.values()) {
+        for (const row of left) {
+          remove.run(row.item_id);
+          changed = true;
+        }
+      }
+      if (changed) this.db.prepare("UPDATE playlists SET updated_at = ? WHERE id = ?").run(now, playlistId);
+      return playlistId;
+    });
+    if (changed) this.changed();
+    return playlistId;
   }
 
   private insertItems(playlistId: string, tracks: Track[]): number {
@@ -180,6 +285,7 @@ export class Library {
   }
 
   addToPlaylist(id: string, tracks: Track[]): number {
+    this.assertEditable(id);
     const added = this.transaction(() => {
       const exists = this.db.prepare("SELECT 1 FROM playlists WHERE id = ?").get(id);
       if (!exists) throw new Error("Playlist not found");
@@ -192,6 +298,7 @@ export class Library {
   }
 
   removeFromPlaylist(id: string, itemId: string): void {
+    this.assertEditable(id);
     this.db.prepare("DELETE FROM playlist_items WHERE playlist_id = ? AND item_id = ?").run(id, itemId);
     this.db.prepare("UPDATE playlists SET updated_at = ? WHERE id = ?").run(new Date().toISOString(), id);
     this.changed();
@@ -199,6 +306,7 @@ export class Library {
 
   /** `itemIds` is the full new order; unknown ids are ignored */
   reorderPlaylist(id: string, itemIds: string[]): void {
+    this.assertEditable(id);
     this.transaction(() => {
       const update = this.db.prepare("UPDATE playlist_items SET position = ? WHERE playlist_id = ? AND item_id = ?");
       itemIds.forEach((itemId, position) => update.run(position, id, itemId));

@@ -12,6 +12,7 @@ import { useUpdates } from "@/ui/updates";
 import { Mosaic } from "./Artwork";
 import { LiquidGlass } from "./LiquidGlass";
 import { Logo } from "./Logo";
+import { ServiceIcon } from "./ServiceIcon";
 import { PlayingBars } from "./PlayingBars";
 import { playlistMenu } from "./playlistMenu";
 import { SEARCH_INPUT_ID } from "./TopBar";
@@ -172,7 +173,7 @@ export function Sidebar() {
               route={{ name: "playlist", id: p.id }}
               icon={<Mosaic sources={p.items.map((i) => i.track.artwork)} className="size-[22px] rounded-[5px]" fallback={<ListMusic className="size-3" />} />}
               label={p.name}
-              trailing={bars(p.id)}
+              trailing={bars(p.id) || (p.synced && <ServiceIcon service={p.synced.service} plain className="size-3 text-ink-3" />)}
               onContextMenu={(e) => openMenu(e, playlistMenu(p))}
             />
           ))}

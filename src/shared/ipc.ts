@@ -79,6 +79,15 @@ export const IPC = {
   feedOpenAlbum: "feed:open-album",
   feedSetNotifications: "feed:set-notifications",
 
+  accountsList: "accounts:list",
+  accountsChanged: "accounts:changed",
+  accountsConnect: "accounts:connect",
+  accountsCancelConnect: "accounts:cancel-connect",
+  accountsReopenSignIn: "accounts:reopen-sign-in",
+  accountsDisconnect: "accounts:disconnect",
+  accountsSync: "accounts:sync",
+  accountsSetPlaylistEnabled: "accounts:set-playlist-enabled",
+
   scrobbleStatus: "scrobble:status",
   scrobbleStatusChanged: "scrobble:status-changed",
   scrobblePlayed: "scrobble:played",

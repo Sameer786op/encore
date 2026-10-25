@@ -1,11 +1,12 @@
 import { create } from "zustand";
-import type { Playlist, Track } from "@shared/types";
+import type { AccountService, Playlist, Track } from "@shared/types";
 
 export type ModalState =
   | { kind: "create-playlist"; tracks?: Track[]; name?: string; onCreated?: (playlist: Playlist) => void }
   | { kind: "rename-playlist"; id: string; name: string }
   | { kind: "confirm"; title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void }
-  | { kind: "pick-song"; query: string; onPick: (track: Track) => void };
+  | { kind: "pick-song"; query: string; onPick: (track: Track) => void }
+  | { kind: "disconnect-account"; service: AccountService; playlists: number };
 
 interface ModalStore {
   modal: ModalState | null;

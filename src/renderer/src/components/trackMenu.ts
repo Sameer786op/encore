@@ -13,7 +13,8 @@ export function addToPlaylistEntries(tracks: Track[]): MenuEntry[] {
   return [
     { label: "New playlist…", icon: Plus, onSelect: () => openModal({ kind: "create-playlist", tracks }) },
     "divider",
-    ...snapshot.playlists.map((p) => ({ label: p.name, onSelect: () => void addToPlaylist(p, tracks) })),
+    // synced playlists change only on the service they come from
+    ...snapshot.playlists.filter((p) => !p.synced).map((p) => ({ label: p.name, onSelect: () => void addToPlaylist(p, tracks) })),
   ];
 }
 

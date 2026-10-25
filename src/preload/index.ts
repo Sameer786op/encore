@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import type {
+  AccountStatus,
   DiscordStatus,
   EncoreApi,
   FeedStatus,
@@ -113,6 +114,16 @@ const api: EncoreApi = {
     follow: (artist, on) => ipcRenderer.invoke(IPC.feedFollow, artist, on),
     onOpenAlbum: (listener) => subscribe<string>(IPC.feedOpenAlbum, listener),
     setNotifications: (on) => ipcRenderer.invoke(IPC.feedSetNotifications, on),
+  },
+  accounts: {
+    list: () => ipcRenderer.invoke(IPC.accountsList),
+    onChange: (listener) => subscribe<AccountStatus[]>(IPC.accountsChanged, listener),
+    connect: (service) => ipcRenderer.invoke(IPC.accountsConnect, service),
+    cancelConnect: (service) => ipcRenderer.invoke(IPC.accountsCancelConnect, service),
+    reopenSignIn: (service) => ipcRenderer.invoke(IPC.accountsReopenSignIn, service),
+    disconnect: (service, keepPlaylists) => ipcRenderer.invoke(IPC.accountsDisconnect, service, keepPlaylists),
+    sync: (service) => ipcRenderer.invoke(IPC.accountsSync, service),
+    setPlaylistEnabled: (service, remoteId, enabled) => ipcRenderer.invoke(IPC.accountsSetPlaylistEnabled, service, remoteId, enabled),
   },
   scrobble: {
     status: () => ipcRenderer.invoke(IPC.scrobbleStatus),

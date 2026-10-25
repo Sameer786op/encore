@@ -9,6 +9,7 @@ import { useCurrentTrack, usePlayer } from "@/player/store";
 import { useSettings } from "@/settings/store";
 import { useUpdates } from "@/ui/updates";
 import { cn } from "@/lib/cn";
+import { AccountSettings } from "./settings/AccountSettings";
 import { AppearanceSettings } from "./settings/AppearanceSettings";
 import { MiniPlayerSettings } from "./settings/MiniPlayerSettings";
 import { Card, Group, Row } from "./settings/parts";
@@ -317,6 +318,10 @@ export function SettingsPage() {
       >
         Settings
       </motion.h1>
+
+      <Group id="accounts" title="Connected accounts">
+        <AccountSettings />
+      </Group>
 
       <Group title="Appearance">
         <AppearanceSettings />

@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { BellOff, BellRing, Check, ChevronLeft, ChevronRight, Heart, ListMusic, Play, Plus, Shuffle } from "lucide-react";
 import type { AlbumSummary, ArtistSummary, DailyMix, Playlist, RemotePlaylist, Track } from "@shared/types";
+import { ACCOUNT_NAMES } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
@@ -12,6 +13,7 @@ import { openMenu, type MenuEntry } from "@/ui/menu";
 import { toast } from "@/ui/toast";
 import { Artwork, Mosaic } from "./Artwork";
 import { MixCover } from "./MixCover";
+import { ServiceIcon } from "./ServiceIcon";
 import { trackMenu } from "./trackMenu";
 import { playlistMenu } from "./playlistMenu";
 import { albumCache, remotePlaylistCache } from "@/pages/albumCache";
@@ -176,7 +178,10 @@ export function PlaylistCard({ playlist }: { playlist: Playlist }) {
         {tracks.length > 0 && <HoverPlay onClick={play} label={`Play ${playlist.name}`} />}
       </div>
       <div className="mt-2.5 truncate text-[13px] font-medium leading-tight">{playlist.name}</div>
-      <div className="mt-0.5 truncate text-[13px] leading-tight text-ink-2">Playlist • {plural(tracks.length, "song")}</div>
+      <div className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] leading-tight text-ink-2">
+        {playlist.synced && <ServiceIcon service={playlist.synced.service} plain className="size-3 shrink-0" />}
+        <span className="truncate">{playlist.synced ? ACCOUNT_NAMES[playlist.synced.service] : "Playlist"} • {plural(tracks.length, "song")}</span>
+      </div>
     </CardShell>
   );
 }

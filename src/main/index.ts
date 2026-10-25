@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell, type IpcMainInvokeEvent } from "electron";
 import type {
   AlbumSummary,
   ArtistSummary,
@@ -16,9 +16,17 @@ import type {
   Track,
   WindowState,
 } from "@shared/types";
-import { MINI_CORNERS, type MiniConfig, type MiniCorner } from "@shared/types";
+import { ACCOUNT_SERVICES, MINI_CORNERS, type AccountService, type MiniConfig, type MiniCorner } from "@shared/types";
 import { IPC } from "@shared/ipc";
 import { shouldScrobble } from "@shared/scrobbleRules";
+import { AppleProvider } from "./accounts/apple";
+import { GoogleSignIn } from "./accounts/google";
+import type { AccountAuth, AccountProvider } from "./accounts/provider";
+import { SpotifyProvider } from "./accounts/spotify";
+import { standinAccounts } from "./accounts/standin";
+import { AccountSync } from "./accounts/sync";
+import { AccountWeb } from "./accounts/web";
+import { YouTubeProvider } from "./accounts/youtube";
 import { Appearance, WALLPAPER_TYPES } from "./appearance";
 import { GlobalKeys } from "./globalKeys";
 import { Thumbar } from "./thumbar";
@@ -30,6 +38,7 @@ import { buildActivity, presenceKey } from "./discord/presence";
 import { FeedService } from "./feed/service";
 import { ListeningHistory } from "./history/history";
 import { ImportManager } from "./imports/manager";
+import { readSpotify } from "./imports/links";
 import { ImportService } from "./imports/service";
 import { Library } from "./library/library";
 import { LocalLibrary } from "./local/local";
@@ -72,6 +81,8 @@ let feed: FeedService;
 let scrobbler: Scrobbler;
 let updates: Updater;
 let appearance: Appearance;
+let accounts: AccountSync;
+let accountWeb: AccountWeb | null = null;
 const discord = new DiscordRpc();
 let discordShowWhenPaused = false;
 let nowPlaying: NowPlaying | null = null;
@@ -122,6 +133,7 @@ function showMainWindow(): void {
   if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
     updates?.checkIfStale();
     void feed?.checkReleasesOnOpen();
+    accounts?.syncIfStale();
   }
   tray.hide();
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -291,6 +303,42 @@ function stringArg(value: unknown, name: string): string {
   return value;
 }
 
+function serviceArg(value: unknown): AccountService {
+  if (!ACCOUNT_SERVICES.includes(value as AccountService)) throw new Error("Unknown service");
+  return value as AccountService;
+}
+
+/** the real sign-ins and readers, or the stand-ins automated tests use */
+function accountConnections(): { providers: Record<AccountService, AccountProvider>; auth: Record<AccountService, AccountAuth> } {
+  if (process.env.ENCORE_ACCOUNTS_STANDIN) return standinAccounts(process.env.ENCORE_ACCOUNTS_STANDIN);
+  const web = new AccountWeb({ parent: () => mainWindow, icon });
+  accountWeb = web;
+  const google = new GoogleSignIn({
+    // kept encrypted, like the scrobbling keys
+    store: {
+      get: () => {
+        const saved = getSetting(db, "accounts.youtube.signIn");
+        return saved ? electronVault.decrypt(saved) : null;
+      },
+      set: (value) => setSetting(db, "accounts.youtube.signIn", value === null ? null : electronVault.encrypt(value)),
+    },
+    // Google's page opens in the person's own browser, where they're signed in to Google already; the code is ready to paste
+    openPage: ({ code, url }) => {
+      if (process.env.ENCORE_NO_BROWSER) return;
+      clipboard.writeText(code);
+      void shell.openExternal(url);
+    },
+  });
+  return {
+    providers: {
+      spotify: new SpotifyProvider(web.apiAuth("spotify"), (id) => readSpotify({ service: "spotify", kind: "playlist", id })),
+      youtube: new YouTubeProvider(google.client),
+      apple: new AppleProvider(web.apiAuth("apple")),
+    },
+    auth: { spotify: web.auth("spotify"), youtube: google, apple: web.auth("apple") },
+  };
+}
+
 function artistArg(value: unknown): ArtistSummary {
   const a = value as ArtistSummary;
   if (!a || typeof a.id !== "string" || !/^[\w-]{1,64}$/.test(a.id) || typeof a.name !== "string") throw new Error("Expected an artist");
@@ -369,6 +417,16 @@ function registerIpc(): void {
   });
   handle(IPC.clearHistory, () => library.clearHistory());
   handle(IPC.setAlbumSaved, (album: unknown, saved: unknown) => library.setAlbumSaved(albumArg(album), saved === true));
+
+  handle(IPC.accountsList, () => accounts.list());
+  handle(IPC.accountsConnect, (service: unknown) => accounts.connect(serviceArg(service)));
+  handle(IPC.accountsCancelConnect, (service: unknown) => accounts.cancelConnect(serviceArg(service)));
+  handle(IPC.accountsReopenSignIn, (service: unknown) => accounts.reopenSignIn(serviceArg(service)));
+  handle(IPC.accountsDisconnect, (service: unknown, keep: unknown) => accounts.disconnect(serviceArg(service), keep === true));
+  handle(IPC.accountsSync, (service: unknown) => accounts.sync(serviceArg(service)));
+  handle(IPC.accountsSetPlaylistEnabled, (service: unknown, remoteId: unknown, enabled: unknown) =>
+    accounts.setPlaylistEnabled(serviceArg(service), stringArg(remoteId, "playlist id"), enabled === true),
+  );
 
   handle(IPC.importFromLink, (url: unknown) => importService.fromLink(stringArg(url, "link").slice(0, 2000)));
   handle(IPC.importPickFile, async () => {
@@ -552,6 +610,7 @@ app.whenReady().then(() => {
   local = new LocalLibrary(db, join(userData, "artwork"));
   lyrics = new LyricsService(db, { youtubeLyrics: lyricsText, localPath: (id) => local.pathOf(id) });
   feed = new FeedService(db, library, matcher, { searchArtists, artist, radio }, notifyReleases);
+  accounts = new AccountSync({ db, library, matcher, ...accountConnections(), follow: (artists, lookups) => feed.followFromAccount(artists, lookups) });
   scrobbler = new Scrobbler(db, { lastfm: new Lastfm(), listenbrainz: new ListenBrainz() }, electronVault, (url) => void shell.openExternal(url));
   // only installed copies update themselves, and not ones from the Microsoft Store, which does it;
   // test runs can opt in with ENCORE_UPDATES=1
@@ -577,6 +636,7 @@ app.whenReady().then(() => {
   feed.onStatus((status) => send(IPC.feedStatusChanged, status));
   scrobbler.onStatus((status) => send(IPC.scrobbleStatusChanged, status));
   updates.onStatus((status) => send(IPC.updateStatusChanged, status));
+  accounts.onChange((list) => send(IPC.accountsChanged, list));
 
   handleMediaProtocol({
     localPath: (id) => local.pathOf(id),
@@ -594,17 +654,22 @@ app.whenReady().then(() => {
     thumbar = null;
     // the mini player can't play anything on its own
     mini.destroy();
+    // nor can the hidden windows accounts use; they'd keep the app from quitting
+    accounts.dispose();
+    accountWeb?.dispose();
   });
   imports.resume();
   local.start();
   feed.start();
   scrobbler.start();
   updates.start();
+  accounts.start();
 });
 
 app.on("window-all-closed", () => {
   discord.disconnect();
   feed?.dispose();
+  accounts?.dispose();
   scrobbler?.dispose();
   updates?.dispose();
   imports?.dispose();

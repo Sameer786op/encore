@@ -2,17 +2,20 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Disc3, Ellipsis, Heart, History, ListMusic, MicVocal, Plus, Trash2 } from "lucide-react";
 import type { HistoryEntry, Track } from "@shared/types";
+import { ACCOUNT_NAMES } from "@shared/types";
 import { Mosaic } from "@/components/Artwork";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { AlbumCard, ArtistCard, CardGrid, LikedSongsCard, PlaylistCard } from "@/components/Cards";
 import { CollectionHeader, Dot } from "@/components/CollectionHeader";
 import { BigPlayButton, EmptyState, IconButton, PillButton, SectionTitle, Segmented, ShuffleButton } from "@/components/common";
 import { FindField, SortButton, useListPref, useTrackFinder, type SortOption } from "@/components/ListTools";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import { TrackList } from "@/components/TrackList";
 import { playlistMenu } from "@/components/playlistMenu";
+import { useAccounts } from "@/accounts/store";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
-import { artistNames, formatTotal, plural, relativeDate } from "@/lib/format";
+import { artistNames, formatTotal, plural, relativeDate, timeAgo } from "@/lib/format";
 import { byText, matchesQuery } from "@/lib/search";
 import { openMenu } from "@/ui/menu";
 import { openModal } from "@/ui/modal";
@@ -263,6 +266,8 @@ export function PlaylistPage({ id }: { id: string }) {
   const context = { kind: "playlist" as const, label: playlist?.name ?? "Playlist", id };
   const { play, shuffle, playing, loading } = usePlayCollection(tracks, context);
   const finder = useTrackFinder(tracks, `playlist.${id}`);
+  // when a synced playlist's account last looked for changes
+  const lastSync = useAccounts((s) => s.accounts.find((a) => a.service === playlist?.synced?.service)?.lastSync);
 
   if (!playlist) {
     return loaded ? <EmptyState icon={<ListMusic className="size-7" />} title="This playlist doesn't exist" body="It may have been deleted." /> : null;
@@ -270,6 +275,9 @@ export function PlaylistPage({ id }: { id: string }) {
 
   const itemIds = playlist.items.map((i) => i.itemId);
   const art = tracks.map((t) => t.artwork);
+  // a synced playlist changes only where it comes from
+  const synced = playlist.synced;
+  const from = synced ? ACCOUNT_NAMES[synced.service] : "";
 
   return (
     <div className="relative">
@@ -277,11 +285,20 @@ export function PlaylistPage({ id }: { id: string }) {
       <div className="relative px-8 pb-16 pt-[72px]">
         <CollectionHeader
           art={<Mosaic sources={art} className="size-full" fallback={<ListMusic className="size-16" strokeWidth={1.25} />} />}
-          kind="Playlist"
+          kind={synced ? `Playlist from ${from}` : "Playlist"}
           title={playlist.name}
-          onTitleClick={() => openModal({ kind: "rename-playlist", id: playlist.id, name: playlist.name })}
+          onTitleClick={synced ? undefined : () => openModal({ kind: "rename-playlist", id: playlist.id, name: playlist.name })}
           meta={
             <>
+              {synced && (
+                <>
+                  <span className="inline-flex items-center gap-1.5" title={`Songs added or removed on ${from} change here too`}>
+                    <ServiceIcon service={synced.service} className="size-3.5" />
+                    {lastSync ? `Synced ${timeAgo(lastSync)}` : `Synced from ${from}`}
+                  </span>
+                  <Dot />
+                </>
+              )}
               <span>{plural(tracks.length, "song")}</span>
               {tracks.length > 0 && (
                 <>
@@ -307,7 +324,13 @@ export function PlaylistPage({ id }: { id: string }) {
         />
         {tracks.length > 0 && finder.toolbar}
         <div className={tracks.length > 0 ? "mt-3" : "mt-8"}>
-          {tracks.length === 0 ? (
+          {tracks.length === 0 && synced ? (
+            <EmptyState
+              icon={<ListMusic className="size-7" />}
+              title="Nothing here yet"
+              body={`Songs you add to this playlist on ${from} show up here by themselves.`}
+            />
+          ) : tracks.length === 0 ? (
             <EmptyState
               icon={<ListMusic className="size-7" />}
               title="This playlist is empty"
@@ -325,17 +348,21 @@ export function PlaylistPage({ id }: { id: string }) {
                 keys={finder.indexes.map((i) => itemIds[i])}
                 context={context}
                 extra={{ title: "Date added", render: (_t, i) => relativeDate(playlist.items[finder.indexes[i]]?.addedAt ?? "") }}
-                menuExtras={(_t, i) => [
-                  {
-                    label: "Remove from this playlist",
-                    icon: Trash2,
-                    danger: true,
-                    onSelect: () => void useLibrary.getState().removeFromPlaylist(playlist.id, playlist.items[finder.indexes[i]].itemId),
-                  },
-                ]}
+                menuExtras={
+                  synced
+                    ? undefined
+                    : (_t, i) => [
+                        {
+                          label: "Remove from this playlist",
+                          icon: Trash2,
+                          danger: true,
+                          onSelect: () => void useLibrary.getState().removeFromPlaylist(playlist.id, playlist.items[finder.indexes[i]].itemId),
+                        },
+                      ]
+                }
                 // dragging only makes sense in the playlist's own order
                 onReorder={
-                  finder.changed
+                  finder.changed || synced
                     ? undefined
                     : (keys) => {
                         if (keys.join("|") !== itemIds.join("|")) void useLibrary.getState().reorderPlaylist(playlist.id, keys);

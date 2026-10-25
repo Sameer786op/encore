@@ -25,6 +25,7 @@ import { HomePage } from "@/pages/HomePage";
 import { MixPage } from "@/pages/MixPage";
 import { RemotePlaylistPage } from "@/pages/RemotePlaylistPage";
 import { useFeed } from "@/feed/store";
+import { useAccounts } from "@/accounts/store";
 import { HistoryPage, LibraryPage, LikedPage, PlaylistPage } from "@/pages/LibraryPages";
 import { ImportPage } from "@/pages/ImportPage";
 import { ImportReviewPage } from "@/pages/ImportReviewPage";
@@ -84,6 +85,7 @@ export default function App() {
     useImports.getState().init();
     useLocal.getState().init();
     useFeed.getState().init();
+    useAccounts.getState().init();
     const stopAppearance = connectAppearance();
     const stopUpdates = connectUpdates();
     const stopSync = connectPlayerSync();
