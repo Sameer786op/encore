@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./client", () => ({ getYouTube: () => Promise.reject(new Error("offline in tests")) }));
 
-const { homeRank, homeSections, playlistByline } = await import("./catalog");
+const { homeRank, homeSections, playlistByline, searchResults } = await import("./catalog");
 const { mapTrack } = await import("./mappers");
 
 const song = (id: string) => ({ item_type: "song", id, title: `Song ${id}`, artists: [{ name: "Someone" }] });
@@ -92,5 +92,52 @@ describe("mapTrack", () => {
   it("doesn't take a play count for an artist, and prefers the artists it was given", () => {
     expect(mapTrack({ id: "abc", title: "Song", flex_columns: [column("Song"), column("1.2M plays")] })?.artists).toEqual([]);
     expect(mapTrack({ id: "abc", title: "Song", flex_columns: [column("Song"), column("Someone else")] }, { artists: [{ name: "The band" }] })?.artists).toEqual([{ name: "The band" }]);
+  });
+});
+
+describe("searchResults", () => {
+  const row = (item_type: string, id: string, title: string, artist = "Someone") => ({ item_type, id, title, artists: [{ name: artist }] });
+  const raw = (songs: object[], videos: object[], general: object = {}, suggestions: string[] = []) => ({
+    general: { contents: [], ...general },
+    songs: { songs: { contents: songs } },
+    videos: { videos: { contents: videos } },
+    suggestions: [{ contents: suggestions.map((s) => ({ type: "SearchSuggestion", suggestion: s })) }],
+  });
+
+  it("keeps YouTube Music's order while its songs hold the words searched", () => {
+    const songs = [row("song", "a", "Other Tune"), row("song", "b", "Husn"), row("song", "c", "Husn (Live)"), row("song", "d", "Husn Hai")];
+    const r = searchResults("husn", raw(songs, [row("video", "v", "Husn (Official Video)")]));
+    expect(r.tracks.map((t) => t.sourceId)).toEqual(["a", "b", "c", "d"]);
+    expect(r.videos.map((t) => t.sourceId)).toEqual(["v"]);
+    expect(r.noExactMatch).toBe(false);
+  });
+
+  it("brings up videos of the song when the songs don't have it, skipping reactions", () => {
+    const songs = [row("song", "a", "Something Else"), row("song", "b", "Another One")];
+    const videos = [row("video", "r", "Ek Tarfa REACTION"), row("video", "v", "Ek Tarfa", "Darshan Raval"), row("video", "x", "Unrelated")];
+    const r = searchResults("ek tarfa", raw(songs, videos));
+    expect(r.tracks.map((t) => t.sourceId)).toEqual(["v", "a", "b"]);
+    expect(r.videos.map((t) => t.sourceId)).toEqual(["x", "r"]);
+  });
+
+  it("offers YouTube Music's spelling and suggestions as related searches, once each", () => {
+    const r = searchResults("kesriya", raw([row("song", "a", "Kesariya", "Arijit Singh")], [], { did_you_mean: { corrected_query: "kesariya" } }, ["Kesriya", "kesariya", "kesriya song"]));
+    expect(r.didYouMean).toBe("kesariya");
+    expect(r.related).toEqual(["kesariya", "kesriya song"]);
+    // the corrected spelling counts as a match
+    expect(r.noExactMatch).toBe(false);
+  });
+
+  it("says what was searched instead when YouTube Music corrected the spelling itself", () => {
+    const r = searchResults("blinding lites", raw([row("song", "a", "Blinding Lights", "The Weeknd")], [], { showing_results_for: { corrected_query: "blinding lights" } }));
+    expect(r.showingFor).toBe("blinding lights");
+    expect(r.didYouMean).toBeUndefined();
+    expect(r.noExactMatch).toBe(false);
+  });
+
+  it("marks a search nothing matches, so other searches can be offered first", () => {
+    const r = searchResults("zxqv wrrbl", raw([row("song", "a", "No Brainer")], [], {}, ["zxqv"]));
+    expect(r.noExactMatch).toBe(true);
+    expect(r.related).toEqual(["zxqv"]);
   });
 });

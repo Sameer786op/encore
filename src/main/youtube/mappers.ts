@@ -48,7 +48,8 @@ export function bestArtwork(value: unknown, size: number | null = 544): string |
 function artistRefs(item: Loose): ArtistRef[] {
   const list: Loose[] = item?.artists?.length ? item.artists : item?.authors?.length ? item.authors : item?.author ? [item.author] : [];
   return list
-    .map((a) => ({ id: a?.channel_id || undefined, name: text(a?.name).trim() }))
+    // some rows run the album and length into the last artist: "Harpreet Bachher • Kesariya Balam • 6:42"
+    .map((a) => ({ id: a?.channel_id || undefined, name: text(a?.name).split(" • ")[0].trim() }))
     .filter((a) => a.name.length > 0);
 }
 
@@ -123,7 +124,8 @@ export function mapPlaylist(item: Loose): RemotePlaylist | null {
     // browse ids put VL in front of the playlist id
     id: raw.startsWith("VL") ? raw.slice(2) : raw,
     title,
-    subtitle: text(item?.subtitle).trim() || undefined,
+    // rows in search results say "Playlist • Owner" in their second column instead
+    subtitle: text(item?.subtitle).trim() || text(item?.flex_columns?.[1]?.title).trim() || undefined,
     artwork: bestArtwork(item?.thumbnails ?? item?.thumbnail),
   };
 }

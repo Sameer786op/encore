@@ -1,14 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, ChevronRight, Clock3, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Play, Search, X } from "lucide-react";
+import type { SearchSuggestions, SuggestedItem } from "@shared/types";
 import { navigate, useNav } from "@/nav/store";
+import { usePlayer } from "@/player/store";
 import { useSearch } from "@/search/store";
 import { useSettings } from "@/settings/store";
 import { comboParts, keysFor } from "@/ui/shortcuts";
 import { cn } from "@/lib/cn";
+import { Artwork } from "./Artwork";
 import { LiquidGlass } from "./LiquidGlass";
 
 export const SEARCH_INPUT_ID = "encore-search";
+
+type Option = { type: "query"; value: string } | { type: "item"; item: SuggestedItem };
+
+const NO_SUGGESTIONS: SearchSuggestions = { queries: [], items: [] };
+
+function itemTitle(item: SuggestedItem): string {
+  return item.kind === "track" ? item.track.title : item.kind === "artist" ? item.artist.name : item.kind === "album" ? item.album.title : item.playlist.title;
+}
+
+function itemArtwork(item: SuggestedItem): string | undefined {
+  return item.kind === "track" ? item.track.artwork : item.kind === "artist" ? item.artist.artwork : item.kind === "album" ? item.album.artwork : item.playlist.artwork;
+}
+
+const optionKey = (o: Option) => (o.type === "query" ? `q:${o.value}` : `${o.item.kind}:${itemTitle(o.item)}:${itemArtwork(o.item) ?? ""}`);
 
 function SearchBox() {
   const route = useNav((s) => s.route);
@@ -20,19 +37,19 @@ function SearchBox() {
   const submit = useSearch((s) => s.submit);
   const input = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<SearchSuggestions>(NO_SUGGESTIONS);
   const [highlight, setHighlight] = useState(-1);
   const searchKeys = keysFor(useSettings((s) => s.shortcuts)).search[0];
 
   // fetch suggestions as the user types
   useEffect(() => {
     const q = query.trim();
-    if (!q || !focused) return setSuggestions([]);
+    if (!q || !focused) return setSuggestions(NO_SUGGESTIONS);
     let cancelled = false;
     const timer = setTimeout(() => {
       window.encore.catalog
         .suggestions(q)
-        .then((list) => !cancelled && setSuggestions(list))
+        .then((found) => !cancelled && setSuggestions(found))
         .catch(() => undefined);
     }, 150);
     return () => {
@@ -41,15 +58,33 @@ function SearchBox() {
     };
   }, [query, focused]);
 
-  const options = query.trim() ? suggestions : recent.slice(0, 6);
+  // searches YouTube Music suggests, then songs, artists, albums and playlists to open right away
+  const options: Option[] = query.trim()
+    ? [...suggestions.queries.map((value) => ({ type: "query" as const, value })), ...suggestions.items.map((item) => ({ type: "item" as const, item }))]
+    : recent.slice(0, 6).map((value) => ({ type: "query" as const, value }));
   const open = focused && options.length > 0;
+  const firstItem = options.findIndex((o) => o.type === "item");
   useEffect(() => setHighlight(-1), [query, focused]);
 
-  const choose = (value: string) => {
-    submit(value);
-    navigate({ name: "search" });
+  const close = () => {
     setFocused(false);
     input.current?.blur();
+  };
+
+  const choose = (option: Option) => {
+    if (option.type === "query") {
+      submit(option.value);
+      navigate({ name: "search" });
+      return close();
+    }
+    // the search stays behind, for going back to it
+    if (query.trim()) submit(query);
+    const item = option.item;
+    if (item.kind === "track") usePlayer.getState().playTracks([item.track], 0, { kind: "search", label: `"${query.trim()}"` });
+    else if (item.kind === "artist") navigate({ name: "artist", id: item.artist.id });
+    else if (item.kind === "album") navigate({ name: "album", id: item.album.id });
+    else navigate({ name: "ytplaylist", id: item.playlist.id });
+    close();
   };
 
   return (
@@ -82,7 +117,7 @@ function SearchBox() {
               e.preventDefault();
               setHighlight((h) => Math.max(-1, h - 1));
             } else if (e.key === "Enter") {
-              choose(highlight >= 0 ? options[highlight] : query);
+              choose(highlight >= 0 ? options[highlight] : { type: "query", value: query });
             } else if (e.key === "Escape") {
               input.current?.blur();
             }
@@ -116,15 +151,39 @@ function SearchBox() {
           >
             {!query.trim() && <li className="px-3 pb-1 pt-1.5 text-[11.5px] font-semibold text-ink-3">Recent searches</li>}
             {options.map((option, i) => (
-              <li key={option}>
+              <li key={optionKey(option)} role="option" aria-selected={i === highlight}>
+                {i === firstItem && i > 0 && <div aria-hidden className="mx-3 my-1.5 h-px bg-white/[0.08]" />}
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => choose(option)}
                   onMouseEnter={() => setHighlight(i)}
-                  className={cn("flex w-full items-center gap-3 rounded-[11px] px-3 py-[7px] text-left text-[13.5px] transition-colors duration-100", i === highlight ? "bg-white/[0.1] text-ink" : "text-ink-2")}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-[11px] text-left text-[13.5px] transition-colors duration-100",
+                    option.type === "query" ? "px-3 py-[7px]" : "px-2 py-1.5",
+                    i === highlight ? "bg-white/[0.1] text-ink" : "text-ink-2",
+                  )}
                 >
-                  {query.trim() ? <Search className="size-4 shrink-0 text-ink-3" /> : <Clock3 className="size-4 shrink-0 text-ink-3" />}
-                  <span className="truncate">{option}</span>
+                  {option.type === "query" ? (
+                    <>
+                      {query.trim() ? <Search className="size-4 shrink-0 text-ink-3" /> : <Clock3 className="size-4 shrink-0 text-ink-3" />}
+                      <span className="truncate">{option.value}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="relative shrink-0">
+                        <Artwork src={itemArtwork(option.item)} className={cn("size-10", option.item.kind === "artist" ? "rounded-full" : "rounded-[7px]")} />
+                        {option.item.kind === "track" && (
+                          <span className={cn("absolute inset-0 grid place-items-center rounded-[7px] bg-black/45 text-white transition-opacity duration-150", i === highlight ? "opacity-100" : "opacity-0")}>
+                            <Play className="ml-px size-4" fill="currentColor" strokeWidth={0} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-ink">{itemTitle(option.item)}</span>
+                        <span className="block truncate text-[12px] text-ink-3">{option.item.subtitle}</span>
+                      </span>
+                    </>
+                  )}
                 </button>
               </li>
             ))}

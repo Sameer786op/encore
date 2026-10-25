@@ -16,7 +16,7 @@ Vyse Music keeps itself up to date: it checks every time you open it and every h
 
 ## What works today
 
-- **Search** songs, albums, artists and videos, with suggestions as you type and recent searches. **Show more songs** keeps going past the first page. A search is asked again after 10 minutes so new uploads turn up, and **Refresh** asks right away.
+- **Search** songs, albums, artists, videos and playlists, with tabs for each. As you type, suggestions show searches and songs, artists, albums and playlists you can open right away. A misspelling gets **Did you mean…** (or is corrected for you), and when nothing holds the words you typed, **related searches** come first; when there are no results at all, they're offered instead. A song that's only an upload is found among the videos and moved up with the songs. **Show more** keeps going past the first page. A search is asked again after 10 minutes so new uploads turn up, and **Refresh** asks right away.
 - **Playback** that starts in about a second, with seeking anywhere in the song. Songs stream in the best format YouTube Music offers without Premium: Opus at about 130–160 kbps and 48 kHz. The sound panel shows the format of the song that's playing. Volume, shuffle, repeat (all / one), and a song that won't load is skipped with a message.
 - **Queue**: play now, play next, add to queue, drag to reorder, remove, clear. When the queue runs out, **Autoplay** keeps going with similar songs. **Start radio** works from any song.
 - **Library**: liked songs, playlists (create, rename, delete, add, remove, drag to reorder), and recently played (a song counts after 30 seconds).

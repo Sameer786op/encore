@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Clock3, LoaderCircle, Play, RefreshCw, SearchX, X } from "lucide-react";
-import type { SearchResults } from "@shared/types";
+import { Clock3, LoaderCircle, Play, RefreshCw, Search, SearchX, X } from "lucide-react";
+import type { SearchResults, SearchTab } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
-import { AlbumCard, ArtistCard, CardRow, TrackCard } from "@/components/Cards";
-import { EmptyState, SectionTitle } from "@/components/common";
+import { AlbumCard, ArtistCard, CardGrid, CardRow, RemotePlaylistCard, TrackCard } from "@/components/Cards";
+import { EmptyState, SectionTitle, SPRING } from "@/components/common";
 import { TrackList } from "@/components/TrackList";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
@@ -119,24 +119,196 @@ function RecentSearches() {
   );
 }
 
-export function SearchPage() {
-  const query = useSearch((s) => s.query);
-  const results = useSearch((s) => s.results);
-  const loading = useSearch((s) => s.loading);
-  const error = useSearch((s) => s.error);
+const TABS: { value: SearchTab; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "songs", label: "Songs" },
+  { value: "videos", label: "Videos" },
+  { value: "artists", label: "Artists" },
+  { value: "albums", label: "Albums" },
+  { value: "playlists", label: "Playlists" },
+];
+
+/** All, Songs, Videos… the accent pill slides to the one picked */
+function SearchTabs() {
+  const tab = useSearch((s) => s.tab);
+  const setTab = useSearch((s) => s.setTab);
+  return (
+    <div role="tablist" aria-label="Kinds of results" className="mb-7 flex flex-wrap gap-2">
+      {TABS.map((t) => (
+        <button
+          key={t.value}
+          role="tab"
+          aria-selected={tab === t.value}
+          onClick={() => setTab(t.value)}
+          className={cn(
+            "pressable relative h-8 rounded-full px-4 text-[13px] font-semibold transition-[color,filter] duration-200",
+            tab === t.value ? "text-on-accent" : "glass-control text-ink hover:brightness-125",
+          )}
+        >
+          {tab === t.value && (
+            <motion.span
+              layoutId="search-tab"
+              transition={{ type: "spring", stiffness: 520, damping: 40 }}
+              className="absolute inset-0 rounded-full bg-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.45),inset_0_-1px_1px_rgb(0_0_0/0.18),0_6px_18px_-8px_rgb(var(--accent-rgb)/0.7)]"
+            />
+          )}
+          <span className="relative">{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** the page scrolls in a column of its own; a new search starts at its top */
+const toTop = (from: Element) => from.closest(".overflow-y-auto")?.scrollTo({ top: 0, behavior: "smooth" });
+
+/** "Showing results for…" when YouTube Music corrected the spelling, "Did you mean…?" when it only suggests one */
+function Correction({ results }: { results: SearchResults }) {
   const submit = useSearch((s) => s.submit);
+  if (results.showingFor) {
+    return (
+      <p className="-mt-2 mb-6 text-[14px] text-ink-2">
+        Showing results for <span className="font-semibold text-ink">{results.showingFor}</span>
+      </p>
+    );
+  }
+  if (!results.didYouMean) return null;
+  const meant = results.didYouMean;
+  return (
+    <p className="-mt-2 mb-6 text-[14px] text-ink-2">
+      Did you mean{" "}
+      <button
+        onClick={(e) => {
+          submit(meant);
+          toTop(e.currentTarget);
+        }}
+        className="font-semibold text-accent underline-offset-2 hover:underline"
+      >
+        {meant}
+      </button>
+      ?
+    </p>
+  );
+}
+
+/** other searches to try, as chips; picking one searches it */
+function RelatedSearches({ queries, title = "Related searches", centered, className }: { queries: string[]; title?: string; centered?: boolean; className?: string }) {
+  const submit = useSearch((s) => s.submit);
+  if (queries.length === 0) return null;
+  return (
+    <section aria-label={title} className={className}>
+      {title && <h2 className={cn("mb-3 font-display text-[17px] font-bold tracking-[-0.02em]", centered && "text-center")}>{title}</h2>}
+      <div className={cn("flex flex-wrap gap-2", centered && "justify-center")}>
+        {queries.map((q, i) => (
+          <motion.button
+            key={q}
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ ...SPRING, delay: i * 0.035 }}
+            onClick={(e) => {
+              submit(q);
+              toTop(e.currentTarget);
+            }}
+            className="glass-control inline-flex h-9 max-w-full items-center gap-2 rounded-full pl-3.5 pr-4 text-[13.5px] font-medium text-ink transition-[filter] hover:brightness-125"
+          >
+            <Search className="size-3.5 shrink-0 text-ink-3" strokeWidth={2.4} />
+            <span className="truncate">{q}</span>
+          </motion.button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ShowMore({ what }: { what: "songs" | "videos" }) {
   const loadMore = useSearch((s) => s.loadMore);
   const loadingMore = useSearch((s) => s.loadingMore);
-  const [showAllSongs, setShowAllSongs] = useState(false);
+  return (
+    <div className="mt-4 flex justify-center">
+      <button
+        onClick={() => void loadMore(what)}
+        disabled={loadingMore}
+        className="glass-control pressable inline-flex h-9 items-center gap-2 rounded-full px-5 text-[13px] font-semibold text-ink hover:brightness-125 disabled:opacity-70"
+      >
+        {loadingMore && <LoaderCircle className="size-4 animate-spin" />}
+        {loadingMore ? `Loading more ${what}` : `Show more ${what}`}
+      </button>
+    </div>
+  );
+}
 
-  const context = { kind: "search" as const, label: `"${results?.query ?? query}"` };
-  const hasAnything = results && (results.tracks.length || results.albums.length || results.artists.length || results.videos.length);
+/** a tab with nothing on it still offers somewhere to go */
+function NothingHere({ what, results }: { what: string; results: SearchResults }) {
+  return (
+    <div className="py-10">
+      <p className="mb-6 text-[14px] text-ink-2">
+        No {what} for "{results.showingFor ?? results.query}".
+      </p>
+      <RelatedSearches queries={results.related} title="Try searching for" />
+    </div>
+  );
+}
+
+function CardsSkeleton() {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(172px,1fr))] gap-x-5 gap-y-6">
+      {Array.from({ length: 10 }, (_, i) => (
+        <div key={i}>
+          <div className="skeleton aspect-square rounded-[10px]" />
+          <div className="skeleton mt-3 h-3.5 w-3/4 rounded" />
+          <div className="skeleton mt-2 h-3 w-1/2 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** the Artists, Albums and Playlists tabs, which ask YouTube Music for that kind alone */
+function KindResults({ tab, results }: { tab: "artists" | "albums" | "playlists"; results: SearchResults }) {
+  const kind = useSearch((s) => s.kind);
+  const loading = useSearch((s) => s.kindLoading);
+  const failed = useSearch((s) => s.kindError);
+  const setTab = useSearch((s) => s.setTab);
+  const q = results.showingFor ?? results.query;
+  const current = kind && kind.tab === tab && kind.query === q ? kind.results : null;
+  if (failed && !current) {
+    return (
+      <EmptyState
+        icon={<SearchX className="size-7" />}
+        title={`Couldn't load ${tab}`}
+        body="Check your connection and try again."
+        action={
+          <button onClick={() => setTab(tab)} className="glass-control pressable rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-ink hover:brightness-125">
+            Try again
+          </button>
+        }
+      />
+    );
+  }
+  if (!current) return loading ? <CardsSkeleton /> : null;
+  const list = current[tab];
+  if (list.length === 0) return <NothingHere what={tab} results={results} />;
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: loading ? 0.6 : 1 }} transition={{ duration: 0.2 }}>
+      <CardGrid>
+        {tab === "artists" && current.artists.map((a) => <ArtistCard key={a.id} artist={a} subtitle={a.subtitle?.replace(/^Artist\s*•\s*/, "") || "Artist"} />)}
+        {tab === "albums" && current.albums.map((a) => <AlbumCard key={a.id} album={a} />)}
+        {tab === "playlists" && current.playlists.map((p) => <RemotePlaylistCard key={p.id} playlist={p} />)}
+      </CardGrid>
+    </motion.div>
+  );
+}
+
+function AllResults({ results }: { results: SearchResults }) {
+  const [showAllSongs, setShowAllSongs] = useState(false);
+  const context = { kind: "search" as const, label: `"${results.query}"` };
 
   // with a top result, the first four songs sit beside it and the rest come after albums;
   // without one, all the songs lead
-  const skip = results?.top ? 4 : 0;
-  const moreSongs = results && results.tracks.length > skip && (
-    <section className="mt-9">
+  const skip = results.top ? 4 : 0;
+  const moreSongs = results.tracks.length > skip && (
+    <section className="mt-9 first:mt-0">
       <SectionTitle
         action={
           <div className="flex items-center gap-1">
@@ -154,22 +326,82 @@ export function SearchPage() {
       </SectionTitle>
       <TrackList tracks={results.tracks.slice(skip, showAllSongs ? undefined : skip + 10)} context={context} />
       {results.moreSongs && (showAllSongs || results.tracks.length <= skip + 10) && (
-        <div className="mt-4 flex justify-center">
-          <button
-            onClick={() => {
-              setShowAllSongs(true);
-              void loadMore();
-            }}
-            disabled={loadingMore}
-            className="glass-control pressable inline-flex h-9 items-center gap-2 rounded-full px-5 text-[13px] font-semibold text-ink hover:brightness-125 disabled:opacity-70"
-          >
-            {loadingMore && <LoaderCircle className="size-4 animate-spin" />}
-            {loadingMore ? "Loading more songs" : "Show more songs"}
-          </button>
+        <div onClickCapture={() => setShowAllSongs(true)}>
+          <ShowMore what="songs" />
         </div>
       )}
     </section>
   );
+
+  return (
+    <>
+      {/* when nothing holds the words searched, other searches come first */}
+      {results.noExactMatch && <RelatedSearches queries={results.related} className="mb-9" />}
+
+      {results.top && (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-8 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <section className="flex flex-col">
+            <SectionTitle>Top result</SectionTitle>
+            <TopResult results={results} />
+          </section>
+          <section className="min-w-0">
+            <SectionTitle action={<RefreshResults />}>Songs</SectionTitle>
+            <TrackList tracks={results.tracks.slice(0, 4)} context={context} showAlbum={false} />
+          </section>
+        </div>
+      )}
+
+      {!results.top && moreSongs}
+
+      {results.artists.length > 0 && (
+        <section className="mt-9">
+          <SectionTitle>Artists</SectionTitle>
+          <CardRow>{results.artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
+        </section>
+      )}
+
+      {results.albums.length > 0 && (
+        <section className="mt-9">
+          <SectionTitle>Albums</SectionTitle>
+          <CardRow>{results.albums.map((a) => <AlbumCard key={a.id} album={a} />)}</CardRow>
+        </section>
+      )}
+
+      {results.top && moreSongs}
+
+      {results.videos.length > 0 && (
+        <section className="mt-9">
+          <SectionTitle>Videos and live versions</SectionTitle>
+          <CardRow>
+            {results.videos.slice(0, 12).map((t, i, list) => (
+              <TrackCard key={t.id} track={t} list={list} index={i} context={context} />
+            ))}
+          </CardRow>
+        </section>
+      )}
+
+      {results.playlists.length > 0 && (
+        <section className="mt-9">
+          <SectionTitle>Playlists</SectionTitle>
+          <CardRow>{results.playlists.map((p) => <RemotePlaylistCard key={p.id} playlist={p} />)}</CardRow>
+        </section>
+      )}
+
+      {!results.noExactMatch && <RelatedSearches queries={results.related} className="mt-11" />}
+    </>
+  );
+}
+
+export function SearchPage() {
+  const query = useSearch((s) => s.query);
+  const results = useSearch((s) => s.results);
+  const loading = useSearch((s) => s.loading);
+  const error = useSearch((s) => s.error);
+  const submit = useSearch((s) => s.submit);
+  const tab = useSearch((s) => s.tab);
+
+  const context = { kind: "search" as const, label: `"${results?.query ?? query}"` };
+  const hasAnything = results && (results.tracks.length || results.albums.length || results.artists.length || results.videos.length || results.playlists.length);
 
   return (
     <div className="@container px-8 pb-16 pt-[68px]">
@@ -191,53 +423,47 @@ export function SearchPage() {
       )}
 
       {query.trim() && results && !hasAnything && !loading && (
-        <EmptyState icon={<SearchX className="size-7" />} title={`No results for "${results.query}"`} body="Check the spelling, or try fewer or different words." />
+        <EmptyState
+          icon={<SearchX className="size-7" />}
+          title={`No results for "${results.query}"`}
+          body={results.related.length ? "Try one of these searches instead." : "Check the spelling, or try fewer or different words."}
+          action={results.related.length > 0 && <RelatedSearches queries={results.related} title="" centered />}
+        />
       )}
 
       {query.trim() && results && hasAnything ? (
-        <motion.div key={results.query} initial={{ opacity: 0 }} animate={{ opacity: loading ? 0.6 : 1 }} transition={{ duration: 0.2 }}>
-          {results.top && (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-8 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              <section className="flex flex-col">
-                <SectionTitle>Top result</SectionTitle>
-                <TopResult results={results} />
-              </section>
-              <section className="min-w-0">
-                <SectionTitle action={<RefreshResults />}>Songs</SectionTitle>
-                <TrackList tracks={results.tracks.slice(0, 4)} context={context} showAlbum={false} />
-              </section>
-            </div>
-          )}
+        <>
+          <SearchTabs />
+          <motion.div key={`${results.query}:${tab}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: loading ? 0.6 : 1, y: 0 }} transition={{ opacity: { duration: 0.2 }, y: { type: "spring", stiffness: 300, damping: 32 } }}>
+            <Correction results={results} />
 
-          {!results.top && moreSongs}
+            {tab === "all" && <AllResults results={results} />}
 
-          {results.artists.length > 0 && (
-            <section className="mt-9">
-              <SectionTitle>Artists</SectionTitle>
-              <CardRow>{results.artists.map((a) => <ArtistCard key={a.id} artist={a} />)}</CardRow>
-            </section>
-          )}
+            {tab === "songs" &&
+              (results.tracks.length === 0 ? (
+                <NothingHere what="songs" results={results} />
+              ) : (
+                <section>
+                  <SectionTitle action={<RefreshResults />}>Songs</SectionTitle>
+                  <TrackList tracks={results.tracks} context={context} />
+                  {results.moreSongs && <ShowMore what="songs" />}
+                </section>
+              ))}
 
-          {results.albums.length > 0 && (
-            <section className="mt-9">
-              <SectionTitle>Albums</SectionTitle>
-              <CardRow>{results.albums.map((a) => <AlbumCard key={a.id} album={a} />)}</CardRow>
-            </section>
-          )}
+            {tab === "videos" &&
+              (results.videos.length === 0 ? (
+                <NothingHere what="videos" results={results} />
+              ) : (
+                <section>
+                  <SectionTitle action={<RefreshResults />}>Videos and live versions</SectionTitle>
+                  <TrackList tracks={results.videos} context={context} showAlbum={false} />
+                  {results.moreVideos && <ShowMore what="videos" />}
+                </section>
+              ))}
 
-          {results.top && moreSongs}
-
-          {results.videos.length > 0 && (
-            <section className="mt-9">
-              <SectionTitle>Videos and live versions</SectionTitle>
-              <CardRow>
-                {results.videos.map((t, i) => (
-                  <TrackCard key={t.id} track={t} list={results.videos} index={i} context={context} />
-                ))}
-              </CardRow>
-            </section>
-          )}
-        </motion.div>
+            {(tab === "artists" || tab === "albums" || tab === "playlists") && <KindResults tab={tab} results={results} />}
+          </motion.div>
+        </>
       ) : null}
     </div>
   );

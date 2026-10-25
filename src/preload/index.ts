@@ -26,6 +26,7 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
 const api: EncoreApi = {
   catalog: {
     search: (query) => ipcRenderer.invoke(IPC.search, query),
+    searchKind: (query, kind) => ipcRenderer.invoke(IPC.searchKind, query, kind),
     suggestions: (query) => ipcRenderer.invoke(IPC.suggestions, query),
     album: (id) => ipcRenderer.invoke(IPC.album, id),
     artist: (id) => ipcRenderer.invoke(IPC.artist, id),

@@ -46,15 +46,49 @@ export interface ArtistSummary {
 }
 
 export interface SearchResults {
+  /** what was typed */
   query: string;
+  /** the spelling the results are for, when YouTube Music corrected what was typed */
+  showingFor?: string;
+  /** a spelling YouTube Music thinks was meant; the results are still for what was typed */
+  didYouMean?: string;
+  /** other searches to try, likeliest first */
+  related: string[];
+  /** no song or video holds the words searched, so the song may not be there */
+  noExactMatch?: boolean;
   top?: { kind: "track"; track: Track } | { kind: "album"; album: AlbumSummary } | { kind: "artist"; artist: ArtistSummary };
   tracks: Track[];
   albums: AlbumSummary[];
   artists: ArtistSummary[];
   videos: Track[];
+  playlists: RemotePlaylist[];
   /** pass to catalog.searchMore for the next page of songs */
   moreSongs?: string;
+  /** pass to catalog.searchMore for the next page of videos */
+  moreVideos?: string;
 }
+
+/** the tabs over search results; the last three each ask YouTube Music for just that kind */
+export type SearchTab = "all" | "songs" | "videos" | "artists" | "albums" | "playlists";
+export type SearchKind = "artists" | "albums" | "playlists";
+
+export interface SearchKindResults {
+  artists: ArtistSummary[];
+  albums: AlbumSummary[];
+  playlists: RemotePlaylist[];
+}
+
+/** what YouTube Music suggests while typing: searches, and things to open right away */
+export interface SearchSuggestions {
+  queries: string[];
+  items: SuggestedItem[];
+}
+
+export type SuggestedItem =
+  | { kind: "track"; track: Track; subtitle: string }
+  | { kind: "artist"; artist: ArtistSummary; subtitle: string }
+  | { kind: "album"; album: AlbumSummary; subtitle: string }
+  | { kind: "playlist"; playlist: RemotePlaylist; subtitle: string };
 
 /** the format a song streams in */
 export interface StreamQuality {
@@ -432,11 +466,13 @@ export interface WindowState {
 export interface EncoreApi {
   catalog: {
     search(query: string): Promise<SearchResults>;
-    suggestions(query: string): Promise<string[]>;
+    /** artists, albums or playlists only, more of them than the mixed results hold */
+    searchKind(query: string, kind: SearchKind): Promise<SearchKindResults>;
+    suggestions(query: string): Promise<SearchSuggestions>;
     album(id: string): Promise<AlbumDetails>;
     artist(id: string): Promise<ArtistDetails>;
     home(): Promise<HomeSection[]>;
-    /** the next page of songs for a search */
+    /** the next page of songs or videos for a search */
     searchMore(token: string): Promise<{ tracks: Track[]; more?: string }>;
     playlist(id: string): Promise<RemotePlaylistDetails>;
     radio(track: Track): Promise<Track[]>;

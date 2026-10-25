@@ -1,6 +1,7 @@
 // IPC channel names, shared by the main process and the preload bridge.
 export const IPC = {
   search: "catalog:search",
+  searchKind: "catalog:search-kind",
   suggestions: "catalog:suggestions",
   album: "catalog:album",
   searchMore: "catalog:search-more",

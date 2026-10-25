@@ -51,7 +51,7 @@ import { Lastfm, ListenBrainz } from "./scrobble/clients";
 import { Scrobbler } from "./scrobble/scrobbler";
 import { Updater } from "./updates/updater";
 import { electronVault } from "./scrobble/vault";
-import { album, artist, home, lyricsText, playlist, radio, remotePlaylist, search, searchArtists, searchMore, searchSongs, suggestions, trackById } from "./youtube/catalog";
+import { album, artist, home, lyricsText, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, suggestions, trackById } from "./youtube/catalog";
 import { configureYouTube } from "./youtube/client";
 import { resolveAudio } from "./youtube/streams";
 import icon from "../../resources/icon.png?asset";
@@ -362,6 +362,10 @@ const SCROBBLE_SERVICES: ScrobbleService[] = ["lastfm", "listenbrainz"];
 
 function registerIpc(): void {
   handle(IPC.search, (query: unknown) => search(stringArg(query, "query").slice(0, 200)));
+  handle(IPC.searchKind, (query: unknown, kind: unknown) => {
+    if (kind !== "artists" && kind !== "albums" && kind !== "playlists") throw new Error("Unknown kind of search");
+    return searchKind(stringArg(query, "query").slice(0, 200), kind);
+  });
   handle(IPC.suggestions, (query: unknown) => suggestions(stringArg(query, "query").slice(0, 200)));
   handle(IPC.album, (id: unknown) => album(stringArg(id, "album id")));
   handle(IPC.searchMore, (token: unknown) => searchMore(stringArg(token, "search token")));
