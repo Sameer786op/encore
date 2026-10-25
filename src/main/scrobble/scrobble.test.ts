@@ -9,7 +9,7 @@ import { openDatabase } from "../db";
 import { lastfmSignature, Lastfm, ListenBrainz } from "./clients";
 import { Scrobbler, toScrobble } from "./scrobbler";
 
-// a tiny stand-in for both services, recording what Encore sends
+// a tiny stand-in for both services, recording what Vyse Music sends
 interface Received {
   path: string;
   params: Record<string, string>;

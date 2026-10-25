@@ -213,7 +213,7 @@ const GLOBAL_RUN: Record<Exclude<GlobalCommand, "mini" | "show">, () => void> = 
   like: toggleLikeCurrent,
 };
 
-/** let Settings record a combination that Encore itself has registered, then put the shortcuts back */
+/** let Settings record a combination that Vyse Music itself has registered, then put the shortcuts back */
 export function pauseGlobalKeys(paused: boolean): void {
   void window.encore.app.pauseGlobalKeys(paused).then((states) => useGlobalKeyStates.setState({ states }));
 }

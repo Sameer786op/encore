@@ -1,0 +1,26 @@
+# The Microsoft Store build: npm run dist:store
+# The Store signs the package, so people don't see a SmartScreen or browser
+# warning, and it delivers updates, so the GitHub self-updater is off in it.
+# Replace the three placeholder values with the ones in Partner Center under
+# Product management > Product identity, and displayName with the reserved name.
+extends: ./electron-builder.yml
+win:
+  target:
+    - appx
+appx:
+  identityName: Placeholder.FillInFromPartnerCenter
+  publisher: CN=00000000-0000-0000-0000-000000000000
+  publisherDisplayName: Fill in from Partner Center
+  applicationId: VyseMusic
+  displayName: Vyse Music
+  backgroundColor: transparent
+  # Windows 10 1809 and later, as Electron needs
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.26100.0
+  languages:
+    - en-US
+  artifactName: Vyse-Music-Store-${version}.${ext}
+publish: null
+# the packaging tools from the Windows 11 SDK, instead of the 2019 set electron-builder uses by default
+toolsets:
+  winCodeSign: "1.1.0"

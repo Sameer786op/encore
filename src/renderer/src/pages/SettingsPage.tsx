@@ -4,7 +4,8 @@ import { ExternalLink, FolderOpen, LoaderCircle, RefreshCw } from "lucide-react"
 import type { DiscordStatus, ScrobbleService, ScrobbleStatus, UpdateStatus } from "@shared/types";
 import { Equalizer } from "@/components/Equalizer";
 import { Segmented, Toggle } from "@/components/common";
-import { usePlayer } from "@/player/store";
+import { describeQuality, useStreamQuality } from "@/player/quality";
+import { useCurrentTrack, usePlayer } from "@/player/store";
 import { useSettings } from "@/settings/store";
 import { useUpdates } from "@/ui/updates";
 import { cn } from "@/lib/cn";
@@ -16,20 +17,33 @@ import { GlobalShortcutSettings, ShortcutSettings } from "./settings/ShortcutSet
 function updateBody(status: UpdateStatus): string {
   switch (status.state) {
     case "off":
-      return "This copy doesn't update itself. Installed copies do.";
+      return status.store ? "The Microsoft Store keeps Vyse Music up to date." : "This copy doesn't update itself. Installed copies do.";
     case "checking":
       return "Checking for updates…";
     case "downloading":
-      return `Downloading Encore ${status.version ?? ""}… ${status.progress ?? 0}%`;
+      return `Downloading Vyse Music ${status.version ?? ""}… ${status.progress ?? 0}%`;
     case "ready":
-      return `Encore ${status.version} is ready. It goes in when you restart.`;
+      return `Vyse Music ${status.version} is ready. It goes in when you restart.`;
     case "latest":
       return "You have the latest version.";
     case "error":
       return status.error ?? "Couldn't check for updates.";
     default:
-      return "New versions download by themselves and go in when Encore restarts.";
+      return "New versions download by themselves and go in when Vyse Music restarts.";
   }
+}
+
+/** the quality songs stream at, with what the current one is playing at */
+function QualityRow() {
+  const quality = useStreamQuality(useCurrentTrack());
+  return (
+    <Row
+      title="Sound quality"
+      body="Songs always stream at the best quality YouTube Music offers without Premium: Opus at about 130 to 160 kbps, 48 kHz. Higher quality needs a YouTube Music Premium sign-in. Your own music files play at their full quality, including lossless FLAC."
+    >
+      {quality && <span className="whitespace-nowrap text-[13px] tabular-nums text-ink-2">{quality === "local" ? "Your file" : describeQuality(quality)}</span>}
+    </Row>
+  );
 }
 
 function UpdateRow() {
@@ -59,7 +73,7 @@ const DISCORD_STATUS: Record<DiscordStatus["state"], [string, string]> = {
   off: ["Off", "bg-white/20"],
   connecting: ["Looking for Discord…", "bg-amber-400"],
   connected: ["Connected", "bg-switch"],
-  "not-running": ["Discord isn't running. Encore keeps trying in the background.", "bg-white/30"],
+  "not-running": ["Discord isn't running. Vyse Music keeps trying in the background.", "bg-white/30"],
   error: ["Discord refused the connection", "bg-red-400"],
 };
 
@@ -87,7 +101,7 @@ function DiscordSettings() {
         title="Discord application ID"
         body={
           <>
-            Discord needs an app to show the status. Create one called "Encore" at{" "}
+            Discord needs an app to show the status. Create one called "Vyse Music" at{" "}
             <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
               discord.com/developers <ExternalLink className="size-3" />
             </a>
@@ -237,10 +251,10 @@ function ScrobbleSettings() {
           fm.connected ? (
             "Your plays show up on your Last.fm profile, along with what's playing right now."
           ) : fm.pending ? (
-            "Last.fm opened in your browser. Approve Encore there and this connects by itself."
+            "Last.fm opened in your browser. Approve Vyse Music there and this connects by itself."
           ) : (
             <>
-              Last.fm needs its own free API account for Encore. Create one at <Link href="https://www.last.fm/api/account/create">last.fm/api/account/create</Link> (any name and
+              Last.fm needs its own free API account for Vyse Music. Create one at <Link href="https://www.last.fm/api/account/create">last.fm/api/account/create</Link> (any name and
               description will do), then paste the API key and shared secret it gives you.
             </>
           )
@@ -278,7 +292,7 @@ function ScrobbleSettings() {
       {(lb.connected || fm.connected) && (
         <div className="border-t border-white/[0.07] py-3 text-[12.5px] text-ink-3">
           A song counts once you've heard half of it or four minutes, whichever comes first.
-          {status.queued > 0 && ` ${status.queued === 1 ? "1 play is" : `${status.queued} plays are`} waiting to be sent; Encore keeps trying while it's open.`}
+          {status.queued > 0 && ` ${status.queued === 1 ? "1 play is" : `${status.queued} plays are`} waiting to be sent; Vyse Music keeps trying while it's open.`}
         </div>
       )}
     </Card>
@@ -332,13 +346,20 @@ export function SettingsPage() {
           <Row title="Crossfade inside albums" body="Off keeps albums gapless, the way live records and DJ mixes are meant to flow.">
             <Toggle checked={settings.crossfadeSameAlbum} onChange={(crossfadeSameAlbum) => settings.update({ crossfadeSameAlbum })} label="Crossfade inside albums" />
           </Row>
+          <QualityRow />
           <Row title="Volume levelling" body="Plays every song at about the same loudness, so a quiet song isn't followed by a loud one.">
             <Toggle checked={settings.levelling} onChange={(levelling) => settings.update({ levelling })} label="Volume levelling" />
           </Row>
           <Row title="Autoplay" body="Keep playing similar songs when your queue ends.">
             <Toggle checked={autoplay} onChange={setAutoplay} label="Autoplay" />
           </Row>
-          <Row title="Keep playing when the window is closed" body="Closing Encore while music plays moves it to the system tray by the clock. Right-click its icon there to quit.">
+          <Row
+            title="Continue where you left off"
+            body="If music was playing when Vyse Music closed, it carries on from the same spot when you open it. If not, the last song waits there, paused."
+          >
+            <Toggle checked={settings.continueOnOpen} onChange={(continueOnOpen) => settings.update({ continueOnOpen })} label="Continue where you left off" />
+          </Row>
+          <Row title="Keep playing when the window is closed" body="Closing Vyse Music while music plays moves it to the system tray by the clock. Right-click its icon there to quit.">
             <Toggle checked={settings.backgroundPlay} onChange={(backgroundPlay) => settings.update({ backgroundPlay })} label="Keep playing when the window is closed" />
           </Row>
           <Row title="Pause when headphones are unplugged" body="Also when Bluetooth headphones or speakers disconnect, so the music doesn't carry on out loud.">
@@ -387,7 +408,7 @@ export function SettingsPage() {
         <Card>
           <Row
             title="Tell me about new releases"
-            body="A notification when an artist you listen to or follow puts out a new album or single. Encore checks a few times a day while it's open."
+            body="A notification when an artist you listen to or follow puts out a new album or single. Vyse Music checks a few times a day while it's open."
           >
             <Toggle checked={settings.releaseAlerts} onChange={(releaseAlerts) => settings.update({ releaseAlerts })} label="New release notifications" />
           </Row>
@@ -408,7 +429,7 @@ export function SettingsPage() {
       <Group title="About">
         <Card>
           <UpdateRow />
-          <Row title="Encore" body="Free and open source, with no ads and no account. Your library, history and settings stay on this computer.">
+          <Row title="Vyse Music" body="Free and open source, with no ads and no account. Your library, history and settings stay on this computer.">
             <button onClick={() => void window.encore.app.openDataFolder()} className="glass-control pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium hover:brightness-125">
               <FolderOpen className="size-4" /> Data folder
             </button>

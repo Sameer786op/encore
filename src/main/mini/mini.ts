@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { BrowserWindow, screen, type NativeImage, type WebContents } from "electron";
+import { BrowserWindow, screen, type WebContents } from "electron";
 import type { MiniConfig, MiniCorner } from "@shared/types";
 
 // The floating mini player: a small, frameless, always-on-top window that
@@ -39,17 +39,7 @@ export class MiniPlayer {
   /** whether a song is loaded; no point floating an empty player */
   hasTrack = false;
 
-  private icon: NativeImage | string;
-
-  constructor(private readonly options: MiniOptions) {
-    this.icon = options.icon;
-  }
-
-  /** the icon follows the accent colour */
-  setIcon(icon: NativeImage): void {
-    this.icon = icon;
-    if (this.win && !this.win.isDestroyed()) this.win.setIcon(icon);
-  }
+  constructor(private readonly options: MiniOptions) {}
 
   owns(sender: WebContents): boolean {
     return !!this.win && !this.win.isDestroyed() && this.win.webContents === sender;
@@ -104,8 +94,8 @@ export class MiniPlayer {
       ...position,
       width: WIDTH,
       height: HEIGHT,
-      title: "Encore mini player",
-      icon: this.icon,
+      title: "Vyse Music mini player",
+      icon: this.options.icon,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",

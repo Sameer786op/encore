@@ -72,7 +72,7 @@ export function MiniPlayerSettings() {
 
   return (
     <Card>
-      <Row title="Open the mini player when Encore is minimized" body="A small player you can drag anywhere.">
+      <Row title="Open the mini player when Vyse Music is minimized" body="A small player you can drag anywhere.">
         <Toggle checked={mini.showOnMinimize} onChange={(showOnMinimize) => set({ showOnMinimize })} label="Mini player on minimize" />
       </Row>
       <Row title="Keep it above other windows" body={mini.alwaysOnTop ? "It floats over everything, even full-screen apps." : "Other windows can cover it, like any other window."}>

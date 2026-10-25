@@ -28,7 +28,7 @@ export class AuthError extends Error {
 /** worth trying again later */
 export class TemporaryError extends Error {}
 
-const APP = { name: "Encore", version: "0.1.0" };
+const APP = { name: "Vyse Music", version: "0.1.0" };
 const TIMEOUT_MS = 15_000;
 
 // ---- ListenBrainz ----

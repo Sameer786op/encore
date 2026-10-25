@@ -4,8 +4,6 @@ import { accentShades, DEFAULT_ACCENT, presetFor, type AccentShades } from "./co
 // Settings that change how the app looks live in CSS variables and one
 // attribute on <html>, so every pane picks them up at once without
 // re-rendering: the theme, the accent colour and how see-through the glass is.
-// The main window also hands the main process a recoloured app icon, so the
-// taskbar and tray match the accent.
 
 type Theme = "dark" | "light";
 
@@ -44,9 +42,6 @@ function applyAccent(shades: AccentShades): void {
   style.setProperty("--color-accent-deep", shades.deep);
   style.setProperty("--color-on-accent", shades.onAccent);
   style.setProperty("--accent-rgb", shades.rgb);
-  style.setProperty("--logo-1", shades.logo[0]);
-  style.setProperty("--logo-2", shades.logo[1]);
-  style.setProperty("--logo-3", shades.logo[2]);
 }
 
 function applyGlass(settings: Settings): void {
@@ -68,56 +63,6 @@ function applyGlass(settings: Settings): void {
   style.setProperty("--sidebar-blur", `${sidebar.blur}px`);
   style.setProperty("--player-alpha", String(player.alpha));
   style.setProperty("--player-blur", `${player.blur}px`);
-}
-
-/** the app icon (resources/icon.svg) in the given gradient */
-export function logoSvg([top, middle, bottom]: [string, string, string]): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${top}" /><stop offset="0.55" stop-color="${middle}" /><stop offset="1" stop-color="${bottom}" />
-    </linearGradient>
-    <radialGradient id="shine" cx="0.3" cy="0.2" r="0.8">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35" /><stop offset="1" stop-color="#ffffff" stop-opacity="0" />
-    </radialGradient>
-  </defs>
-  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#bg)" />
-  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#shine)" />
-  <g stroke="#ffffff" stroke-width="38" stroke-linecap="round">
-    <line x1="136" y1="222" x2="136" y2="290" /><line x1="196" y1="160" x2="196" y2="352" /><line x1="256" y1="200" x2="256" y2="312" />
-    <line x1="316" y1="130" x2="316" y2="382" /><line x1="376" y1="190" x2="376" y2="322" />
-  </g>
-</svg>`;
-}
-
-async function renderIcon(colors: [string, string, string]): Promise<string> {
-  const image = new Image();
-  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoSvg(colors))}`;
-  await image.decode();
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  canvas.getContext("2d")!.drawImage(image, 0, 0, 256, 256);
-  return canvas.toDataURL("image/png");
-}
-
-let iconTimer = 0;
-let iconKey = "";
-
-/** the taskbar, tray and window icon follow the accent; the stock icon stays for the default */
-function syncIcon(settings: Settings): void {
-  const isDefault = settings.accent === DEFAULT_ACCENT.id;
-  const key = isDefault ? "default" : JSON.stringify(accentShades(accentOf(settings).color, "dark", accentOf(settings).logo).logo);
-  if (key === iconKey) return;
-  iconKey = key;
-  clearTimeout(iconTimer);
-  // dragging the custom colour picker sends a stream of colours; only the last one matters
-  iconTimer = window.setTimeout(() => {
-    if (isDefault) return void window.encore.app.setIcon(null);
-    void renderIcon(currentShades("dark").logo)
-      .then((png) => window.encore.app.setIcon(png))
-      .catch(() => undefined);
-  }, 350);
 }
 
 /**
@@ -155,10 +100,7 @@ export function connectAppearance({ mini = false }: { mini?: boolean } = {}): ()
     applyGlass(settings);
   };
   applyAll();
-  if (!mini) {
-    void window.encore.app.setTheme(useSettings.getState().theme);
-    syncIcon(useSettings.getState());
-  }
+  if (!mini) void window.encore.app.setTheme(useSettings.getState().theme);
 
   const onSystemChange = () => applyAll();
   reduceTransparency?.addEventListener("change", onSystemChange);
@@ -168,11 +110,9 @@ export function connectAppearance({ mini = false }: { mini?: boolean } = {}): ()
     if (themeChanged || s.accent !== prev.accent || s.customAccent !== prev.customAccent || s.glass !== prev.glass || s.glassAreas !== prev.glassAreas) applyAll();
     if (mini) return;
     if (themeChanged) void window.encore.app.setTheme(s.theme);
-    if (s.accent !== prev.accent || s.customAccent !== prev.customAccent) syncIcon(s);
   });
   return () => {
     stop();
-    clearTimeout(iconTimer);
     reduceTransparency?.removeEventListener("change", onSystemChange);
     prefersDark?.removeEventListener("change", onSystemChange);
   };

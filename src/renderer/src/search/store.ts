@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SearchResults } from "@shared/types";
+import { toast } from "@/ui/toast";
 
 const RECENT_KEY = "encore.recentSearches";
 const DEBOUNCE_MS = 300;
@@ -8,6 +9,8 @@ interface SearchStore {
   query: string;
   results: SearchResults | null;
   loading: boolean;
+  /** the next page of songs is on its way */
+  loadingMore: boolean;
   error: string | null;
   recent: string[];
   setQuery(query: string): void;
@@ -15,6 +18,8 @@ interface SearchStore {
   submit(query?: string): void;
   forgetRecent(query: string): void;
   clearRecent(): void;
+  /** add the next page of songs to the results */
+  loadMore(): Promise<void>;
 }
 
 function loadRecent(): string[] {
@@ -34,7 +39,13 @@ function saveRecent(list: string[]): void {
   }
 }
 
-const cache = new Map<string, SearchResults>();
+// the same search within 10 minutes is instant; after that YouTube Music is asked again, for anything new
+const FRESH_MS = 10 * 60_000;
+const cache = new Map<string, { results: SearchResults; at: number }>();
+const cached = (key: string) => {
+  const hit = cache.get(key);
+  return hit && Date.now() - hit.at < FRESH_MS ? hit.results : undefined;
+};
 let timer: ReturnType<typeof setTimeout> | undefined;
 let latest = 0;
 
@@ -43,13 +54,14 @@ export const useSearch = create<SearchStore>((set, get) => {
     const q = query.trim();
     if (!q) return set({ results: null, loading: false, error: null });
     const key = q.toLowerCase();
-    const hit = cache.get(key);
+    const hit = cached(key);
     if (hit) return set({ results: hit, loading: false, error: null });
     const ticket = ++latest;
     set({ loading: true, error: null });
     try {
       const results = await window.encore.catalog.search(q);
-      cache.set(key, results);
+      cache.delete(key);
+      cache.set(key, { results, at: Date.now() });
       if (cache.size > 40) cache.delete(cache.keys().next().value!);
       if (ticket === latest) set({ results, loading: false });
     } catch {
@@ -69,6 +81,7 @@ export const useSearch = create<SearchStore>((set, get) => {
     query: "",
     results: null,
     loading: false,
+    loadingMore: false,
     error: null,
     recent: loadRecent(),
     setQuery(query) {
@@ -79,7 +92,7 @@ export const useSearch = create<SearchStore>((set, get) => {
         set({ results: null, loading: false, error: null });
         return;
       }
-      set({ loading: !cache.has(query.trim().toLowerCase()) });
+      set({ loading: !cached(query.trim().toLowerCase()) });
       timer = setTimeout(() => void run(query), DEBOUNCE_MS);
     },
     submit(query) {
@@ -97,6 +110,26 @@ export const useSearch = create<SearchStore>((set, get) => {
     clearRecent() {
       set({ recent: [] });
       saveRecent([]);
+    },
+    async loadMore() {
+      const { results, loadingMore } = get();
+      if (!results?.moreSongs || loadingMore) return;
+      set({ loadingMore: true });
+      try {
+        const page = await window.encore.catalog.searchMore(results.moreSongs);
+        const current = get().results;
+        // a different search was made meanwhile
+        if (!current || current.query !== results.query) return;
+        const seen = new Set(current.tracks.map((t) => t.id));
+        const next = { ...current, tracks: [...current.tracks, ...page.tracks.filter((t) => !seen.has(t.id))], moreSongs: page.more };
+        const entry = cache.get(next.query.toLowerCase());
+        if (entry) entry.results = next;
+        set({ results: next });
+      } catch {
+        toast("Couldn't load more songs. Try the search again.", { kind: "error" });
+      } finally {
+        set({ loadingMore: false });
+      }
     },
   };
 });

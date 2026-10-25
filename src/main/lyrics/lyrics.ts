@@ -15,7 +15,7 @@ import { INTERLUDE, isInstrumental, parseLrc } from "./lrc";
 const FOUND_DAYS = 60;
 const NOT_FOUND_DAYS = 3;
 const LRCLIB = "https://lrclib.net/api";
-const USER_AGENT = "Encore/0.1 (free desktop music player)";
+const USER_AGENT = "VyseMusic/0.3 (free desktop music player)";
 
 interface LrclibRecord {
   trackName?: string;

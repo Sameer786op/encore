@@ -5,12 +5,12 @@ export interface AccentPreset {
   id: string;
   name: string;
   color: string;
-  /** a logo gradient of its own instead of shades of the accent */
+  /** a two-colour swatch of its own instead of a flat one */
   logo?: [string, string];
 }
 
 export const ACCENTS: AccentPreset[] = [
-  { id: "encore", name: "Encore", color: "#fa2d48" },
+  { id: "encore", name: "Ruby", color: "#fa2d48" },
   { id: "sunset", name: "Sunset", color: "#ff7a1a" },
   { id: "amber", name: "Amber", color: "#ffb800" },
   { id: "forest", name: "Forest", color: "#34c759" },

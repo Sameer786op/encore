@@ -10,7 +10,7 @@ export function connectUpdates(): () => void {
     const was = useUpdates.getState().state;
     useUpdates.setState(status, true);
     if (status.state === "ready" && was !== "ready") {
-      toast(`Encore ${status.version} is ready`, {
+      toast(`Vyse Music ${status.version} is ready`, {
         action: { label: "Restart", run: () => void window.encore.updates.install() },
         durationMs: 15_000,
       });

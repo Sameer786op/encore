@@ -115,8 +115,8 @@ export function Sidebar() {
   return (
     <LiquidGlass as="aside" area="sidebar" radius={22} sheen className="absolute bottom-2 left-2 top-2 z-30 flex w-[var(--sidebar-w)] flex-col overflow-hidden">
       <div className={cn("drag flex h-[54px] shrink-0 items-center gap-2.5", compact ? "justify-center" : "px-4")}>
-        <Logo className="size-[26px] drop-shadow-[0_4px_8px_rgb(var(--accent-rgb)/0.45)]" />
-        {!compact && <span className="font-display text-[17px] font-bold tracking-[-0.02em]">Encore</span>}
+        <Logo className="size-[28px] drop-shadow-[0_4px_10px_rgb(122_92_255/0.45)]" />
+        {!compact && <span className="font-display text-[17px] font-bold tracking-[-0.02em] whitespace-nowrap">Vyse Music</span>}
       </div>
 
       <div className={cn("min-h-0 flex-1 overflow-y-auto pb-2", compact ? "px-2" : "px-2.5", " scrollbar-none [mask-image:linear-gradient(to_bottom,transparent,black_10px,black_calc(100%_-_16px),transparent)]")}>

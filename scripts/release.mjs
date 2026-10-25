@@ -1,5 +1,5 @@
 // Builds the Windows installer and publishes it as a GitHub release, which is
-// where installed copies of Encore look for updates.
+// where installed copies of Vyse Music look for updates.
 //
 //   npm version patch   (or minor / major) to raise the version first
 //   npm run release
@@ -54,15 +54,15 @@ if (exists) {
   process.exit(1);
 }
 
-console.log(`Building Encore ${version}…`);
+console.log(`Building Vyse Music ${version}…`);
 npx("electron-vite build");
 npx("electron-builder --win --publish never");
 
-const files = [`Encore-Setup-${version}.exe`, `Encore-Setup-${version}.exe.blockmap`, "latest.yml"].map((f) => join(root, "release", f));
+const files = [`Vyse-Music-Setup-${version}.exe`, `Vyse-Music-Setup-${version}.exe.blockmap`, "latest.yml"].map((f) => join(root, "release", f));
 for (const f of files) if (!existsSync(f)) throw new Error(`Missing ${f}`);
 if (!readFileSync(files[2], "utf8").includes(`version: ${version}`)) throw new Error("release/latest.yml is for a different version");
 
 console.log(`Publishing ${tag}…`);
 run("git", ["push", "--follow-tags"]);
-run(cli, ["release", "create", tag, ...files, "--title", `Encore ${version}`, "--generate-notes"]);
-console.log(`Done. Installed copies will pick up ${version} within a few hours, or from Settings → About.`);
+run(cli, ["release", "create", tag, ...files, "--title", `Vyse Music ${version}`, "--generate-notes"]);
+console.log(`Done. Installed copies pick up ${version} the next time they're opened, or within an hour.`);

@@ -120,7 +120,7 @@ export function ListeningPage() {
         <EmptyState
           icon={<BarChart3 className="size-7" />}
           title="Your listening shows up here"
-          body="Import your history from Spotify, YouTube Music or Apple Music, or just keep listening in Encore."
+          body="Import your history from Spotify, YouTube Music or Apple Music, or just keep listening in Vyse Music."
           action={
             <button onClick={() => navigate({ name: "import" })} className="glass-control pressable rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-ink hover:brightness-125">
               Import your history
@@ -176,7 +176,7 @@ export function ListeningPage() {
         ))}
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-[12.5px] text-ink-2">
           <span className="size-1.5 rounded-full" style={{ background: ORIGIN_COLOR.encore }} />
-          Encore
+          Vyse Music
         </span>
       </div>
 

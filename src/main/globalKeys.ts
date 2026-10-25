@@ -1,7 +1,7 @@
 import { globalShortcut } from "electron";
 import { GLOBAL_COMMANDS, globalKeysFor, isGlobalCommand, toAccelerator, type GlobalCommand, type GlobalKeysConfig, type GlobalKeyState } from "@shared/shortcuts";
 
-// Shortcuts that work while another app has focus or Encore sits in the tray.
+// Shortcuts that work while another app has focus or Vyse Music sits in the tray.
 // Windows gives each combination to whichever app asks first, so one may
 // already be taken; the Settings page says which.
 

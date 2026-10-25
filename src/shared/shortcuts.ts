@@ -1,7 +1,7 @@
 // Key combinations are written like "Ctrl+Alt+ArrowRight" or "Space": the
 // modifiers in a fixed order, then one key. Both windows and the main process
 // use this format; the main process turns it into an Electron accelerator for
-// shortcuts that work while Encore is in the background.
+// shortcuts that work while Vyse Music is in the background.
 
 export type GlobalCommand = "playPause" | "next" | "previous" | "volumeUp" | "volumeDown" | "like" | "mini" | "show";
 
@@ -13,7 +13,7 @@ export const GLOBAL_COMMANDS: { id: GlobalCommand; label: string; keys: string }
   { id: "volumeDown", label: "Volume down", keys: "Ctrl+Alt+ArrowDown" },
   { id: "like", label: "Like the song that's playing", keys: "Ctrl+Alt+L" },
   { id: "mini", label: "Show or hide the mini player", keys: "Ctrl+Alt+Shift+M" },
-  { id: "show", label: "Bring Encore to the front", keys: "Ctrl+Alt+E" },
+  { id: "show", label: "Bring Vyse Music to the front", keys: "Ctrl+Alt+E" },
 ];
 
 export const isGlobalCommand = (id: unknown): id is GlobalCommand => GLOBAL_COMMANDS.some((c) => c.id === id);

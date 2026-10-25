@@ -1,10 +1,31 @@
-import type { AlbumDetails, ArtistDetails, ArtistSummary, HomeSection, SearchResults, Track } from "@shared/types";
+import { randomUUID } from "node:crypto";
+import type { AlbumDetails, ArtistDetails, ArtistSummary, HomeSection, RemotePlaylistDetails, SearchResults, Track } from "@shared/types";
 import { trackId } from "@shared/types";
 import { cleanArtistName } from "../matching/text";
 import { getYouTube } from "./client";
-import { artistsFromRuns, bestArtwork, compact, mapAlbum, mapArtist, mapTrack, text, uniqueById } from "./mappers";
+import { artistsFromRuns, bestArtwork, compact, mapAlbum, mapArtist, mapPlaylist, mapTrack, text, uniqueById } from "./mappers";
 
 type Loose = Record<string, any>;
+
+// "Show more" pages of song results, by token; only the latest searches keep theirs
+const moreSongs = new Map<string, Loose>();
+
+function keepMore(page: Loose | null): string | undefined {
+  if (!page?.has_continuation) return undefined;
+  const token = randomUUID();
+  moreSongs.set(token, page);
+  if (moreSongs.size > 30) moreSongs.delete(moreSongs.keys().next().value!);
+  return token;
+}
+
+export async function searchMore(token: string): Promise<{ tracks: Track[]; more?: string }> {
+  const page = moreSongs.get(token);
+  if (!page) throw new Error("Those results are too old; search again");
+  moreSongs.delete(token);
+  const next = (await page.getContinuation()) as Loose;
+  const items = (next.contents?.contents ?? []) as Loose[];
+  return { tracks: uniqueById(compact(items.map((i) => mapTrack(i)))), more: keepMore(next) };
+}
 
 export async function search(query: string): Promise<SearchResults> {
   const yt = await getYouTube();
@@ -28,6 +49,7 @@ export async function search(query: string): Promise<SearchResults> {
     // "Profile" rows are regular channels, not artists
     artists: uniqueById(compact(byType("artist").filter((i) => !text(i.subtitle).startsWith("Profile")).map(mapArtist))),
     videos: uniqueById(compact(byType("video").map((i) => mapTrack(i)))),
+    moreSongs: keepMore(songSearch),
   };
 
   const card = shelves.find((s) => s.type === "MusicCardShelf");
@@ -113,21 +135,55 @@ export async function searchArtists(query: string): Promise<ArtistSummary[]> {
   return uniqueById(compact(items.map(mapArtist)));
 }
 
+/** what's new and popular comes first */
+export function homeRank(title: string): number {
+  if (/quick picks/i.test(title)) return 0;
+  if (/^new (releases|albums)/i.test(title)) return 1;
+  if (/trending/i.test(title)) return 2;
+  if (/hits|top |chart|biggest/i.test(title)) return 3;
+  if (/new music videos/i.test(title)) return 4;
+  return 5;
+}
+
+function homeSection(shelf: Loose): HomeSection | null {
+  if (shelf?.type !== "MusicCarouselShelf") return null;
+  const title = text(shelf.header?.title).trim();
+  // community playlists are anyone's uploads; moods and podcasts aren't songs
+  if (!title || /community/i.test(title)) return null;
+  const items = (shelf.contents ?? []) as Loose[];
+  const section: HomeSection = {
+    title,
+    tracks: uniqueById(compact(items.filter((i) => i.item_type === "song" || i.item_type === "video").map((i) => mapTrack(i)))),
+    albums: uniqueById(compact(items.filter((i) => i.item_type === "album").map(mapAlbum))),
+    playlists: uniqueById(compact(items.filter((i) => i.item_type === "playlist").map(mapPlaylist))),
+  };
+  return section.tracks.length + section.albums.length + section.playlists.length > 0 ? section : null;
+}
+
+/** shelves from YouTube Music's home (both pages) and Explore, newest and most popular first */
+export function homeSections(shelves: Loose[]): HomeSection[] {
+  const sections: HomeSection[] = [];
+  for (const shelf of shelves) {
+    const section = homeSection(shelf);
+    if (!section) continue;
+    // "New releases" and "New albums & singles" are one list
+    const same = sections.find((s) => s.title === section.title || (homeRank(s.title) === 1 && homeRank(section.title) === 1));
+    if (!same) sections.push(section);
+    else {
+      same.tracks = uniqueById([...same.tracks, ...section.tracks]);
+      same.albums = uniqueById([...same.albums, ...section.albums]);
+      same.playlists = uniqueById([...same.playlists, ...section.playlists]);
+    }
+  }
+  return sections.map((section, i) => ({ section, i })).sort((a, b) => homeRank(a.section.title) - homeRank(b.section.title) || a.i - b.i).map((x) => x.section);
+}
+
 export async function home(): Promise<HomeSection[]> {
   const yt = await getYouTube();
-  const feed = (await yt.music.getHomeFeed()) as unknown as Loose;
-  const sections = (feed.sections ?? []) as Loose[];
-  return sections
-    .filter((s) => s.type === "MusicCarouselShelf")
-    .map((s) => {
-      const items = (s.contents ?? []) as Loose[];
-      return {
-        title: text(s.header?.title),
-        tracks: compact(items.filter((i) => i.item_type === "song" || i.item_type === "video").map((i) => mapTrack(i))),
-        albums: compact(items.filter((i) => i.item_type === "album").map(mapAlbum)),
-      };
-    })
-    .filter((s) => s.title && (s.tracks.length > 0 || s.albums.length > 0));
+  const [feed, explore] = (await Promise.all([yt.music.getHomeFeed().catch(() => null), yt.music.getExplore().catch(() => null)])) as (Loose | null)[];
+  if (!feed && !explore) throw new Error("YouTube Music didn't answer");
+  const more = feed?.has_continuation ? ((await feed.getContinuation().catch(() => null)) as Loose | null) : null;
+  return homeSections([...(feed?.sections ?? []), ...(more?.sections ?? []), ...(explore?.sections ?? [])]);
 }
 
 /** songs only (no videos), for matching songs from other services */
@@ -138,10 +194,10 @@ export async function searchSongs(query: string): Promise<Track[]> {
 }
 
 /** a saved YouTube or YouTube Music playlist, following "load more" pages */
-export async function playlist(id: string, maxTracks = 5000): Promise<{ name: string; tracks: Track[] }> {
+async function playlistPages(id: string, maxTracks: number): Promise<{ header: Loose; items: Loose[] }> {
   const yt = await getYouTube();
   let page = (await yt.music.getPlaylist(id)) as unknown as Loose;
-  const name = text(page.header?.title) || "YouTube playlist";
+  const header = (page.header ?? {}) as Loose;
   const items: Loose[] = [...((page.items ?? page.contents ?? []) as Loose[])];
   while (page.has_continuation && items.length < maxTracks) {
     page = (await page.getContinuation()) as Loose;
@@ -149,7 +205,34 @@ export async function playlist(id: string, maxTracks = 5000): Promise<{ name: st
     if (more.length === 0) break;
     items.push(...more);
   }
-  return { name, tracks: compact(items.slice(0, maxTracks).map((i) => mapTrack(i))) };
+  return { header, items: items.slice(0, maxTracks) };
+}
+
+export async function playlist(id: string, maxTracks = 5000): Promise<{ name: string; tracks: Track[] }> {
+  const { header, items } = await playlistPages(id, maxTracks);
+  return { name: text(header.title) || "YouTube playlist", tracks: compact(items.map((i) => mapTrack(i))) };
+}
+
+/** who made a playlist, from a header like "Playlist • YouTube Music • 2026"; the page counts the songs itself */
+export function playlistByline(subtitle: string): string | undefined {
+  const parts = subtitle
+    .split("•")
+    .map((part) => part.trim())
+    .filter((part) => part && !/^(playlist|album|single|ep)$/i.test(part) && !/^\d{4}$/.test(part) && !/\d[\d.,]*\s*[KMB]?\s+(songs?|tracks?|views?)\b/i.test(part) && !/\b(hours?|minutes?|hr|min)\b/i.test(part));
+  return parts.join(" • ") || undefined;
+}
+
+/** a YouTube Music playlist to open as a page, such as a chart */
+export async function remotePlaylist(id: string): Promise<RemotePlaylistDetails> {
+  const { header, items } = await playlistPages(id, 300);
+  return {
+    id,
+    title: text(header.title) || "Playlist",
+    subtitle: playlistByline(`${text(header.subtitle)} • ${text(header.second_subtitle)}`),
+    description: text(header.description?.description ?? header.description) || undefined,
+    artwork: bestArtwork(header.thumbnail ?? header.thumbnails),
+    tracks: uniqueById(compact(items.map((i) => mapTrack(i)))),
+  };
 }
 
 /** one song's details from its video id */

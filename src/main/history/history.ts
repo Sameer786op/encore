@@ -7,7 +7,7 @@ import type { Matcher } from "../matching/matcher";
 import { classify } from "../matching/score";
 import { cleanArtistName, fold, songKey, splitArtists } from "../matching/text";
 
-// Listening history from other services, kept next to Encore's own plays,
+// Listening history from other services, kept next to Vyse Music's own plays,
 // and the numbers behind the "Your listening" page.
 
 interface SongRow {
@@ -90,7 +90,7 @@ export class ListeningHistory {
       byKey.set(r.song_key, { key: r.song_key, title: r.title, artist: r.artist, album: r.album ?? undefined, plays: r.plays, ms: r.ms, videoId: r.video_id ?? undefined });
     }
 
-    // Encore's own plays count too
+    // Vyse Music's own plays count too
     const own = this.db
       .prepare("SELECT t.data AS data, COUNT(*) AS plays, SUM(p.played_ms) AS ms FROM plays p JOIN tracks t ON t.id = p.track_id GROUP BY p.track_id")
       .all() as unknown as { data: string; plays: number; ms: number }[];

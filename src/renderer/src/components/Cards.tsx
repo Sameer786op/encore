@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { BellOff, BellRing, Check, ChevronLeft, ChevronRight, Heart, ListMusic, Play, Plus, Shuffle } from "lucide-react";
-import type { AlbumSummary, ArtistSummary, DailyMix, Playlist, Track } from "@shared/types";
+import type { AlbumSummary, ArtistSummary, DailyMix, Playlist, RemotePlaylist, Track } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
@@ -14,7 +14,7 @@ import { Artwork, Mosaic } from "./Artwork";
 import { MixCover } from "./MixCover";
 import { trackMenu } from "./trackMenu";
 import { playlistMenu } from "./playlistMenu";
-import { albumCache } from "@/pages/albumCache";
+import { albumCache, remotePlaylistCache } from "@/pages/albumCache";
 
 function HoverPlay({ onClick, label }: { onClick: () => void; label: string }) {
   return (
@@ -112,6 +112,29 @@ export function AlbumCard({ album, subtitle, badge }: { album: AlbumSummary; sub
       </div>
       <div className="mt-2.5 truncate text-[13px] font-medium leading-tight">{album.title}</div>
       <div className="mt-0.5 truncate text-[13px] leading-tight text-ink-2">{line}</div>
+    </CardShell>
+  );
+}
+
+async function playRemotePlaylist(playlist: RemotePlaylist): Promise<void> {
+  try {
+    const details = await remotePlaylistCache.get(playlist.id);
+    usePlayer.getState().playTracks(details.tracks, 0, { kind: "home", label: details.title, id: `ytplaylist:${details.id}` });
+  } catch {
+    toast(`Couldn't load "${playlist.title}"`, { kind: "error" });
+  }
+}
+
+/** a YouTube Music playlist, such as a chart */
+export function RemotePlaylistCard({ playlist }: { playlist: RemotePlaylist }) {
+  return (
+    <CardShell onClick={() => navigate({ name: "ytplaylist", id: playlist.id })}>
+      <div className="relative">
+        <Artwork src={playlist.artwork} className={ART} />
+        <HoverPlay onClick={() => void playRemotePlaylist(playlist)} label={`Play ${playlist.title}`} />
+      </div>
+      <div className="mt-2.5 truncate text-[13px] font-medium leading-tight">{playlist.title}</div>
+      <div className="mt-0.5 truncate text-[13px] leading-tight text-ink-2">{playlist.subtitle ?? "Playlist"}</div>
     </CardShell>
   );
 }

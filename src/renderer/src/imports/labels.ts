@@ -5,7 +5,7 @@ export const ORIGIN_LABEL: Record<ImportOrigin, string> = {
   apple: "Apple Music",
   youtube: "YouTube Music",
   csv: "CSV file",
-  encore: "Encore",
+  encore: "Vyse Music",
 };
 
 /** small colour cue per service, as a CSS colour */

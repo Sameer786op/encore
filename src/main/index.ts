@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell, type IpcMainInvokeEvent } from "electron";
@@ -41,7 +42,7 @@ import { Lastfm, ListenBrainz } from "./scrobble/clients";
 import { Scrobbler } from "./scrobble/scrobbler";
 import { Updater } from "./updates/updater";
 import { electronVault } from "./scrobble/vault";
-import { album, artist, home, lyricsText, playlist, radio, search, searchArtists, searchSongs, suggestions, trackById } from "./youtube/catalog";
+import { album, artist, home, lyricsText, playlist, radio, remotePlaylist, search, searchArtists, searchMore, searchSongs, suggestions, trackById } from "./youtube/catalog";
 import { configureYouTube } from "./youtube/client";
 import { resolveAudio } from "./youtube/streams";
 import icon from "../../resources/icon.png?asset";
@@ -50,6 +51,8 @@ registerMediaScheme();
 
 // automated tests run against a throwaway profile
 if (process.env.ENCORE_USER_DATA) app.setPath("userData", process.env.ENCORE_USER_DATA);
+// Vyse Music used to be called Encore: keep using the library, history and settings saved under the old name
+else if (existsSync(join(app.getPath("appData"), "Encore"))) app.setPath("userData", join(app.getPath("appData"), "Encore"));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -115,6 +118,11 @@ const globalKeys = new GlobalKeys((command) => {
 /** bring the main window to the front, for notification clicks and second launches */
 function showMainWindow(): void {
   if (!mainWindow) return;
+  // opening it again from the tray or the Start menu counts as opening the app
+  if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
+    updates?.checkIfStale();
+    feed?.checkReleasesOnOpen();
+  }
   tray.hide();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
@@ -131,7 +139,7 @@ function notifyReleases(releases: ReleaseItem[]): void {
       releases.length === 1
         ? `${first.album.title}${first.album.kind ? ` \u00b7 ${first.album.kind}` : ""}`
         : `From ${artists.slice(0, 3).join(", ")}${artists.length > 3 ? " and more" : ""}`,
-    icon: appearance.iconPath,
+    icon,
     silent: false,
   });
   notification.on("click", () => {
@@ -144,8 +152,8 @@ function notifyReleases(releases: ReleaseItem[]): void {
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    title: "Encore",
-    icon: appearance.iconPath,
+    title: "Vyse Music",
+    icon,
     width: 1320,
     height: 840,
     minWidth: 960,
@@ -179,9 +187,9 @@ function createWindow(): BrowserWindow {
     if (getSetting(db, "background.explained") !== "yes" && Notification.isSupported()) {
       setSetting(db, "background.explained", "yes");
       new Notification({
-        title: "Encore is still playing",
+        title: "Vyse Music is still playing",
         body: "It's in the system tray by the clock. Click it to come back, or right-click it to quit. You can turn this off in Settings.",
-        icon: appearance.iconPath,
+        icon,
       }).show();
     }
   });
@@ -308,6 +316,12 @@ function registerIpc(): void {
   handle(IPC.search, (query: unknown) => search(stringArg(query, "query").slice(0, 200)));
   handle(IPC.suggestions, (query: unknown) => suggestions(stringArg(query, "query").slice(0, 200)));
   handle(IPC.album, (id: unknown) => album(stringArg(id, "album id")));
+  handle(IPC.searchMore, (token: unknown) => searchMore(stringArg(token, "search token")));
+  handle(IPC.remotePlaylist, (id: unknown) => {
+    const value = stringArg(id, "playlist id");
+    if (!/^[\w-]{1,128}$/.test(value)) throw new Error("Expected a playlist id");
+    return remotePlaylist(value);
+  });
   handle(IPC.artist, (id: unknown) => artist(stringArg(id, "artist id")));
   handle(IPC.home, () => home());
   handle(IPC.radio, (track: unknown) => {
@@ -319,6 +333,12 @@ function registerIpc(): void {
     if (source !== "youtube" || !videoId) return null;
     const stream = await resolveAudio(videoId).catch(() => null);
     return typeof stream?.loudnessDb === "number" ? stream.loudnessDb : null;
+  });
+  handle(IPC.quality, async (trackId: unknown) => {
+    const [source, videoId] = stringArg(trackId, "track id").split(":");
+    if (source !== "youtube" || !videoId) return null;
+    const stream = await resolveAudio(videoId).catch(() => null);
+    return stream ? { codec: stream.codec, kbps: Math.round(stream.bitrate / 1000), sampleRate: stream.sampleRate } : null;
   });
   handle(IPC.prefetch, async (trackId: unknown) => {
     const [source, videoId] = stringArg(trackId, "track id").split(":");
@@ -484,7 +504,6 @@ function registerIpc(): void {
     backgroundPlay = (config as { backgroundPlay?: unknown })?.backgroundPlay !== false;
   });
   handle(IPC.appSetTheme, (theme: unknown) => appearance.setTheme(theme));
-  handle(IPC.appSetIcon, (png: unknown) => appearance.setIcon(png));
   handle(IPC.appPickWallpaper, () => (mainWindow ? appearance.pickWallpaper(mainWindow) : null));
   handle(IPC.appClearWallpaper, () => appearance.clearWallpaper());
   handle(IPC.appSetGlobalKeys, (config: unknown) => globalKeys.configure(config));
@@ -510,26 +529,20 @@ app.on("before-quit", () => {
 app.on("will-quit", () => globalKeys.dispose());
 
 app.whenReady().then(() => {
-  app.setAppUserModelId("app.encore.player");
+  // a Store copy already has its package's ID, which its taskbar pin and notifications use
+  if (!process.windowsStore) app.setAppUserModelId("app.encore.player");
   const userData = app.getPath("userData");
   configureYouTube({ cacheDir: join(userData, "youtube-cache") });
   db = openDatabase(join(userData, "library.db"));
   appearance = new Appearance({
     db,
     userData,
-    stockIcon: icon,
-    onIcon: (image, path) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setIcon(image);
-      mini?.setIcon(image);
-      tray.setIcon(path);
-    },
     onTheme: () => {
       if (!mainWindow || mainWindow.isDestroyed()) return;
       mainWindow.setTitleBarOverlay(appearance.titleBarOverlay);
       mainWindow.setBackgroundColor(appearance.backgroundColor);
     },
   });
-  tray.setIcon(appearance.iconPath);
   library = new Library(db);
   matcher = new Matcher(db, { searchSongs, trackById });
   imports = new ImportManager(db, library, matcher);
@@ -539,11 +552,13 @@ app.whenReady().then(() => {
   lyrics = new LyricsService(db, { youtubeLyrics: lyricsText, localPath: (id) => local.pathOf(id) });
   feed = new FeedService(db, library, matcher, { searchArtists, artist, radio }, notifyReleases);
   scrobbler = new Scrobbler(db, { lastfm: new Lastfm(), listenbrainz: new ListenBrainz() }, electronVault, (url) => void shell.openExternal(url));
-  // only installed copies update themselves; test runs can opt in with ENCORE_UPDATES=1
-  updates = new Updater(app.isPackaged && (!process.env.ENCORE_USER_DATA || process.env.ENCORE_UPDATES === "1"));
+  // only installed copies update themselves, and not ones from the Microsoft Store, which does it;
+  // test runs can opt in with ENCORE_UPDATES=1
+  const fromStore = process.windowsStore === true;
+  updates = new Updater(app.isPackaged && !fromStore && (!process.env.ENCORE_USER_DATA || process.env.ENCORE_UPDATES === "1"), fromStore);
   mini = new MiniPlayer({
     preload: join(import.meta.dirname, "../preload/index.cjs"),
-    icon: appearance.iconPath,
+    icon,
     stateFile: join(userData, "mini-player.json"),
     load: (win) => loadRenderer(win, "mini"),
     onVisible: (visible) => send(IPC.miniVisible, visible),

@@ -167,7 +167,7 @@ describe("ListeningHistory", () => {
     expect(history.sources()).toEqual([{ origin: "spotify", plays: 2, firstAt: "2021-01-01T10:00:00.000Z", lastAt: "2021-01-02T10:00:00.000Z" }]);
   });
 
-  it("adds up songs across services and Encore's own plays", () => {
+  it("adds up songs across services and Vyse Music's own plays", () => {
     history.add("spotify", [play("STAY (with Justin Bieber)", "The Kid LAROI", "2021-07-01T10:00:00.000Z"), play("Yellow", "Coldplay", "2020-03-01T10:00:00.000Z")]);
     history.add("apple", [play("Stay", "The Kid LAROI, Justin Bieber", "2022-01-01T12:00:00.000Z", 400_000, 2)]);
     library.recordPlay(yt("cccccccccc1", "Stay", "The Kid LAROI", 141), 141_000, new Date("2023-05-05T10:00:00Z"));
@@ -175,7 +175,7 @@ describe("ListeningHistory", () => {
     const insights = history.insights();
     expect(insights.totals).toMatchObject({ plays: 5, songs: 2, artists: 2, firstAt: "2020-03-01T10:00:00.000Z" });
     expect(insights.topSongs[0]).toMatchObject({ plays: 4, artist: expect.stringContaining("Kid LAROI") });
-    // the Encore play gives the top song a playable track
+    // the Vyse Music play gives the top song a playable track
     expect(insights.topSongs[0].track?.sourceId).toBe("cccccccccc1");
     expect(insights.topArtists[0]).toMatchObject({ name: "The Kid LAROI", plays: 4 });
     expect(insights.years.map((y) => [y.year, y.plays])).toEqual([

@@ -33,13 +33,15 @@ export interface Settings {
   wallpaper: { url: string | null; blur: number; dim: number };
   /** closing the window while music plays keeps it going from the system tray */
   backgroundPlay: boolean;
+  /** music that was playing when the app closed carries on from the same spot when it opens */
+  continueOnOpen: boolean;
   /** pause when the headphones or speakers being played on are disconnected */
   pauseOnUnplug: boolean;
   /** what double-clicking (or pressing Enter on) a song in a list does */
   doubleClick: "play" | "queue";
   /** keyboard shortcuts changed from their defaults, by command id (ui/shortcuts); [] turns one off */
   shortcuts: Record<string, string[]>;
-  /** shortcuts that work while Encore is in the background */
+  /** shortcuts that work while Vyse Music is in the background */
   globalKeys: GlobalKeysConfig;
 }
 
@@ -70,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   artworkLook: { blur: 90, dim: 0.58 },
   wallpaper: { url: null, blur: 0, dim: 0.3 },
   backgroundPlay: true,
+  continueOnOpen: true,
   pauseOnUnplug: true,
   doubleClick: "play",
   shortcuts: {},

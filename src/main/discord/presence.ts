@@ -23,7 +23,7 @@ export function buildActivity(state: NowPlaying, options: { showWhenPaused: bool
     details: field(track.title, "Unknown song"),
     state: field(track.artists.map((a) => a.name).join(", "), "Unknown artist"),
     assets: {
-      ...(artwork ? { large_image: artwork, large_text: field(track.album?.title ?? track.title, "Encore") } : {}),
+      ...(artwork ? { large_image: artwork, large_text: field(track.album?.title ?? track.title, "Vyse Music") } : {}),
       ...(state.playing ? {} : { small_text: "Paused" }),
     },
     instance: false,

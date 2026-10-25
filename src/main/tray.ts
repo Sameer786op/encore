@@ -1,7 +1,7 @@
 import { Menu, Tray, nativeImage, type NativeImage } from "electron";
 import type { NowPlaying, PlayerCommand } from "@shared/types";
 
-// While Encore plays with its window closed, it lives in the system tray:
+// While Vyse Music plays with its window closed, it lives in the system tray:
 // a click brings the window back, and the menu has the basic controls and Quit.
 
 interface BackgroundTrayOptions {
@@ -24,17 +24,7 @@ export class BackgroundTray {
   private now: NowPlaying | null = null;
   private menuKey = "";
 
-  private icon: string;
-
-  constructor(private readonly options: BackgroundTrayOptions) {
-    this.icon = options.icon;
-  }
-
-  /** the icon follows the accent colour */
-  setIcon(path: string): void {
-    this.icon = path;
-    this.tray?.setImage(trayImage(path));
-  }
+  constructor(private readonly options: BackgroundTrayOptions) {}
 
   get visible(): boolean {
     return !!this.tray;
@@ -42,7 +32,7 @@ export class BackgroundTray {
 
   show(): void {
     if (this.tray) return;
-    this.tray = new Tray(trayImage(this.icon));
+    this.tray = new Tray(trayImage(this.options.icon));
     this.tray.on("click", () => this.options.show());
     this.menuKey = "";
     this.refresh();
@@ -68,7 +58,7 @@ export class BackgroundTray {
     this.menuKey = key;
     const artists = track?.artists.map((a) => a.name).join(", ");
     // Windows cuts tooltips off at 127 characters
-    this.tray.setToolTip((track ? `Encore: ${track.title} · ${artists}` : "Encore").slice(0, 127));
+    this.tray.setToolTip((track ? `Vyse Music: ${track.title} · ${artists}` : "Vyse Music").slice(0, 127));
     const send = (kind: "toggle" | "next" | "previous") => () => this.options.command({ kind });
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
@@ -77,8 +67,8 @@ export class BackgroundTray {
         { label: "Next", enabled: !!track, click: send("next") },
         { label: "Previous", enabled: !!track, click: send("previous") },
         { type: "separator" },
-        { label: "Open Encore", click: () => this.options.show() },
-        { label: "Quit Encore", click: () => this.options.quit() },
+        { label: "Open Vyse Music", click: () => this.options.show() },
+        { label: "Quit Vyse Music", click: () => this.options.quit() },
       ]),
     );
   }

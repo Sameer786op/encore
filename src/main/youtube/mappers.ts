@@ -1,4 +1,4 @@
-import type { AlbumSummary, ArtistRef, ArtistSummary, Track } from "@shared/types";
+import type { AlbumSummary, ArtistRef, ArtistSummary, RemotePlaylist, Track } from "@shared/types";
 import { trackId } from "@shared/types";
 
 // youtubei.js parses YouTube's responses into many node classes. We only read
@@ -52,6 +52,19 @@ function artistRefs(item: Loose): ArtistRef[] {
     .filter((a) => a.name.length > 0);
 }
 
+/** uploads that aren't marked as music, as in some charts, name the artist only in the row's second column */
+function columnArtists(item: Loose): ArtistRef[] {
+  const column = item?.flex_columns?.[1]?.title;
+  if (!column || /\b(views?|plays?|subscribers?)\b/i.test(text(column))) return [];
+  return artistsFromRuns(column);
+}
+
+/** "3:16" or "1:02:45" in the row's last column, for rows that don't say their length otherwise */
+function columnSeconds(item: Loose): number {
+  const match = /^(?:(\d+):)?(\d{1,2}):(\d{2})$/.exec(text(item?.fixed_columns?.[0]?.title).trim());
+  return match ? Number(match[1] ?? 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) : 0;
+}
+
 function isExplicit(item: Loose): boolean {
   const badges = Array.isArray(item?.badges) ? item.badges : [];
   return badges.some((b: Loose) => b?.icon_type === "MUSIC_EXPLICIT_BADGE");
@@ -70,13 +83,13 @@ export function mapTrack(item: Loose, fallback: TrackFallback = {}): Track | nul
   if (!title) return null;
   const artists = artistRefs(item);
   const album = item?.album?.name ? { id: item.album.id || undefined, title: text(item.album.name) } : fallback.album;
-  const seconds = Number(item?.duration?.seconds ?? 0);
+  const seconds = Number(item?.duration?.seconds ?? 0) || columnSeconds(item);
   return {
     id: trackId("youtube", videoId),
     source: "youtube",
     sourceId: videoId,
     title,
-    artists: artists.length > 0 ? artists : (fallback.artists ?? []),
+    artists: artists.length > 0 ? artists : fallback.artists?.length ? fallback.artists : columnArtists(item),
     album,
     durationMs: Number.isFinite(seconds) ? seconds * 1000 : 0,
     artwork: bestArtwork(item?.thumbnails ?? item?.thumbnail) ?? fallback.artwork,
@@ -97,6 +110,20 @@ export function mapAlbum(item: Loose): AlbumSummary | null {
     artists: artistRefs(item),
     year: item?.year ? String(item.year) : undefined,
     kind: kind && !/^\d{4}$/.test(kind) ? kind : undefined,
+    artwork: bestArtwork(item?.thumbnails ?? item?.thumbnail),
+  };
+}
+
+export function mapPlaylist(item: Loose): RemotePlaylist | null {
+  const raw: unknown = item?.id;
+  if (typeof raw !== "string" || !raw) return null;
+  const title = text(item?.title).trim();
+  if (!title) return null;
+  return {
+    // browse ids put VL in front of the playlist id
+    id: raw.startsWith("VL") ? raw.slice(2) : raw,
+    title,
+    subtitle: text(item?.subtitle).trim() || undefined,
     artwork: bestArtwork(item?.thumbnails ?? item?.thumbnail),
   };
 }

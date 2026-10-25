@@ -146,7 +146,7 @@ export class Scrobbler {
     }
     if (!attempt.cancelled) {
       this.pending = false;
-      this.errors.lastfm ??= "Encore wasn't approved on Last.fm in time. Try connecting again.";
+      this.errors.lastfm ??= "Vyse Music wasn't approved on Last.fm in time. Try connecting again.";
       this.changed();
     }
   }

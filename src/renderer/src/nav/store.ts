@@ -10,6 +10,8 @@ export type Route =
   | { name: "album"; id: string }
   | { name: "artist"; id: string }
   | { name: "mix"; id: string }
+  /** a YouTube Music playlist, such as a chart */
+  | { name: "ytplaylist"; id: string }
   | { name: "import" }
   | { name: "import-job"; id: string }
   | { name: "listening" }

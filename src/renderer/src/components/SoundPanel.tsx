@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { describeQuality, useStreamQuality } from "@/player/quality";
+import { useCurrentTrack } from "@/player/store";
 import { useSettings, type Settings } from "@/settings/store";
 import { cn } from "@/lib/cn";
 import { Slider } from "./Slider";
@@ -41,6 +43,20 @@ function Row({ label, value, children }: { label: string; value: string; childre
         <span className="tabular-nums text-ink-2">{value}</span>
       </div>
       {children}
+    </div>
+  );
+}
+
+/** what the song that's playing streams at */
+function QualityLine() {
+  const quality = useStreamQuality(useCurrentTrack());
+  if (!quality) return null;
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-t border-white/[0.08] pt-3 text-[12.5px]">
+      <span className="font-medium text-ink">Quality</span>
+      <span className="truncate tabular-nums text-ink-2" title={quality === "local" ? undefined : "The best YouTube Music offers without Premium"}>
+        {quality === "local" ? "Your file, as it is" : describeQuality(quality)}
+      </span>
     </div>
   );
 }
@@ -158,6 +174,8 @@ function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }
         </div>
         <Toggle checked={sound.keepPitch} onChange={(keepPitch) => set({ keepPitch })} label="Key lock" />
       </div>
+
+      <QualityLine />
     </motion.div>
   );
 }

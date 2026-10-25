@@ -115,7 +115,7 @@ export function LocalFilesPage() {
           <EmptyState
             icon={<FolderPlus className="size-7" />}
             title="Add your music folder"
-            body="Encore plays MP3, FLAC, AAC, Ogg, Opus and WAV files, reads their tags and cover art, and notices new files as you add them."
+            body="Vyse Music plays MP3, FLAC, AAC, Ogg, Opus and WAV files, reads their tags and cover art, and notices new files as you add them."
             action={
               <button onClick={addFolder} className="glass-control pressable rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-ink hover:brightness-125">
                 Choose a folder

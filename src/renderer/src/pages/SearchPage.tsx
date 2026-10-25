@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Clock3, Play, SearchX, X } from "lucide-react";
+import { Clock3, LoaderCircle, Play, SearchX, X } from "lucide-react";
 import type { SearchResults } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
 import { AlbumCard, ArtistCard, CardRow, TrackCard } from "@/components/Cards";
@@ -109,6 +109,8 @@ export function SearchPage() {
   const loading = useSearch((s) => s.loading);
   const error = useSearch((s) => s.error);
   const submit = useSearch((s) => s.submit);
+  const loadMore = useSearch((s) => s.loadMore);
+  const loadingMore = useSearch((s) => s.loadingMore);
   const [showAllSongs, setShowAllSongs] = useState(false);
 
   const context = { kind: "search" as const, label: `"${results?.query ?? query}"` };
@@ -131,6 +133,21 @@ export function SearchPage() {
         {skip ? "More songs" : "Songs"}
       </SectionTitle>
       <TrackList tracks={results.tracks.slice(skip, showAllSongs ? undefined : skip + 10)} context={context} />
+      {results.moreSongs && (showAllSongs || results.tracks.length <= skip + 10) && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => {
+              setShowAllSongs(true);
+              void loadMore();
+            }}
+            disabled={loadingMore}
+            className="glass-control pressable inline-flex h-9 items-center gap-2 rounded-full px-5 text-[13px] font-semibold text-ink hover:brightness-125 disabled:opacity-70"
+          >
+            {loadingMore && <LoaderCircle className="size-4 animate-spin" />}
+            {loadingMore ? "Loading more songs" : "Show more songs"}
+          </button>
+        </div>
+      )}
     </section>
   );
 

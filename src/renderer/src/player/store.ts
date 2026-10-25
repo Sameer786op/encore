@@ -110,6 +110,8 @@ function finishListening(): void {
 interface SavedPlayer {
   queue: QueueState;
   position: number;
+  /** music was playing when this was saved, so it carries on when the app opens */
+  playing: boolean;
   volume: number;
   muted: boolean;
   autoplay: boolean;
@@ -124,6 +126,7 @@ function loadSaved(): Partial<SavedPlayer> {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let savedPlaying = false;
 function scheduleSave(): void {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveNow, 800);
@@ -139,7 +142,8 @@ function saveNow(): void {
     const keep = new Set(items.map((i) => i.uid));
     queue = { ...queue, items, index: queue.index - start, unshuffled: queue.unshuffled?.filter((u) => keep.has(u)) ?? null };
   }
-  const saved: SavedPlayer = { queue, position: s.position, volume: s.volume, muted: s.muted, autoplay: s.autoplay };
+  savedPlaying = s.status === "playing" || s.status === "loading";
+  const saved: SavedPlayer = { queue, position: s.position, playing: savedPlaying, volume: s.volume, muted: s.muted, autoplay: s.autoplay };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   } catch {
@@ -479,10 +483,15 @@ export const useCurrentTrack = () => usePlayer((s) => currentItem(s.queue)?.trac
 /** live audio levels for visuals; null until something has played */
 export const getAnalyser = (): AnalyserNode | null => engine?.analyser ?? null;
 
-// save the position every few seconds while playing, and on quit
+// save the position every few seconds while playing (and once after it stops), and on quit
 setInterval(() => {
-  if (usePlayer.getState().status === "playing") saveNow();
+  if (usePlayer.getState().status === "playing" || savedPlaying) saveNow();
 }, 5000);
+
+// carry on where you left off: music that was playing when the app closed continues from the same spot
+if (saved.playing && currentItem(usePlayer.getState().queue) && useSettings.getState().continueOnOpen) {
+  setTimeout(() => usePlayer.getState().status === "paused" && usePlayer.getState().togglePlay(), 300);
+}
 
 window.addEventListener("beforeunload", () => {
   finishListening();

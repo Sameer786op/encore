@@ -10,6 +10,11 @@ export interface AudioStream {
   expiresAt: number;
   loudnessDb?: number;
   client: InnerTubeClient;
+  /** "opus" or "mp4a.40.2" */
+  codec: string;
+  /** average bits per second */
+  bitrate: number;
+  sampleRate: number;
 }
 
 // Clients tried in order. VISIONOS currently serves whole files without a
@@ -29,6 +34,8 @@ interface LooseFormat {
   itag?: number;
   mime_type?: string;
   bitrate?: number;
+  average_bitrate?: number;
+  audio_sample_rate?: number;
   content_length?: number;
   has_audio?: boolean;
   has_video?: boolean;
@@ -37,10 +44,11 @@ interface LooseFormat {
   decipher(player: unknown): Promise<string>;
 }
 
-function pickAudioFormat(formats: LooseFormat[]): LooseFormat | undefined {
+export function pickAudioFormat<T extends Pick<LooseFormat, "has_audio" | "has_video" | "is_drc" | "mime_type" | "bitrate" | "audio_sample_rate">>(formats: T[]): T | undefined {
   const audio = formats.filter((f) => f.has_audio && !f.has_video && !f.is_drc && f.mime_type);
-  // Chromium plays both Opus/WebM and AAC/MP4; take the highest bitrate
-  return audio.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0];
+  // Chromium plays both Opus/WebM and AAC/MP4; take the highest bitrate, then the higher sample rate.
+  // Without Premium that's Opus at about 130-160 kbps, 48 kHz (itag 251), ahead of AAC at 128 kbps (itag 140).
+  return audio.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0) || (b.audio_sample_rate ?? 0) - (a.audio_sample_rate ?? 0))[0];
 }
 
 /** a URL that only answers the first chunk is useless, so check a range from the middle too */
@@ -80,6 +88,9 @@ async function resolveWithClient(videoId: string, client: InnerTubeClient): Prom
     expiresAt,
     loudnessDb: format.loudness_db ?? info.player_config?.audio_config?.loudness_db,
     client,
+    codec: /codecs="([^"]+)"/.exec(format.mime_type!)?.[1] ?? format.mime_type!.split(";")[0],
+    bitrate: format.average_bitrate ?? format.bitrate ?? 0,
+    sampleRate: Number(format.audio_sample_rate ?? 0),
   };
 }
 

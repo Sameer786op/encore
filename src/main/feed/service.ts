@@ -22,7 +22,9 @@ export interface FeedCatalog {
 
 const ARTIST_ID_DAYS = 60;
 const ARTIST_INFO_DAYS = 7;
-const RELEASE_CHECK_HOURS = 6;
+const RELEASE_CHECK_HOURS = 1;
+/** opening the app looks for new releases right away, unless that was done this recently */
+const OPEN_CHECK_GAP_MS = 10 * 60_000;
 const MIX_COUNT = 5;
 const MIX_ARTISTS = 14;
 const WATCH_ARTISTS = 30;
@@ -86,13 +88,14 @@ export class FeedService {
 
   start(): void {
     this.timers.push(setTimeout(() => void this.get(), 4_000));
-    this.timers.push(setTimeout(() => void this.checkReleasesIfDue(), 30_000));
+    // every time the app opens, look for new releases straight away
+    this.timers.push(setTimeout(() => this.checkReleasesOnOpen(), 6_000));
     this.timers.push(
       setInterval(() => {
         // left open past midnight: make the new day's feed
         this.get();
         void this.checkReleasesIfDue();
-      }, 60 * 60_000),
+      }, 10 * 60_000),
     );
   }
 
@@ -341,19 +344,24 @@ export class FeedService {
     return releasesForFeed(relevant, rank);
   }
 
-  private async checkReleasesIfDue(): Promise<void> {
-    const last = getSetting(this.db, "releases.lastCheck");
-    if (last && Date.now() - Date.parse(last) < RELEASE_CHECK_HOURS * 3_600_000) return;
-    const budget = { left: 20 };
-    const artists = [...this.followed(), ...(await this.topArtists(this.taste(), WATCH_ARTISTS, budget))];
-    await this.checkReleases(artists);
-    setSetting(this.db, "releases.lastCheck", new Date().toISOString());
+  /** for opening the app or bringing it back from the tray */
+  checkReleasesOnOpen(): void {
+    void this.checkReleasesIfDue(OPEN_CHECK_GAP_MS);
   }
 
-  /** look at each artist's releases; returns the ones that are new since last time */
-  checkReleases(artists: ArtistSummary[]): Promise<ReleaseItem[]> {
+  private async checkReleasesIfDue(gapMs = RELEASE_CHECK_HOURS * 3_600_000): Promise<void> {
+    const last = getSetting(this.db, "releases.lastCheck");
+    if (last && Date.now() - Date.parse(last) < gapMs) return;
+    setSetting(this.db, "releases.lastCheck", new Date().toISOString());
+    const budget = { left: 20 };
+    const artists = [...this.followed(), ...(await this.topArtists(this.taste(), WATCH_ARTISTS, budget))];
+    await this.checkReleases(artists, gapMs);
+  }
+
+  /** look at each artist's releases, using what was fetched within `maxAgeMs`; returns the ones that are new since last time */
+  checkReleases(artists: ArtistSummary[], maxAgeMs = RELEASE_CHECK_HOURS * 3_600_000): Promise<ReleaseItem[]> {
     // checks queue up one after another, so each one looks at its own artists
-    const run = (this.checking ?? Promise.resolve([] as ReleaseItem[])).catch(() => [] as ReleaseItem[]).then(() => this.doCheck(artists));
+    const run = (this.checking ?? Promise.resolve([] as ReleaseItem[])).catch(() => [] as ReleaseItem[]).then(() => this.doCheck(artists, maxAgeMs));
     this.checking = run;
     void run.finally(() => {
       if (this.checking === run) this.checking = null;
@@ -361,12 +369,12 @@ export class FeedService {
     return run;
   }
 
-  private async doCheck(artists: ArtistSummary[]): Promise<ReleaseItem[]> {
+  private async doCheck(artists: ArtistSummary[], maxAgeMs: number): Promise<ReleaseItem[]> {
     const unique = artists.filter((a, i) => artists.findIndex((b) => b.id === a.id) === i);
     const fresh: SeenRelease[] = [];
     await mapLimit(unique, 2, async (artist) => {
       if (this.disposed) return;
-      const info = await this.artistInfo(artist.id, RELEASE_CHECK_HOURS / 24);
+      const info = await this.artistInfo(artist.id, maxAgeMs / 86_400_000);
       if (!info) return;
       const seen = new Set(
         (this.db.prepare("SELECT release_id FROM releases_seen WHERE artist_id = ?").all(artist.id) as unknown as { release_id: string }[]).map((r) => r.release_id),

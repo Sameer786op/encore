@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { History, Import, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import type { HomeSection, Track } from "@shared/types";
-import { AlbumCard, ArtistCard, CardRow, CardSkeletonRow, LikedSongsCard, MixCard, PlaylistCard, TrackCard } from "@/components/Cards";
+import { AlbumCard, ArtistCard, CardRow, CardSkeletonRow, LikedSongsCard, MixCard, PlaylistCard, RemotePlaylistCard, TrackCard } from "@/components/Cards";
 import { SectionTitle } from "@/components/common";
 import { SEARCH_INPUT_ID } from "@/components/TopBar";
 import { useFeed } from "@/feed/store";
@@ -10,14 +10,20 @@ import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { greeting } from "@/lib/format";
 
-// YouTube Music's own home feed, loaded once per session
-let homeFeed: Promise<HomeSection[]> | null = null;
-function loadHomeFeed(): Promise<HomeSection[]> {
-  homeFeed ??= window.encore.catalog.home().catch((error) => {
-    homeFeed = null;
-    throw error;
-  });
-  return homeFeed;
+// What's new and popular on YouTube Music: its home page, new releases,
+// trending songs and charts. Looked at again every 10 minutes so the latest
+// songs turn up without a restart.
+const HOME_FRESH_MS = 10 * 60_000;
+let homeFeed: { sections: Promise<HomeSection[]>; at: number } | null = null;
+
+function loadHomeFeed(force = false): Promise<HomeSection[]> {
+  if (!homeFeed || force || Date.now() - homeFeed.at >= HOME_FRESH_MS) {
+    const entry = { sections: window.encore.catalog.home(), at: Date.now() };
+    // a failed load is tried again next time instead of being kept
+    entry.sections.catch(() => homeFeed === entry && (homeFeed = null));
+    homeFeed = entry;
+  }
+  return homeFeed.sections;
 }
 
 function useHomeFeed() {
@@ -25,12 +31,21 @@ function useHomeFeed() {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
-    loadHomeFeed().then(
-      (s) => alive && setSections(s),
-      () => alive && setFailed(true),
-    );
+    // a refresh that fails keeps what's already on screen
+    const load = (force = false) =>
+      loadHomeFeed(force).then(
+        (s) => alive && setSections(s),
+        () => alive && setFailed(true),
+      );
+    void load();
+    const timer = setInterval(() => !document.hidden && void load(true), HOME_FRESH_MS);
+    // coming back to the window after a while
+    const onVisible = () => !document.hidden && void load();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
   return { sections, failed };
@@ -156,7 +171,7 @@ export function HomePage() {
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-semibold">Your daily mixes will show up here</div>
               <div className="mt-0.5 text-[13px] leading-relaxed text-ink-2">
-                Keep listening, or bring in your history from Spotify, YouTube Music or Apple Music, and Encore will make mixes from the artists you love.
+                Keep listening, or bring in your history from Spotify, YouTube Music or Apple Music, and Vyse Music will make mixes from the artists you love.
               </div>
             </div>
             <button onClick={() => navigate({ name: "import" })} className="glass-control pressable h-9 shrink-0 rounded-full px-5 text-[13px] font-semibold text-accent hover:brightness-125">
@@ -238,6 +253,7 @@ export function HomePage() {
                 <TrackCard key={track.id} track={track} list={section.tracks} index={i} context={{ kind: "home", label: section.title, id: `home:${section.title}` }} />
               )),
               ...section.albums.map((album) => <AlbumCard key={album.id} album={album} />),
+              ...section.playlists.map((playlist) => <RemotePlaylistCard key={playlist.id} playlist={playlist} />),
             ]}
           </CardRow>
         </Section>

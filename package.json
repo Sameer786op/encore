@@ -1,9 +1,9 @@
 {
   "name": "encore",
-  "productName": "Encore",
+  "productName": "Vyse Music",
   "version": "0.2.0",
   "private": true,
-  "description": "A free, ad-free desktop music player. Your music from everywhere, in one place.",
+  "description": "Vyse Music: a free, ad-free desktop music player. Your music from everywhere, in one place.",
   "license": "MIT",
   "homepage": "https://github.com/Sameer786op/encore",
   "repository": {
@@ -21,11 +21,12 @@
     "dist:win": "electron-vite build && electron-builder --win",
     "probe": "node scripts/probe-youtube.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "icon": "electron scripts/make-icon.mjs",
+    "icons": "electron scripts/make-icons.mjs",
     "smoke:imports": "node scripts/smoke-imports.mjs",
     "smoke:player": "node scripts/smoke-player.mjs",
     "smoke:feed": "node scripts/smoke-feed.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "dist:store": "node scripts/dist-store.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.11",

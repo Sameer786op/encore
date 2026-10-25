@@ -141,8 +141,18 @@ try {
   await win.waitForTimeout(2500);
   const lib = await win.evaluate(() => window.encore.library.get());
   check("liked songs and playlists survive a restart", lib.liked.length === 1 && lib.playlists.some((p) => p.id === playlist.id), `${lib.liked.length} liked, ${lib.playlists.length} playlists`);
+  for (let i = 0; i < 20 && !(await state(win)).playing; i++) await win.waitForTimeout(500);
   s = await state(win);
-  check("the current song survives a restart, paused", s.title === titleBeforeRestart && !s.playing, `"${s.title}"`);
+  check("the song that was playing carries on after a restart", s.title === titleBeforeRestart && s.playing, `"${s.title}" at ${s.position}s`);
+  await win.locator('footer button[aria-label="Pause"]').click();
+  await win.waitForTimeout(1000);
+  await app.close();
+
+  // paused when the app closed: it opens on that song, still paused, and Play carries on
+  ({ app, win, errors } = await launch());
+  await win.waitForTimeout(3500);
+  s = await state(win);
+  check("a paused song opens paused", s.title === titleBeforeRestart && !s.playing, `"${s.title}"`);
   await win.locator('footer button[aria-label="Play"]').click();
   await win.waitForTimeout(5000);
   s = await state(win);

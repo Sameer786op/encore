@@ -146,12 +146,12 @@ function AccentPicker() {
   const accent = useSettings((s) => s.accent);
   const custom = useSettings((s) => s.customAccent);
   const update = useSettings((s) => s.update);
-  const name = accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === accent)?.name ?? "Encore");
+  const name = accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === accent)?.name ?? "Ruby");
 
   return (
     <div className="flex items-center gap-5">
       <div className="relative shrink-0">
-        <Logo className="size-14 drop-shadow-[0_8px_18px_rgb(var(--accent-rgb)/0.45)]" />
+        <Logo className="size-14 drop-shadow-[0_8px_18px_rgb(122_92_255/0.45)]" />
       </div>
       <div className="min-w-0 flex-1">
         <div role="radiogroup" aria-label="Accent color" className="flex flex-wrap items-center gap-3">
@@ -349,7 +349,7 @@ export function AppearanceSettings() {
       <Block title="Theme" body="Dark, light, or whichever Windows is using.">
         <ThemePicker />
       </Block>
-      <Block title="Color" body="Recolours buttons and highlights, the Encore logo, and its icon on the taskbar.">
+      <Block title="Color" body="Recolours buttons and highlights.">
         <AccentPicker />
       </Block>
       <BackgroundSettings />

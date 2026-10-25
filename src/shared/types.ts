@@ -52,6 +52,29 @@ export interface SearchResults {
   albums: AlbumSummary[];
   artists: ArtistSummary[];
   videos: Track[];
+  /** pass to catalog.searchMore for the next page of songs */
+  moreSongs?: string;
+}
+
+/** the format a song streams in */
+export interface StreamQuality {
+  /** "opus" or "mp4a.40.2" */
+  codec: string;
+  kbps: number;
+  sampleRate: number;
+}
+
+/** a playlist on YouTube Music, such as a chart */
+export interface RemotePlaylist {
+  id: string;
+  title: string;
+  subtitle?: string;
+  artwork?: string;
+}
+
+export interface RemotePlaylistDetails extends RemotePlaylist {
+  description?: string;
+  tracks: Track[];
 }
 
 export interface AlbumDetails extends AlbumSummary {
@@ -72,6 +95,7 @@ export interface HomeSection {
   title: string;
   tracks: Track[];
   albums: AlbumSummary[];
+  playlists: RemotePlaylist[];
 }
 
 export interface LikedTrack {
@@ -270,7 +294,7 @@ export interface DiscordStatus {
   message?: string;
 }
 
-/** where Encore's own updates stand; "off" in builds that don't update themselves, like development */
+/** where Vyse Music's own updates stand; "off" in builds that don't update themselves, like development */
 export interface UpdateStatus {
   state: "off" | "idle" | "checking" | "downloading" | "ready" | "latest" | "error";
   /** the version that's running */
@@ -280,6 +304,8 @@ export interface UpdateStatus {
   /** download progress, 0 to 100 */
   progress?: number;
   error?: string;
+  /** installed from the Microsoft Store, which keeps it up to date */
+  store?: boolean;
 }
 
 /** where the mini player opens: where it was last left, or a corner of the main screen */
@@ -313,9 +339,9 @@ export interface DailyMix {
 export interface ReleaseItem {
   album: AlbumSummary;
   artist: ArtistSummary;
-  /** when Encore first noticed it */
+  /** when Vyse Music first noticed it */
   firstSeenAt: string;
-  /** came out after Encore started watching this artist */
+  /** came out after Vyse Music started watching this artist */
   isNew: boolean;
 }
 
@@ -344,7 +370,7 @@ export type ScrobbleService = "lastfm" | "listenbrainz";
 export interface ScrobbleServiceStatus {
   connected: boolean;
   user?: string;
-  /** waiting for the user to approve Encore in the browser */
+  /** waiting for the user to approve Vyse Music in the browser */
   pending?: boolean;
   error?: string;
 }
@@ -368,9 +394,14 @@ export interface EncoreApi {
     album(id: string): Promise<AlbumDetails>;
     artist(id: string): Promise<ArtistDetails>;
     home(): Promise<HomeSection[]>;
+    /** the next page of songs for a search */
+    searchMore(token: string): Promise<{ tracks: Track[]; more?: string }>;
+    playlist(id: string): Promise<RemotePlaylistDetails>;
     radio(track: Track): Promise<Track[]>;
     /** how much louder than YouTube's target a song is, in dB; null when unknown */
     loudness(trackId: string): Promise<number | null>;
+    /** the format a YouTube song streams in, or null for other songs */
+    quality(trackId: string): Promise<StreamQuality | null>;
     /** resolves and caches the stream ahead of time so the next track starts instantly */
     prefetch(trackId: string): Promise<void>;
   };
@@ -457,7 +488,7 @@ export interface EncoreApi {
     onStatus(listener: (status: FeedStatus) => void): () => void;
     isFollowing(artistId: string): Promise<boolean>;
     follow(artist: ArtistSummary, on: boolean): Promise<void>;
-    /** a release Encore told you about was clicked in a notification */
+    /** a release Vyse Music told you about was clicked in a notification */
     onOpenAlbum(listener: (albumId: string) => void): () => void;
     setNotifications(on: boolean): Promise<void>;
   };
@@ -467,7 +498,7 @@ export interface EncoreApi {
     /** a song was listened to long enough to count */
     played(track: Track, startedAt: number, listenedMs: number): void;
     connectListenBrainz(token: string): Promise<ScrobbleStatus>;
-    /** saves the API key, then opens Last.fm in the browser to approve Encore */
+    /** saves the API key, then opens Last.fm in the browser to approve Vyse Music */
     connectLastfm(apiKey: string, secret: string): Promise<ScrobbleStatus>;
     disconnect(service: ScrobbleService): Promise<ScrobbleStatus>;
   };
@@ -479,12 +510,10 @@ export interface EncoreApi {
     configure(config: { backgroundPlay: boolean }): Promise<void>;
     /** the window frame, title bar buttons and native dialogs follow this */
     setTheme(theme: ThemeSetting): Promise<void>;
-    /** a PNG data URL of the app icon in the accent colour; null puts the stock icon back */
-    setIcon(png: string | null): Promise<void>;
     /** asks for a picture and keeps a copy; resolves to its address, or null if none was picked */
     pickWallpaper(): Promise<string | null>;
     clearWallpaper(): Promise<void>;
-    /** register shortcuts that work while Encore is in the background; says which ones Windows accepted */
+    /** register shortcuts that work while Vyse Music is in the background; says which ones Windows accepted */
     setGlobalKeys(config: GlobalKeysConfig): Promise<Partial<Record<GlobalCommand, GlobalKeyState>>>;
     /** while true, the global shortcuts let their keys through, so a new one can be recorded */
     pauseGlobalKeys(paused: boolean): Promise<Partial<Record<GlobalCommand, GlobalKeyState>>>;

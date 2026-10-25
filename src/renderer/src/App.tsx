@@ -23,6 +23,7 @@ import { AlbumPage } from "@/pages/AlbumPage";
 import { ArtistPage } from "@/pages/ArtistPage";
 import { HomePage } from "@/pages/HomePage";
 import { MixPage } from "@/pages/MixPage";
+import { RemotePlaylistPage } from "@/pages/RemotePlaylistPage";
 import { useFeed } from "@/feed/store";
 import { HistoryPage, LibraryPage, LikedPage, PlaylistPage } from "@/pages/LibraryPages";
 import { ImportPage } from "@/pages/ImportPage";
@@ -53,6 +54,8 @@ function Page({ route }: { route: Route }) {
       return <ArtistPage id={route.id} />;
     case "mix":
       return <MixPage id={route.id} />;
+    case "ytplaylist":
+      return <RemotePlaylistPage id={route.id} />;
     case "import":
       return <ImportPage />;
     case "import-job":

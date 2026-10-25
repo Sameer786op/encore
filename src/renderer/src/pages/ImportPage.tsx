@@ -190,7 +190,7 @@ const GUIDES = [
       'Open privacy.apple.com and choose "Request a copy of your data".',
       'Select "Apple Media Services information".',
       "Apple emails you when it's ready, usually within a week.",
-      "Download the .zip and drop it here. Encore reads the zips inside it for you.",
+      "Download the .zip and drop it here. Vyse Music reads the zips inside it for you.",
     ],
     link: "https://privacy.apple.com/",
   },
@@ -449,7 +449,7 @@ function HistorySources() {
                 openModal({
                   kind: "confirm",
                   title: `Remove ${ORIGIN_LABEL[s.origin]} history?`,
-                  message: "The plays you imported from this service are deleted from Encore. You can import the export again later.",
+                  message: "The plays you imported from this service are deleted from Vyse Music. You can import the export again later.",
                   confirmLabel: "Remove",
                   danger: true,
                   onConfirm: () => void window.encore.history.removeImported(s.origin).then(load),
@@ -477,7 +477,7 @@ export function ImportPage() {
         Bring your music
       </motion.h1>
       <p className="mt-1 max-w-2xl text-[15px] text-ink-2">
-        Import playlists from a link, or everything you've listened to from your data export. Encore never signs in to your accounts.
+        Import playlists from a link, or everything you've listened to from your data export. Vyse Music never signs in to your accounts.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 @4xl:grid-cols-2">

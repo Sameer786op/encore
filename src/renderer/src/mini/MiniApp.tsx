@@ -84,7 +84,7 @@ export function MiniApp() {
 
         <div className="relative min-w-0 flex-1">
           <div className="truncate text-[13.5px] font-semibold text-white">{track?.title ?? "Nothing playing"}</div>
-          <div className="truncate text-[12px] text-white/60">{track?.artists.map((a) => a.name).join(", ") ?? "Play something in Encore"}</div>
+          <div className="truncate text-[12px] text-white/60">{track?.artists.map((a) => a.name).join(", ") ?? "Play something in Vyse Music"}</div>
           <div className="no-drag mt-1.5 flex items-center gap-0.5">
             <button onClick={() => send({ kind: "previous" })} aria-label="Previous" className="pressable rounded-full p-1.5 text-white/85 hover:bg-white/10 hover:text-white">
               <SkipBack className="size-4" fill="currentColor" />
@@ -104,7 +104,7 @@ export function MiniApp() {
         </div>
 
         <div className="no-drag absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button onClick={() => void window.encore.mini.expand()} aria-label="Open Encore" title="Open Encore" className="pressable rounded-full bg-black/25 p-1 text-white/80 hover:bg-white/15 hover:text-white">
+          <button onClick={() => void window.encore.mini.expand()} aria-label="Open Vyse Music" title="Open Vyse Music" className="pressable rounded-full bg-black/25 p-1 text-white/80 hover:bg-white/15 hover:text-white">
             <Maximize2 className="size-3.5" />
           </button>
           <button onClick={() => void window.encore.mini.close()} aria-label="Close mini player" title="Close" className="pressable rounded-full bg-black/25 p-1 text-white/80 hover:bg-white/15 hover:text-white">

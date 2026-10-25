@@ -2,7 +2,7 @@ import { nativeImage, type BrowserWindow, type NativeImage, type ThumbarButton }
 import type { NowPlaying, PlayerCommand } from "@shared/types";
 import { drawGlyph, encodePng, type Glyph } from "./glyphs";
 
-// Previous, play/pause and next buttons under Encore's preview when you hover
+// Previous, play/pause and next buttons under Vyse Music's preview when you hover
 // its taskbar button.
 
 /** the glyph at every common display scale, so it stays sharp */

@@ -9,7 +9,7 @@ import { toast } from "@/ui/toast";
 import { Card, Group } from "./parts";
 
 // Settings → Keyboard shortcuts: change the keys for anything in the app, and
-// pick the shortcuts that keep working while Encore is in the background.
+// pick the shortcuts that keep working while Vyse Music is in the background.
 
 const spoken = (combo: string) => comboParts(combo).join("+");
 
@@ -193,8 +193,8 @@ export function GlobalShortcutSettings() {
       next[other.id] = "";
       toast(`${spoken(combo)} moved here from "${other.label}"`);
     } else if (inApp) {
-      // Windows hands registered keys to Encore before the window sees them
-      toast(`${spoken(combo)} now works everywhere, so inside Encore it no longer does "${inApp.label}"`);
+      // Windows hands registered keys to Vyse Music before the window sees them
+      toast(`${spoken(combo)} now works everywhere, so inside Vyse Music it no longer does "${inApp.label}"`);
     }
     setKeys(next);
   };
@@ -218,7 +218,7 @@ export function GlobalShortcutSettings() {
     >
       <Card>
         <p className="border-b border-white/[0.07] py-3 text-[12.5px] leading-relaxed text-ink-3">
-          These keep working while you're in another app, or with Encore tucked away in the tray. Your keyboard's media keys always work too.
+          These keep working while you're in another app, or with Vyse Music tucked away in the tray. Your keyboard's media keys always work too.
         </p>
         <div inert={!config.enabled} className={cn("transition-opacity", !config.enabled && "opacity-45")}>
           {GLOBAL_COMMANDS.map((command) => {
