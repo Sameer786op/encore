@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { History, Import, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import type { HomeSection, Track } from "@shared/types";
@@ -9,6 +9,8 @@ import { useFeed } from "@/feed/store";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { greeting } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { toast } from "@/ui/toast";
 
 // What's new and popular on YouTube Music: its home page, new releases,
 // trending songs and charts. Looked at again every 10 minutes so the latest
@@ -29,26 +31,50 @@ function loadHomeFeed(force = false): Promise<HomeSection[]> {
 function useHomeFeed() {
   const [sections, setSections] = useState<HomeSection[] | null>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    // a refresh that fails keeps what's already on screen
-    const load = (force = false) =>
+  const [refreshing, setRefreshing] = useState(false);
+  const alive = useRef(false);
+  // a refresh that fails keeps what's already on screen; says whether it worked
+  const load = useCallback(
+    (force = false) =>
       loadHomeFeed(force).then(
-        (s) => alive && setSections(s),
-        () => alive && setFailed(true),
-      );
+        (s) => {
+          if (alive.current) setSections(s);
+          return true;
+        },
+        () => {
+          if (alive.current) setFailed(true);
+          return false;
+        },
+      ),
+    [],
+  );
+  useEffect(() => {
+    alive.current = true;
     void load();
     const timer = setInterval(() => !document.hidden && void load(true), HOME_FRESH_MS);
     // coming back to the window after a while
     const onVisible = () => !document.hidden && void load();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      alive = false;
+      alive.current = false;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
-  return { sections, failed };
+  }, [load]);
+
+  /** ask YouTube Music for what's new right now, instead of waiting for the next 10-minute look */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    // your artists' new releases arrive in the background, as "New releases for you" and a notification
+    void window.encore.feed.checkReleases().catch(() => undefined);
+    const ok = await load(true);
+    if (!alive.current) return;
+    setRefreshing(false);
+    if (ok) toast("Home has the newest songs from YouTube Music");
+    else toast("Couldn't reach YouTube Music. Check your connection and try again.", { kind: "error" });
+  }, [load]);
+
+  return { sections, failed, refreshing, refresh };
 }
 
 function Section({ title, children, delay = 0, action }: { title: string; children: React.ReactNode; delay?: number; action?: React.ReactNode }) {
@@ -83,7 +109,7 @@ const fromFeed = (label: string, id: string) => ({ kind: "home" as const, label,
 export function HomePage() {
   const snapshot = useLibrary((s) => s.snapshot);
   const loaded = useLibrary((s) => s.loaded);
-  const { sections, failed } = useHomeFeed();
+  const { sections, failed, refreshing, refresh } = useHomeFeed();
   const feed = useFeed((s) => s.feed);
   const building = useFeed((s) => s.status.building);
 
@@ -105,14 +131,25 @@ export function HomePage() {
 
   return (
     <div className="px-8 pb-16 pt-[68px]">
-      <motion.h1
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
-        className="font-display text-[34px] font-bold tracking-[-0.026em]"
-      >
-        {greeting()}
-      </motion.h1>
+      <div className="flex items-center justify-between gap-4">
+        <motion.h1
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+          className="font-display text-[34px] font-bold tracking-[-0.026em]"
+        >
+          {greeting()}
+        </motion.h1>
+        <button
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          title="Ask YouTube Music for the newest songs now, and look for new releases from your artists"
+          className="glass-control pressable inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-[13px] font-semibold text-ink hover:brightness-125 disabled:opacity-70"
+        >
+          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+          {refreshing ? "Checking…" : "Check for new songs"}
+        </button>
+      </div>
 
       {isNew && (
         <motion.div

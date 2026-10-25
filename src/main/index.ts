@@ -121,7 +121,7 @@ function showMainWindow(): void {
   // opening it again from the tray or the Start menu counts as opening the app
   if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
     updates?.checkIfStale();
-    feed?.checkReleasesOnOpen();
+    void feed?.checkReleasesOnOpen();
   }
   tray.hide();
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -480,6 +480,7 @@ function registerIpc(): void {
 
   handle(IPC.feedGet, () => feed.get());
   handle(IPC.feedRefresh, () => feed.refresh());
+  handle(IPC.feedCheckReleases, () => feed.checkReleasesOnOpen());
   handle(IPC.feedStatus, () => feed.getStatus());
   handle(IPC.feedIsFollowing, (artistId: unknown) => feed.isFollowing(stringArg(artistId, "artist id")));
   handle(IPC.feedFollow, (value: unknown, on: unknown) => {

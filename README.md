@@ -16,11 +16,11 @@ Vyse Music keeps itself up to date: it checks every time you open it and every h
 
 ## What works today
 
-- **Search** songs, albums, artists and videos, with suggestions as you type and recent searches. **Show more songs** keeps going past the first page, and a search is asked again after 10 minutes so new uploads turn up.
+- **Search** songs, albums, artists and videos, with suggestions as you type and recent searches. **Show more songs** keeps going past the first page. A search is asked again after 10 minutes so new uploads turn up, and **Refresh** asks right away.
 - **Playback** that starts in about a second, with seeking anywhere in the song. Songs stream in the best format YouTube Music offers without Premium: Opus at about 130–160 kbps and 48 kHz. The sound panel shows the format of the song that's playing. Volume, shuffle, repeat (all / one), and a song that won't load is skipped with a message.
 - **Queue**: play now, play next, add to queue, drag to reorder, remove, clear. When the queue runs out, **Autoplay** keeps going with similar songs. **Start radio** works from any song.
 - **Library**: liked songs, playlists (create, rename, delete, add, remove, drag to reorder), and recently played (a song counts after 30 seconds).
-- **Album and artist pages**, plus a home page built from your own listening (see Phase 4) followed by what's new on YouTube Music: new releases, trending songs, new music videos, and charts and playlists you can open, play or save. It refreshes every 10 minutes while it's on screen.
+- **Album and artist pages**, plus a home page built from your own listening (see Phase 4) followed by what's new on YouTube Music: new releases, trending songs, new music videos, and charts and playlists you can open, play or save. It refreshes every 10 minutes while it's on screen, and **Check for new songs** at the top asks YouTube Music right away and looks for new releases from your artists. Artist pages are fetched again after 10 minutes, so a new single shows up without a restart. Songs never have to be added by hand: everything comes straight from YouTube Music when you look.
 - **Windows integration**: media keys and the Windows media overlay, native window buttons with snap layouts, and a taskbar icon.
 - **It remembers**: the queue, the current song and its position, and the volume all survive a restart. If music was playing when you closed it, it carries on from the same spot when you open it again (Settings → Playback → Continue where you left off).
 

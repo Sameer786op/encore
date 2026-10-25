@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Clock3, LoaderCircle, Play, SearchX, X } from "lucide-react";
+import { Clock3, LoaderCircle, Play, RefreshCw, SearchX, X } from "lucide-react";
 import type { SearchResults } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
 import { AlbumCard, ArtistCard, CardRow, TrackCard } from "@/components/Cards";
@@ -45,6 +45,22 @@ function TopResult({ results }: { results: SearchResults }) {
         <Play className="ml-0.5 size-5" fill="currentColor" strokeWidth={0} />
       </div>
     </motion.div>
+  );
+}
+
+/** search again right away instead of using what was kept from the last 10 minutes */
+function RefreshResults() {
+  const refresh = useSearch((s) => s.refresh);
+  const loading = useSearch((s) => s.loading);
+  return (
+    <button
+      onClick={refresh}
+      disabled={loading}
+      title="Ask YouTube Music again for the newest results"
+      className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-70"
+    >
+      <RefreshCw className={cn("size-3.5", loading && "animate-spin")} /> Refresh
+    </button>
   );
 }
 
@@ -123,11 +139,15 @@ export function SearchPage() {
     <section className="mt-9">
       <SectionTitle
         action={
-          results.tracks.length > skip + 10 && (
-            <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
-              {showAllSongs ? "Show less" : "Show all"}
-            </button>
-          )
+          <div className="flex items-center gap-1">
+            {/* with a top result, Refresh sits by the first songs at the top instead */}
+            {!skip && <RefreshResults />}
+            {results.tracks.length > skip + 10 && (
+              <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+                {showAllSongs ? "Show less" : "Show all"}
+              </button>
+            )}
+          </div>
         }
       >
         {skip ? "More songs" : "Songs"}
@@ -183,7 +203,7 @@ export function SearchPage() {
                 <TopResult results={results} />
               </section>
               <section className="min-w-0">
-                <SectionTitle>Songs</SectionTitle>
+                <SectionTitle action={<RefreshResults />}>Songs</SectionTitle>
                 <TrackList tracks={results.tracks.slice(0, 4)} context={context} showAlbum={false} />
               </section>
             </div>

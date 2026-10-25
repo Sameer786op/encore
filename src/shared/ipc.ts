@@ -70,6 +70,7 @@ export const IPC = {
 
   feedGet: "feed:get",
   feedRefresh: "feed:refresh",
+  feedCheckReleases: "feed:check-releases",
   feedChanged: "feed:changed",
   feedStatus: "feed:status",
   feedStatusChanged: "feed:status-changed",

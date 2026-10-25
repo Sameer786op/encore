@@ -345,8 +345,9 @@ export class FeedService {
   }
 
   /** for opening the app or bringing it back from the tray */
-  checkReleasesOnOpen(): void {
-    void this.checkReleasesIfDue(OPEN_CHECK_GAP_MS);
+  /** look for new releases unless that was done in the last 10 minutes: on opening the app, or from Home */
+  checkReleasesOnOpen(): Promise<void> {
+    return this.checkReleasesIfDue(OPEN_CHECK_GAP_MS).catch(() => undefined);
   }
 
   private async checkReleasesIfDue(gapMs = RELEASE_CHECK_HOURS * 3_600_000): Promise<void> {

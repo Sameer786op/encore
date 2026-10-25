@@ -105,6 +105,7 @@ const api: EncoreApi = {
   feed: {
     get: () => ipcRenderer.invoke(IPC.feedGet),
     refresh: () => ipcRenderer.invoke(IPC.feedRefresh),
+    checkReleases: () => ipcRenderer.invoke(IPC.feedCheckReleases),
     onChange: (listener) => subscribe<HomeFeed>(IPC.feedChanged, listener),
     status: () => ipcRenderer.invoke(IPC.feedStatus),
     onStatus: (listener) => subscribe<FeedStatus>(IPC.feedStatusChanged, listener),

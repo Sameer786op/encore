@@ -483,6 +483,8 @@ export interface EncoreApi {
     /** the latest feed, possibly from earlier today; null before the first build */
     get(): Promise<HomeFeed | null>;
     refresh(): Promise<void>;
+    /** look for new releases from your artists now, unless that was done in the last 10 minutes */
+    checkReleases(): Promise<void>;
     onChange(listener: (feed: HomeFeed) => void): () => void;
     status(): Promise<FeedStatus>;
     onStatus(listener: (status: FeedStatus) => void): () => void;

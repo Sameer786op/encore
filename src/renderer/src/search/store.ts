@@ -16,6 +16,8 @@ interface SearchStore {
   setQuery(query: string): void;
   /** search right away, e.g. on Enter */
   submit(query?: string): void;
+  /** ask YouTube Music again for the search on screen, skipping what was kept from earlier */
+  refresh(): void;
   forgetRecent(query: string): void;
   clearRecent(): void;
   /** add the next page of songs to the results */
@@ -100,6 +102,13 @@ export const useSearch = create<SearchStore>((set, get) => {
       if (query !== undefined) set({ query });
       clearTimeout(timer);
       remember(q);
+      void run(q);
+    },
+    refresh() {
+      const q = get().results?.query ?? get().query;
+      if (!q.trim()) return;
+      clearTimeout(timer);
+      cache.delete(q.trim().toLowerCase());
       void run(q);
     },
     forgetRecent(query) {

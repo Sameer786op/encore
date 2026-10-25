@@ -22,6 +22,6 @@ class PageCache<T> {
 }
 
 export const albumCache = new PageCache<AlbumDetails>((id) => window.encore.catalog.album(id));
-export const artistCache = new PageCache<ArtistDetails>((id) => window.encore.catalog.artist(id));
-// charts change through the day, so these are looked at again after 10 minutes
+// artists put out new singles and charts change through the day, so these are looked at again after 10 minutes
+export const artistCache = new PageCache<ArtistDetails>((id) => window.encore.catalog.artist(id), 50, 10 * 60_000);
 export const remotePlaylistCache = new PageCache<RemotePlaylistDetails>((id) => window.encore.catalog.playlist(id), 20, 10 * 60_000);
