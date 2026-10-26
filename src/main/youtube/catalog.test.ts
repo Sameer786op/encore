@@ -2,13 +2,26 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./client", () => ({ getYouTube: () => Promise.reject(new Error("offline in tests")) }));
 
-const { homeRank, homeSections, playlistByline, searchResults } = await import("./catalog");
+const { homeRank, homeSections, moodChips, playlistByline, searchResults } = await import("./catalog");
 const { mapTrack } = await import("./mappers");
+// what YouTube Music's /next answered for Tum Hi Ho, trimmed to the radio's tuning chips
+const nextChips = (await import("./fixtures/next-chips.json")).default;
 
 const song = (id: string) => ({ item_type: "song", id, title: `Song ${id}`, artists: [{ name: "Someone" }] });
 const album = (id: string) => ({ item_type: "album", id, title: `Album ${id}` });
 const playlist = (id: string) => ({ item_type: "playlist", id, title: `Playlist ${id}`, subtitle: "YouTube Music" });
 const shelf = (title: string, contents: object[]) => ({ type: "MusicCarouselShelf", header: { title }, contents });
+
+describe("moodChips", () => {
+  it("reads the moods a song's radio can be tuned to, leaving out the plain radio", () => {
+    expect(moodChips(nextChips)).toEqual(["Popular", "Discover", "Deep cuts", "Romance", "2010s", "Chill", "Hindi", "2020s", "Upbeat", "2000s"]);
+  });
+
+  it("finds nothing in a song without chips", () => {
+    expect(moodChips({ contents: {} })).toEqual([]);
+    expect(moodChips(null)).toEqual([]);
+  });
+});
 
 describe("homeRank", () => {
   it("puts what's new and popular first", () => {

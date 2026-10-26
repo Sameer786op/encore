@@ -79,6 +79,7 @@ export const IPC = {
   feedFollow: "feed:follow",
   feedOpenAlbum: "feed:open-album",
   feedSetNotifications: "feed:set-notifications",
+  feedMoodMix: "feed:mood-mix",
 
   accountsList: "accounts:list",
   accountsChanged: "accounts:changed",

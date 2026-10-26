@@ -299,15 +299,15 @@ try {
   await win.waitForTimeout(500);
   await shot("p4-04a-scrobbling-setup");
   await win.getByLabel("ListenBrainz user token").fill("wrong-token");
-  await win.locator("main").getByRole("button", { name: "Connect" }).first().click();
+  await win.locator("main").getByRole("button", { name: "Connect", exact: true }).first().click();
   await win.waitForSelector("text=ListenBrainz: Invalid authorization token.", { timeout: 10000 });
   check("a wrong ListenBrainz token is turned down", true);
   await win.getByLabel("ListenBrainz user token").fill("smoke-token");
-  await win.locator("main").getByRole("button", { name: "Connect" }).first().click();
+  await win.locator("main").getByRole("button", { name: "Connect", exact: true }).first().click();
   await win.waitForSelector("text=smoke-listener", { timeout: 10000 });
   await win.getByLabel("Last.fm API key").fill("smoke-api-key");
   await win.getByLabel("Last.fm shared secret").fill("smoke-secret");
-  await win.locator("main").getByRole("button", { name: "Connect" }).last().click();
+  await win.locator("main").getByRole("button", { name: "Connect", exact: true }).last().click();
   await win.waitForSelector("text=Waiting for approval", { timeout: 10000 });
   const opened = await app.evaluate(() => globalThis.opened);
   check("Last.fm approval opens in the browser", opened.some((u) => u === `${base}/auth/?api_key=smoke-api-key&token=smoke-lastfm-token`), opened.join(", "));

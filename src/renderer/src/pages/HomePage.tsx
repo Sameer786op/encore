@@ -4,6 +4,7 @@ import { History, Import, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import type { HomeSection, Track } from "@shared/types";
 import { AlbumCard, ArtistCard, CardRow, CardSkeletonRow, LikedSongsCard, MixCard, PlaylistCard, RemotePlaylistCard, TrackCard } from "@/components/Cards";
 import { SectionTitle } from "@/components/common";
+import { MoodPicker } from "@/components/MoodPicker";
 import { SEARCH_INPUT_ID } from "@/components/TopBar";
 import { useFeed } from "@/feed/store";
 import { useLibrary } from "@/library/store";
@@ -111,6 +112,7 @@ export function HomePage() {
   const loaded = useLibrary((s) => s.loaded);
   const { sections, failed, refreshing, refresh } = useHomeFeed();
   const feed = useFeed((s) => s.feed);
+  const moodMixes = useFeed((s) => s.moodMixes);
   const building = useFeed((s) => s.status.building);
 
   // the most recent plays, one card per song
@@ -127,7 +129,8 @@ export function HomePage() {
   }, [snapshot.history]);
 
   const isNew = loaded && recent.length === 0 && snapshot.liked.length === 0 && snapshot.playlists.length === 0 && !feed?.hasHistory;
-  const mixes = feed?.mixes ?? [];
+  // mood mixes you started today come first
+  const mixes = [...moodMixes, ...(feed?.mixes ?? [])];
 
   return (
     <div className="px-8 pb-16 pt-[68px]">
@@ -182,6 +185,8 @@ export function HomePage() {
           </button>
         </motion.div>
       )}
+
+      <MoodPicker />
 
       {mixes.length > 0 ? (
         <Section title="Made for you" action={<FeedAction />}>

@@ -1,23 +1,37 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { AlbumSummary, ArtistDetails, ArtistSummary, DailyMix, FeedStatus, HomeFeed, ReleaseItem, Track } from "@shared/types";
+import type { AlbumSummary, ArtistDetails, ArtistSummary, DailyMix, FeedStatus, HomeFeed, ReleaseItem, RemotePlaylist, Track } from "@shared/types";
 import { trackId } from "@shared/types";
+import { moodById, type Mood, type MoodId } from "@shared/moods";
 import type { Library } from "../library/library";
 import type { Matcher } from "../matching/matcher";
 import { classify } from "../matching/score";
 import { fold, similarity } from "../matching/text";
 import { getSetting, mapLimit, setSetting } from "../settings";
 import { assembleMix, describeMix, groupArtists, type MixArtist } from "./mixes";
+import { assembleMoodMix, describeMood, pickSeeds, suits } from "./moods";
 import { diffReleases, releasesForFeed, type SeenRelease } from "./releases";
-import { buildTaste, forgottenFavourites, onRepeat, primaryArtist, seededRandom, type Play, type SongTaste, type Taste } from "./taste";
+import { buildTaste, forgottenFavourites, onRepeat, primaryArtist, seededRandom, shuffle, type Play, type SongTaste, type Taste } from "./taste";
 
 // Builds the personal home page once a day: daily mixes, new releases from
 // your artists, songs on repeat and forgotten favourites. Also watches your
-// artists for new releases in the background.
+// artists for new releases in the background, and makes mood mixes when asked.
 
 export interface FeedCatalog {
   searchArtists(query: string): Promise<ArtistSummary[]>;
   artist(id: string): Promise<ArtistDetails>;
   radio(seed: Track): Promise<Track[]>;
+  /** the moods YouTube Music says a song suits */
+  songMoods(videoId: string): Promise<string[]>;
+  moodRadio(videoId: string, code: string): Promise<Track[]>;
+  moodPlaylists(page: string): Promise<RemotePlaylist[]>;
+  playlist(id: string, maxTracks?: number): Promise<{ name: string; tracks: Track[] }>;
+}
+
+/** a mood mix as kept in feed_cache; `version` counts the times New mix was pressed today */
+interface MoodMixEntry {
+  day: string;
+  version: number;
+  mix: DailyMix;
 }
 
 const ARTIST_ID_DAYS = 60;
@@ -30,6 +44,9 @@ const MIX_ARTISTS = 14;
 const WATCH_ARTISTS = 30;
 /** new searches allowed per build; everything found is cached for next time */
 const RESOLVE_BUDGET = 60;
+/** your top songs looked at for a mood mix */
+const MOOD_SONGS = 15;
+const SONG_MOODS_DAYS = 30;
 
 const today = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 const ageDays = (iso: string) => (Date.now() - Date.parse(iso)) / 86_400_000;
@@ -38,6 +55,7 @@ export class FeedService {
   private building: Promise<void> | null = null;
   private rebuild: Promise<void> | null = null;
   private checking: Promise<ReleaseItem[]> | null = null;
+  private moodBuilds = new Map<MoodId, Promise<DailyMix>>();
   private status: FeedStatus = { building: false };
   private feedListeners = new Set<(feed: HomeFeed) => void>();
   private statusListeners = new Set<(status: FeedStatus) => void>();
@@ -73,17 +91,39 @@ export class FeedService {
 
   /** today's feed if built, otherwise the last one */
   get(): HomeFeed | null {
-    const row = this.db.prepare("SELECT data FROM feed_cache WHERE key = 'home' ").get() as { data: string } | undefined;
-    const feed = row ? (JSON.parse(row.data) as HomeFeed) : null;
+    const feed = this.stored();
     if (!feed || feed.day !== today()) void this.build();
-    return feed;
+    return feed && this.withMoodMixes(feed);
+  }
+
+  private stored(): HomeFeed | null {
+    const row = this.db.prepare("SELECT data FROM feed_cache WHERE key = 'home'").get() as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as HomeFeed) : null;
   }
 
   private save(feed: HomeFeed): void {
+    // mood mixes are kept on their own
+    const { moodMixes: _moodMixes, ...stored } = feed;
+    this.put("home", stored, feed.builtAt);
+    this.changed(stored);
+  }
+
+  private changed(feed: HomeFeed): void {
+    const full = this.withMoodMixes(feed);
+    for (const l of this.feedListeners) l(full);
+  }
+
+  private put(key: string, data: unknown, at = new Date().toISOString()): void {
     this.db
-      .prepare("INSERT INTO feed_cache (key, data, built_at) VALUES ('home', ?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data, built_at = excluded.built_at")
-      .run(JSON.stringify(feed), feed.builtAt);
-    for (const l of this.feedListeners) l(feed);
+      .prepare("INSERT INTO feed_cache (key, data, built_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data, built_at = excluded.built_at")
+      .run(key, JSON.stringify(data), at);
+  }
+
+  private withMoodMixes(feed: HomeFeed): HomeFeed {
+    const day = today();
+    const rows = this.db.prepare("SELECT data FROM feed_cache WHERE key LIKE 'mood:%' ORDER BY built_at DESC").all() as unknown as { data: string }[];
+    const moodMixes = rows.map((r) => JSON.parse(r.data) as MoodMixEntry).filter((e) => e.day === day).map((e) => e.mix);
+    return { ...feed, moodMixes };
   }
 
   start(): void {
@@ -344,6 +384,92 @@ export class FeedService {
       rediscover,
     };
     this.save(feed);
+  }
+
+  // ---- mood mixes ----
+
+  /** today's mix for a mood, made now if there isn't one yet; `fresh` makes a different one */
+  moodMix(id: MoodId, fresh = false): Promise<DailyMix> {
+    const running = this.moodBuilds.get(id);
+    if (running) return running;
+    const build = this.buildMoodMix(id, fresh).finally(() => this.moodBuilds.delete(id));
+    this.moodBuilds.set(id, build);
+    return build;
+  }
+
+  private async buildMoodMix(id: MoodId, fresh: boolean): Promise<DailyMix> {
+    const mood = moodById(id);
+    const day = today();
+    const row = this.db.prepare("SELECT data FROM feed_cache WHERE key = ?").get(`mood:${id}`) as { data: string } | undefined;
+    const cached = row ? (JSON.parse(row.data) as MoodMixEntry) : null;
+    if (!fresh && cached?.day === day) return cached.mix;
+    const version = cached?.day === day ? cached.version + 1 : 0;
+    const random = seededRandom(`${day}:${id}:${version}`);
+
+    // your top songs, and the moods YouTube Music says each one suits
+    const top = this.taste().songs.slice(0, MOOD_SONGS);
+    const yours = (await this.playableList(top, { left: 5 }, MOOD_SONGS)).filter((t) => t.source === "youtube");
+    const tagged = await mapLimit(yours, 3, async (track) => ({ track, tags: await this.songMoods(track.sourceId) }));
+    const fitting = tagged.filter((s) => suits(s, mood)).map((s) => s.track);
+    const seeds = pickSeeds(tagged, mood, random);
+    const seedIds = new Set(seeds.map((s) => s.id));
+
+    const [radios, artists] = await Promise.all([
+      // a tuned radio opens with its seed, which belongs in the mix only if it suits the mood
+      Promise.all(seeds.map((s) => this.catalog.moodRadio(s.sourceId, mood.code).then((r) => r.filter((t) => !seedIds.has(t.id)), () => [] as Track[]))),
+      this.seedArtists(seeds),
+    ]);
+    let tracks = radios.some((r) => r.length > 0) ? assembleMoodMix({ yours: fitting, radios }, random) : [];
+    // nothing played yet, or the radios didn't answer: YouTube Music's own playlists for the mood
+    const fromYouTubeMusic = tracks.length < 15;
+    if (fromYouTubeMusic) tracks = await this.moodFromYouTubeMusic(mood, random);
+    if (tracks.length < 8) throw new Error(`Couldn't make a ${mood.name} mix right now. Check your connection and try again.`);
+
+    const mix: DailyMix = {
+      id: `mood-${id}`,
+      title: `${mood.name} Mix`,
+      description: describeMood(mood, fromYouTubeMusic ? [] : seeds, (t) => fitting.includes(t)),
+      artists: fromYouTubeMusic ? [] : artists,
+      tracks,
+      mood: id,
+    };
+    this.put(`mood:${id}`, { day, version, mix } satisfies MoodMixEntry);
+    const home = this.stored();
+    if (home) this.changed(home);
+    return mix;
+  }
+
+  /** the tuning chips for a song, kept for a month since a song's moods don't change */
+  private async songMoods(videoId: string): Promise<string[]> {
+    const key = `song-moods:${videoId}`;
+    const row = this.db.prepare("SELECT data, built_at FROM feed_cache WHERE key = ?").get(key) as { data: string; built_at: string } | undefined;
+    if (row && ageDays(row.built_at) < SONG_MOODS_DAYS) return JSON.parse(row.data) as string[];
+    try {
+      const tags = await this.catalog.songMoods(videoId);
+      this.put(key, tags);
+      return tags;
+    } catch {
+      return row ? (JSON.parse(row.data) as string[]) : [];
+    }
+  }
+
+  private async seedArtists(seeds: Track[]): Promise<ArtistSummary[]> {
+    const budget = { left: 3 };
+    const out: ArtistSummary[] = [];
+    for (const seed of seeds) {
+      const lead = seed.artists[0];
+      if (!lead) continue;
+      const found = await this.resolveArtist(primaryArtist(lead.name), lead.id, budget);
+      if (found && !out.some((a) => a.id === found.id)) out.push(found);
+    }
+    return out;
+  }
+
+  private async moodFromYouTubeMusic(mood: Mood, random: () => number): Promise<Track[]> {
+    const playlists = await this.catalog.moodPlaylists(mood.page).catch(() => [] as RemotePlaylist[]);
+    const picks = shuffle(playlists.slice(0, 8), random).slice(0, 2);
+    const lists = await Promise.all(picks.map((p) => this.catalog.playlist(p.id, 60).then((l) => shuffle(l.tracks, random), () => [] as Track[])));
+    return assembleMoodMix({ yours: [], radios: lists }, random);
   }
 
   // ---- new releases ----

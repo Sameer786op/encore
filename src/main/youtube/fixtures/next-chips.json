@@ -1,0 +1,279 @@
+{
+  "contents": {
+    "singleColumnMusicWatchNextResultsRenderer": {
+      "tabbedRenderer": {
+        "watchNextTabbedResultsRenderer": {
+          "tabs": [
+            {
+              "tabRenderer": {
+                "content": {
+                  "musicQueueRenderer": {
+                    "subHeaderChipCloud": {
+                      "chipCloudRenderer": {
+                        "chips": [
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "All"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDAMVMfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Popular"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATpYvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Discover"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATiXvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Deep cuts"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATpXvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Romance"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATmdvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "2010s"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATd0XvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Chill"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATmXvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Hindi"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATgqvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "2020s"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATd1XvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "Upbeat"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATmbvfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "chipCloudChipRenderer": {
+                              "text": {
+                                "runs": [
+                                  {
+                                    "text": "2000s"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "queueUpdateCommand": {
+                                  "queueUpdateSection": "QUEUE_UPDATE_SECTION_QUEUE",
+                                  "fetchContentsCommand": {
+                                    "watchEndpoint": {
+                                      "playlistId": "RDATd-vfsiPzT50ZiM"
+                                    }
+                                  },
+                                  "dedupeAgainstLocalQueue": true,
+                                  "syncMode": "QUEUE_UPDATE_SYNC_MODE_DEDUPE_AGAINST_LOCAL"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

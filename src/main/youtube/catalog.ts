@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AlbumDetails, ArtistDetails, ArtistSummary, HomeSection, RemotePlaylistDetails, SearchKind, SearchKindResults, SearchResults, SearchSuggestions, SuggestedItem, Track } from "@shared/types";
+import type { AlbumDetails, ArtistDetails, ArtistSummary, HomeSection, RemotePlaylist, RemotePlaylistDetails, SearchKind, SearchKindResults, SearchResults, SearchSuggestions, SuggestedItem, Track } from "@shared/types";
 import { trackId } from "@shared/types";
 import { cleanArtistName } from "../matching/text";
 import { getYouTube } from "./client";
@@ -395,4 +395,49 @@ export async function radio(seed: Track): Promise<Track[]> {
   const panel = (await yt.music.getUpNext(seed.sourceId, true)) as unknown as Loose;
   const items = ((panel.contents ?? []) as Loose[]).map((i) => (i.type === "PlaylistPanelVideoWrapper" ? i.primary : i));
   return uniqueById(compact(items.map((i) => mapTrack(i)))).filter((t) => t.id !== seed.id);
+}
+
+/** the chips a song's radio offers for tuning it ("Chill", "Romance", "2010s"…), which say what moods it suits */
+export function moodChips(raw: unknown): string[] {
+  const labels: string[] = [];
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+    const chip = (node as Loose).chipCloudChipRenderer as Loose | undefined;
+    if (chip) {
+      const playlistId = chip.navigationEndpoint?.queueUpdateCommand?.fetchContentsCommand?.watchEndpoint?.playlistId;
+      const label = ((chip.text?.runs ?? []) as Loose[]).map((r) => r?.text ?? "").join("").trim() || text(chip.text?.simpleText);
+      // "All" plays the plain radio; the tuned ones start with RDAT
+      if (typeof playlistId === "string" && playlistId.startsWith("RDAT") && label) labels.push(label);
+      return;
+    }
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(raw);
+  return [...new Set(labels)];
+}
+
+export async function songMoods(videoId: string): Promise<string[]> {
+  const yt = await getYouTube();
+  const next = (await yt.actions.execute("/next", { client: "YTMUSIC", videoId, playlistId: `RDAMVM${videoId}`, isAudioOnly: true })) as unknown as Loose;
+  return moodChips(next.data);
+}
+
+/** a song's radio tuned to a mood by YouTube Music, e.g. "RDAT" + "mXv" (chill) + the video id */
+export async function moodRadio(videoId: string, code: string): Promise<Track[]> {
+  const yt = await getYouTube();
+  const next = (await yt.actions.execute("/next", { client: "YTMUSIC", videoId, playlistId: `RDAT${code}${videoId}`, isAudioOnly: true, parse: true })) as unknown as Loose;
+  const items = (next.contents_memo?.get("PlaylistPanelVideo") ?? []) as Loose[];
+  return uniqueById(compact(items.map((i) => mapTrack(i))));
+}
+
+/** YouTube Music's own playlists for a mood, from its Moods & moments page of that name */
+export async function moodPlaylists(page: string): Promise<RemotePlaylist[]> {
+  const yt = await getYouTube();
+  const grid = (await yt.actions.execute("/browse", { client: "YTMUSIC", browseId: "FEmusic_moods_and_genres", parse: true })) as unknown as Loose;
+  const buttons = (grid.contents_memo?.get("MusicNavigationButton") ?? []) as Loose[];
+  const target = buttons.find((b) => text(b?.button_text).trim().toLowerCase() === page.toLowerCase())?.endpoint?.payload as Loose | undefined;
+  if (!target?.browseId) throw new Error(`YouTube Music has no ${page} page`);
+  const moodPage = (await yt.actions.execute("/browse", { client: "YTMUSIC", browseId: target.browseId, params: target.params, parse: true })) as unknown as Loose;
+  const items = ((moodPage.contents_memo?.get("MusicTwoRowItem") ?? []) as Loose[]).filter((i) => i?.item_type === "playlist");
+  return uniqueById(compact(items.map((i) => mapPlaylist(i))));
 }

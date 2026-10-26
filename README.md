@@ -56,6 +56,7 @@ Imported history is saved straight away and powers **Your listening**: total pla
 
 - **A home page made from your history**: your daily mixes, new releases from your artists, songs you have on repeat, your top artists, and forgotten favourites you used to play a lot. It uses everything you've listened to: imported history from Spotify, YouTube Music and Apple Music, plus what you play in Vyse Music, with recent listening counting most and liked songs counting extra.
 - **Daily mixes**: your top artists are grouped by who sounds alike (using YouTube Music's "Fans might also like"), and each mix weaves your favourites from them with their popular songs and new discoveries, never the same artist twice in a row. They're remade every day and stay the same all day; **Save** keeps one as a playlist.
+- **Mood mixes**: pick a mood on Home (Chill, Energize, Focus, Warm, Feel good, Party, Workout, Sad or Sleep) and press **Start mix**. The mix weaves your own top songs that suit the mood, going by the moods YouTube Music tags each song with, with YouTube Music's radio tuned to that mood and started from your songs. It plays right away and opens as a page with **New mix** for a different one and **Save** to keep it. Before you've played anything, it uses YouTube Music's own playlists for the mood.
 - **New-release alerts**: Vyse Music watches the artists you listen to most, plus any you **Follow** on their artist page, and sends a Windows notification when one puts out a new album or single. Clicking it opens the release. The first look at an artist only notes what's already out, so you aren't flooded. Checks run when you open Vyse Music and every hour while it's open; turn alerts off in Settings → New releases.
 - **Scrobbling to Last.fm and ListenBrainz**: a song counts once you've heard half of it or four minutes (songs under 30 seconds never count), and both services also see what's playing now. Plays wait in a queue on your computer when you're offline and are sent later. Your keys and tokens are encrypted with your Windows account.
   - **ListenBrainz**: copy your user token from [listenbrainz.org/settings](https://listenbrainz.org/settings/) into Settings → Scrobbling.
@@ -140,7 +141,7 @@ src/
     lyrics/    LRC parsing and the lyrics lookup (local file, LRCLIB, YouTube Music)
     discord/   a small Discord RPC client and the "Listening to" activity
     mini/      the floating mini player window
-    feed/      your taste profile, daily mixes, the release watcher and the home feed
+    feed/      your taste profile, daily and mood mixes, the release watcher and the home feed
     accounts/  connected Spotify, YouTube Music and Apple Music accounts: sign-in windows, readers and the sync
     scrobble/  Last.fm and ListenBrainz clients and the offline scrobble queue
     updates/   finds, downloads and installs new versions from GitHub releases

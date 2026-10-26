@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import type { AlbumSummary, ArtistDetails, ArtistSummary, ReleaseItem, Track } from "@shared/types";
+import type { AlbumSummary, ArtistDetails, ArtistSummary, HomeFeed, ReleaseItem, Track } from "@shared/types";
+import { trackId } from "@shared/types";
 import { openDatabase } from "../db";
 import { ListeningHistory } from "../history/history";
 import { Library } from "../library/library";
@@ -23,10 +24,34 @@ const ARTISTS: Record<string, { id: string; related: string[]; albums: AlbumSumm
   Coldplay: { id: "UCcoldplay", related: [], albums: [{ id: "MPREb_mos", title: "Moon Music", artists: [], year: "2026" }] },
 };
 
-function fakeCatalog(): FeedCatalog & { releases: Record<string, AlbumSummary[]> } {
+/** the tuning chips YouTube Music offers for each song in the history below */
+const SONG_MOODS: Record<string, string[]> = {
+  J7p4bzqLvCw: ["Party", "Upbeat", "2020s"],
+  "TUVcZfQe-Kw": ["Party", "Pump-up"],
+  yKNxeF4KMsY: ["Chill", "Romance", "2000s"],
+};
+
+function fakeCatalog(): FeedCatalog & { releases: Record<string, AlbumSummary[]>; moodLookups: string[] } {
   const releases: Record<string, AlbumSummary[]> = Object.fromEntries(Object.values(ARTISTS).map((a) => [a.id, [...a.albums]]));
+  const moodLookups: string[] = [];
+  const song = (id: string, title: string, artist: string): Track => ({ id: trackId("youtube", id), source: "youtube", sourceId: id, title, artists: [{ name: artist }], durationMs: 200_000 });
   return {
     releases,
+    moodLookups,
+    async songMoods(videoId) {
+      moodLookups.push(videoId);
+      return SONG_MOODS[videoId] ?? [];
+    },
+    // like YouTube Music's, a tuned radio opens with the song it started from
+    async moodRadio(videoId, code) {
+      return [song(videoId, `Seed ${videoId}`, "Seed artist"), ...Array.from({ length: 24 }, (_, i) => song(`${code}-${videoId}-${i}`, `${code} pick ${videoId} ${i}`, `Tuned artist ${i % 7}`))];
+    },
+    async moodPlaylists(page) {
+      return ["PL1", "PL2", "PL3"].map((id) => ({ id, title: `${page} ${id}` }));
+    },
+    async playlist(id) {
+      return { name: id, tracks: Array.from({ length: 30 }, (_, i) => song(`${id}-${i}`, `${id} song ${i}`, `Playlist artist ${i % 9}`)) };
+    },
     async searchArtists(query) {
       const entry = Object.entries(ARTISTS).find(([name]) => name.toLowerCase() === query.toLowerCase());
       return entry ? [{ id: entry[1].id, name: entry[0], artwork: `https://lh3.googleusercontent.com/${entry[1].id}` }] : [];
@@ -146,5 +171,73 @@ describe("FeedService", () => {
     await feed.refresh();
     const home = feed.get()!;
     expect(home).toMatchObject({ hasHistory: false, mixes: [], topArtists: [], onRepeat: [] });
+  });
+
+  describe("mood mixes", () => {
+    it("weaves your songs that suit the mood with radios tuned to it", async () => {
+      const mix = await feed.moodMix("chill");
+      expect(mix).toMatchObject({ id: "mood-chill", title: "Chill Mix", mood: "chill" });
+      expect(mix.description).toMatch(/^Chill songs like Yellow/);
+      expect(mix.tracks.length).toBeGreaterThanOrEqual(20);
+      expect(mix.tracks[0].title).toBe("Yellow");
+      expect(mix.tracks.filter((t) => t.title.startsWith("mXv pick")).length).toBeGreaterThan(15);
+      // your songs that don't suit it stay out, even when a radio started from them
+      expect(mix.tracks.some((t) => ["Blinding Lights", "Levitating"].includes(t.title) || t.title.startsWith("Seed "))).toBe(false);
+      expect(mix.artists.map((a) => a.name)).toContain("Coldplay");
+    });
+
+    it("keeps the day's mix, and makes a different one when asked", async () => {
+      const liked = Array.from({ length: 8 }, (_, i) => yt(`Calm ${i}`, `Calm artist ${i}`, `UCcalm${i}`));
+      for (const t of liked) {
+        library.setLiked(t, true);
+        SONG_MOODS[t.sourceId] = ["Chill"];
+      }
+      const first = await feed.moodMix("chill");
+      expect((await feed.moodMix("chill")).tracks).toEqual(first.tracks);
+      const again = await feed.moodMix("chill", true);
+      expect(again.tracks.map((t) => t.id)).not.toEqual(first.tracks.map((t) => t.id));
+      expect(again.tracks.length).toBeGreaterThanOrEqual(20);
+    });
+
+    it("says when a mix was only inspired by your songs", async () => {
+      // none of the history is tagged Focus, so the radios start from your top songs
+      const mix = await feed.moodMix("focus");
+      expect(mix.description).toMatch(/^Focus music inspired by /);
+      expect(mix.tracks.filter((t) => t.title.startsWith("mav pick")).length).toBeGreaterThan(15);
+    });
+
+    it("looks up each song's moods once", async () => {
+      await feed.moodMix("chill");
+      const lookups = catalog.moodLookups.length;
+      expect(lookups).toBe(3);
+      await feed.moodMix("energize");
+      await feed.moodMix("chill", true);
+      expect(catalog.moodLookups).toHaveLength(lookups);
+    });
+
+    it("uses YouTube Music's own playlists for the mood before anything is played", async () => {
+      db.prepare("DELETE FROM imported_plays").run();
+      const mix = await feed.moodMix("sleep");
+      expect(mix.description).toBe("Sleep picks from YouTube Music");
+      expect(mix.artists).toEqual([]);
+      expect(mix.tracks.length).toBeGreaterThanOrEqual(20);
+      expect(mix.tracks.every((t) => /^PL\d song/.test(t.title))).toBe(true);
+    });
+
+    it("comes with the home feed for the rest of the day, newest first", async () => {
+      await feed.refresh();
+      const seen: HomeFeed[] = [];
+      feed.onChange((f) => seen.push(f));
+      await feed.moodMix("focus");
+      await feed.moodMix("warm");
+      expect(seen.at(-1)!.moodMixes!.map((m) => m.id)).toEqual(["mood-warm", "mood-focus"]);
+      expect(feed.get()!.moodMixes!.map((m) => m.id)).toEqual(["mood-warm", "mood-focus"]);
+      // a rebuilt home page keeps them
+      await feed.refresh();
+      expect(seen.at(-1)!.moodMixes).toHaveLength(2);
+      // yesterday's are gone
+      db.prepare("UPDATE feed_cache SET data = replace(data, ?, '1999-01-01') WHERE key LIKE 'mood:%'").run(feed.get()!.day);
+      expect(feed.get()!.moodMixes).toEqual([]);
+    });
   });
 });

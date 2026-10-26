@@ -115,6 +115,7 @@ const api: EncoreApi = {
     follow: (artist, on) => ipcRenderer.invoke(IPC.feedFollow, artist, on),
     onOpenAlbum: (listener) => subscribe<string>(IPC.feedOpenAlbum, listener),
     setNotifications: (on) => ipcRenderer.invoke(IPC.feedSetNotifications, on),
+    moodMix: (mood, fresh) => ipcRenderer.invoke(IPC.feedMoodMix, mood, fresh),
   },
   accounts: {
     list: () => ipcRenderer.invoke(IPC.accountsList),

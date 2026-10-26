@@ -1,5 +1,6 @@
 // Data shapes shared by the main process and the UI.
 
+import type { MoodId } from "./moods";
 import type { GlobalCommand, GlobalKeysConfig, GlobalKeyState } from "./shortcuts";
 
 export type TrackSource = "youtube" | "local";
@@ -410,6 +411,8 @@ export interface DailyMix {
   description: string;
   artists: ArtistSummary[];
   tracks: Track[];
+  /** set on a mix started from the mood picker */
+  mood?: MoodId;
 }
 
 export interface ReleaseItem {
@@ -432,6 +435,8 @@ export interface HomeFeed {
   onRepeat: Track[];
   /** favourites you haven't played in a long while */
   rediscover: Track[];
+  /** mood mixes started today, newest first */
+  moodMixes?: DailyMix[];
 }
 
 export interface FeedStatus {
@@ -571,6 +576,8 @@ export interface EncoreApi {
     /** a release Vyse Music told you about was clicked in a notification */
     onOpenAlbum(listener: (albumId: string) => void): () => void;
     setNotifications(on: boolean): Promise<void>;
+    /** today's mix for a mood from what you play, made now if there isn't one; `fresh` makes a different one */
+    moodMix(mood: MoodId, fresh?: boolean): Promise<DailyMix>;
   };
   accounts: {
     list(): Promise<AccountStatus[]>;

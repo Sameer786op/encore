@@ -18,6 +18,7 @@ import type {
 } from "@shared/types";
 import { ACCOUNT_SERVICES, MINI_CORNERS, type AccountService, type MiniConfig, type MiniCorner } from "@shared/types";
 import { IPC } from "@shared/ipc";
+import { isMoodId } from "@shared/moods";
 import { shouldScrobble } from "@shared/scrobbleRules";
 import { AppleProvider } from "./accounts/apple";
 import { GoogleSignIn } from "./accounts/google";
@@ -51,7 +52,7 @@ import { Lastfm, ListenBrainz } from "./scrobble/clients";
 import { Scrobbler } from "./scrobble/scrobbler";
 import { Updater } from "./updates/updater";
 import { electronVault } from "./scrobble/vault";
-import { album, artist, home, lyricsText, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, suggestions, trackById } from "./youtube/catalog";
+import { album, artist, home, lyricsText, moodPlaylists, moodRadio, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, songMoods, suggestions, trackById } from "./youtube/catalog";
 import { configureYouTube } from "./youtube/client";
 import { resolveAudio } from "./youtube/streams";
 import icon from "../../resources/icon.png?asset";
@@ -551,6 +552,10 @@ function registerIpc(): void {
     library.refresh();
   });
   handle(IPC.feedSetNotifications, (on: unknown) => feed.setNotifications(on === true));
+  handle(IPC.feedMoodMix, (mood: unknown, fresh: unknown) => {
+    if (!isMoodId(mood)) throw new Error("Unknown mood");
+    return feed.moodMix(mood, fresh === true);
+  });
 
   handle(IPC.scrobbleStatus, () => scrobbler.status());
   handle(IPC.scrobbleConnectListenBrainz, (token: unknown) => scrobbler.connectListenBrainz(stringArg(token, "token").slice(0, 200)));
@@ -613,7 +618,7 @@ app.whenReady().then(() => {
   importService = new ImportService(imports, history, { playlist, album, trackById });
   local = new LocalLibrary(db, join(userData, "artwork"));
   lyrics = new LyricsService(db, { youtubeLyrics: lyricsText, localPath: (id) => local.pathOf(id) });
-  feed = new FeedService(db, library, matcher, { searchArtists, artist, radio }, notifyReleases);
+  feed = new FeedService(db, library, matcher, { searchArtists, artist, radio, songMoods, moodRadio, moodPlaylists, playlist }, notifyReleases);
   accounts = new AccountSync({ db, library, matcher, ...accountConnections(), follow: (artists, lookups) => feed.followFromAccount(artists, lookups) });
   scrobbler = new Scrobbler(db, { lastfm: new Lastfm(), listenbrainz: new ListenBrainz() }, electronVault, (url) => void shell.openExternal(url));
   // only installed copies update themselves, and not ones from the Microsoft Store, which does it;
