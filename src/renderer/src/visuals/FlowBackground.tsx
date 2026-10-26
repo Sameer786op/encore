@@ -1,14 +1,9 @@
 import { useEffect, useRef } from "react";
-import { getAnalyser } from "@/player/store";
+import { bassMeter, quadProgram } from "./gl";
 import type { RGB } from "./palette";
 
 // A slowly flowing field of the cover's colours, drawn with WebGL. Layers of
 // warped noise mix four colours; the bass of the music makes it breathe.
-
-const VERTEX = `
-attribute vec2 a_pos;
-void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
-`;
 
 const FRAGMENT = `
 precision highp float;
@@ -62,14 +57,6 @@ void main() {
 }
 `;
 
-function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
-  const shader = gl.createShader(type);
-  if (!shader) return null;
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
-}
-
 /** draws at half resolution; the soft upscale suits a blurry background */
 const SCALE = 0.5;
 
@@ -82,22 +69,8 @@ export function FlowBackground({ colors, className }: { colors: RGB[]; className
     const canvas = canvasRef.current;
     const gl = canvas?.getContext("webgl", { antialias: false, premultipliedAlpha: false, powerPreference: "low-power" });
     if (!canvas || !gl) return;
-    const vs = compile(gl, gl.VERTEX_SHADER, VERTEX);
-    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
-    const program = gl.createProgram();
-    if (!vs || !fs || !program) return;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
-    gl.useProgram(program);
-
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-    const pos = gl.getAttribLocation(program, "a_pos");
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+    const program = quadProgram(gl, FRAGMENT);
+    if (!program) return;
 
     const u = (name: string) => gl.getUniformLocation(program, name);
     const uRes = u("u_res");
@@ -108,7 +81,7 @@ export function FlowBackground({ colors, className }: { colors: RGB[]; className
     // colours glide to the new cover instead of jumping
     const current = target.current.map((c) => c.map((v) => v / 255));
     let energy = 0;
-    let spectrum: Uint8Array<ArrayBuffer> | null = null;
+    const bass = bassMeter();
     let frame = 0;
     const started = performance.now();
 
@@ -133,15 +106,7 @@ export function FlowBackground({ colors, className }: { colors: RGB[]; className
         gl.uniform3f(uColors[i], current[i][0], current[i][1], current[i][2]);
       }
       // the low end of the spectrum, smoothed, drives the pulse
-      const analyser = getAnalyser();
-      let level = 0;
-      if (analyser) {
-        if (spectrum?.length !== analyser.frequencyBinCount) spectrum = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(spectrum);
-        for (let i = 1; i < 12; i++) level += spectrum[i];
-        level = level / (11 * 255);
-      }
-      energy += (level - energy) * 0.12;
+      energy += (bass() - energy) * 0.12;
       canvas.dataset.energy = energy.toFixed(3);
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uTime, (performance.now() - started) / 1000);

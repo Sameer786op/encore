@@ -84,3 +84,12 @@ export function forBackground(palette: RGB[], count = 4): RGB[] {
     return fromHsl([h, s < 0.08 ? s : Math.max(0.35, Math.min(0.85, s * 1.15)), Math.max(0.12, Math.min(0.42, l * 0.8))]);
   });
 }
+
+/** bright and saturated, for light that glows; a grey cover gives a soft white */
+export function forGlow(palette: RGB[], count = 3): RGB[] {
+  const colors = palette.length > 0 ? palette : FALLBACK_PALETTE;
+  return Array.from({ length: count }, (_, i) => {
+    const [h, s] = toHsl(colors[i % colors.length]);
+    return s < 0.08 ? fromHsl([h, s, 0.86]) : fromHsl([h, Math.max(0.8, s), 0.6]);
+  });
+}

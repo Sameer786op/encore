@@ -464,6 +464,7 @@ export interface ScrobbleStatus {
 
 export interface WindowState {
   maximized: boolean;
+  fullScreen: boolean;
   focused: boolean;
 }
 

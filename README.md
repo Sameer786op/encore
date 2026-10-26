@@ -46,6 +46,7 @@ Imported history is saved straight away and powers **Your listening**: total pla
 
 - **Full-screen player** (click the cover, or press F): a moving background painted from the cover's colours that breathes with the bass, a large cover that springs forward when the music plays and sits back when you pause, and all the controls.
 - **Synced lyrics** (press L): lines light up word by word as they're sung, the view follows the song, long instrumental breaks show animated dots, and clicking a line jumps there. Per-song timing can be nudged if lyrics run early or late. Lyrics come from LRCLIB, a free and open lyrics library, with YouTube Music's plain lyrics as a fallback. Local files use a matching `.lrc` file or lyrics inside their tags.
+- **Edge light**: while the full-screen player shows lyrics, a neon line of light runs round the window. Its colours travel round the edge, it swells with the bass and flashes on the beat, and it dims while paused. Settings → Lyrics has the colours (six presets, rainbow, the cover's colours, or two of your own), speed, glow and the pulse, with a live preview.
 - **Equalizer**: 10 bands, a preamp and 11 presets, with a live response curve. A limiter keeps boosts from clipping.
 - **Crossfade** from 1 to 12 seconds, or **gapless** playback when it's off: the next song is buffered ahead of time and starts the moment the last one ends. Albums play through without fading unless you ask.
 - **Volume levelling**: every song plays at about the same loudness, using YouTube's loudness data or ReplayGain tags in your files.

@@ -11,6 +11,7 @@ import { useUpdates } from "@/ui/updates";
 import { cn } from "@/lib/cn";
 import { AccountSettings } from "./settings/AccountSettings";
 import { AppearanceSettings } from "./settings/AppearanceSettings";
+import { EdgeLightSettings } from "./settings/EdgeLightSettings";
 import { MiniPlayerSettings } from "./settings/MiniPlayerSettings";
 import { Card, Group, Row } from "./settings/parts";
 import { GlobalShortcutSettings, ShortcutSettings } from "./settings/ShortcutSettings";
@@ -402,6 +403,7 @@ export function SettingsPage() {
               ]}
             />
           </Row>
+          <EdgeLightSettings />
         </Card>
       </Group>
 

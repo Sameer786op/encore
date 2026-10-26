@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, Expand, LoaderCircle, MicVocal, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
 import { navigate } from "@/nav/store";
 import { useCurrentTrack, usePlayer } from "@/player/store";
 import { LyricsView } from "@/lyrics/LyricsView";
+import { useSettings } from "@/settings/store";
+import { edgeLook } from "@/visuals/edgeColors";
+import { EdgeLight } from "@/visuals/EdgeLight";
 import { FlowBackground } from "@/visuals/FlowBackground";
+import type { RGB } from "@/visuals/palette";
 import { usePalette } from "@/visuals/usePalette";
 import { useHints } from "@/ui/shortcuts";
 import { useView } from "@/ui/view";
@@ -124,10 +128,43 @@ function Controls() {
   );
 }
 
+/** Windows 11 rounds a window's corners, except when it fills the screen */
+function useWindowRadius(): number {
+  const [square, setSquare] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void window.encore.window.getState().then((state) => alive && setSquare(state.maximized || state.fullScreen));
+    const stop = window.encore.window.onState((state) => setSquare(state.maximized || state.fullScreen));
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, []);
+  return square ? 0 : 8;
+}
+
+/** the line of light round the window, while the lyrics show */
+function WindowEdgeLight({ palette }: { palette: RGB[] }) {
+  const edge = useSettings((s) => s.edgeLight);
+  const radius = useWindowRadius();
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="pointer-events-none absolute inset-0 z-20 mix-blend-plus-lighter"
+    >
+      <EdgeLight {...edgeLook(edge, palette)} speed={edge.speed} glow={edge.glow} pulse={edge.pulse} radius={radius} />
+    </motion.div>
+  );
+}
+
 function Fullscreen() {
   const track = useCurrentTrack();
   const context = usePlayer((s) => s.queue.context);
   const showLyrics = useView((s) => s.lyrics);
+  const edgeLight = useSettings((s) => s.edgeLight.enabled);
   const { closeFullscreen, setLyrics } = useView.getState();
   const palette = usePalette(track?.artwork);
   const hint = useHints();
@@ -217,6 +254,8 @@ function Fullscreen() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>{showLyrics && edgeLight && <WindowEdgeLight key="edge-light" palette={palette} />}</AnimatePresence>
     </motion.div>
   );
 }

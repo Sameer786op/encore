@@ -14,6 +14,12 @@ export interface Settings {
   /** playback speed (1 is normal), whether the key stays put when it changes, and reverb from 0 to 1 */
   sound: { speed: number; keepPitch: boolean; reverb: number };
   lyricsSize: "small" | "medium" | "large";
+  /**
+   * a line of light round the window while the full-screen player shows lyrics:
+   * colours is a preset id from visuals/edgeColors, "rainbow", "artwork" or "custom";
+   * speed and glow go from 0 to 100; pulse swells it with the bass
+   */
+  edgeLight: { enabled: boolean; colors: string; custom: [string, string]; speed: number; glow: number; pulse: boolean };
   miniPlayer: MiniConfig;
   discord: { enabled: boolean; clientId: string; showWhenPaused: boolean };
   /** a desktop notification when an artist you listen to puts out something new */
@@ -56,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eq: DEFAULT_EQ,
   sound: { speed: 1, keepPitch: false, reverb: 0 },
   lyricsSize: "medium",
+  edgeLight: { enabled: true, colors: "neon", custom: ["#ff2fd0", "#3a8bff"], speed: 50, glow: 50, pulse: true },
   miniPlayer: { showOnMinimize: false, alwaysOnTop: true, corner: "remember" },
   discord: { enabled: false, clientId: "", showWhenPaused: false },
   releaseAlerts: true,
@@ -87,6 +94,7 @@ function load(): Settings {
       ...saved,
       eq: { ...DEFAULT_SETTINGS.eq, ...saved.eq },
       sound: { ...DEFAULT_SETTINGS.sound, ...saved.sound },
+      edgeLight: { ...DEFAULT_SETTINGS.edgeLight, ...saved.edgeLight },
       miniPlayer: { ...DEFAULT_SETTINGS.miniPlayer, ...saved.miniPlayer },
       discord: { ...DEFAULT_SETTINGS.discord, ...saved.discord },
       glassAreas: {

@@ -103,7 +103,7 @@ let nowPlayingSentFor = "";
 const ORIGINS: ImportOrigin[] = ["spotify", "apple", "youtube", "csv", "encore"];
 
 function windowState(win: BrowserWindow): WindowState {
-  return { maximized: win.isMaximized(), focused: win.isFocused() };
+  return { maximized: win.isMaximized(), fullScreen: win.isFullScreen(), focused: win.isFocused() };
 }
 
 /** the renderer, at a given view ("" for the main app, "mini" for the mini player) */
@@ -586,7 +586,7 @@ function registerIpc(): void {
   handle(IPC.updateCheck, () => updates.check());
   handle(IPC.updateInstall, () => updates.install());
 
-  handle(IPC.windowGetState, () => (mainWindow ? windowState(mainWindow) : { maximized: false, focused: true }));
+  handle(IPC.windowGetState, () => (mainWindow ? windowState(mainWindow) : { maximized: false, fullScreen: false, focused: true }));
 }
 
 app.on("second-instance", () => showMainWindow());

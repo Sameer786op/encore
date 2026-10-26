@@ -124,7 +124,7 @@ function ThemePicker() {
   );
 }
 
-function Swatch({ color, label, selected, onClick, children }: { color: string; label: string; selected: boolean; onClick?: (e: React.MouseEvent) => void; children?: ReactNode }) {
+export function Swatch({ color, label, selected, onClick, children }: { color: string; label: string; selected: boolean; onClick?: (e: React.MouseEvent) => void; children?: ReactNode }) {
   return (
     <button
       role="radio"
