@@ -1,7 +1,7 @@
 {
   "name": "encore",
   "productName": "Vyse Music",
-  "version": "0.8.0",
+  "version": "0.8.5",
   "private": true,
   "description": "Vyse Music: a free, ad-free desktop music player. Your music from everywhere, in one place.",
   "license": "MIT",
