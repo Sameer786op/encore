@@ -8,9 +8,13 @@ import { AUDIO_TYPES } from "./local/local";
 import { forgetAudio, resolveAudio, StreamUnavailableError, type AudioStream } from "./youtube/streams";
 
 // The audio element asks for encore-media://youtube/<videoId>. We resolve the
-// real stream here and forward byte ranges, a few MB at a time, so seeking
-// works, the renderer never sees YouTube URLs, and Web Audio can process the
-// sound later without CORS trouble.
+// real stream here and forward the byte range it asks for, so seeking works,
+// the renderer never sees YouTube URLs, and Web Audio can process the sound
+// later without CORS trouble. YouTube is asked a few MB at a time, but each
+// answer covers the whole range: Chromium takes the length of the first answer
+// as the length of the file here, and treated a seek past it as the end of the
+// song. Premium audio arrives over SABR instead of a file URL, so it's read
+// from memory as it comes in (youtube/premium.ts).
 // encore-media://local/<id> plays an indexed music file and
 // encore-media://art/<hash>.jpg serves cover art cut out of those files.
 
@@ -41,43 +45,85 @@ function parseRange(header: string | null, total: number): { start: number; end:
   return { start, end };
 }
 
-async function fetchRange(stream: AudioStream, start: number, end: number, signal: AbortSignal): Promise<Response> {
-  return fetch(stream.url, { headers: { range: `bytes=${start}-${end}` }, signal });
+function fetchRange(url: string, start: number, end: number, signal: AbortSignal): Promise<Response> {
+  return fetch(url, { headers: { range: `bytes=${start}-${end}` }, signal });
 }
 
-async function handleYouTube(request: Request, videoId: string, fresh: boolean): Promise<Response> {
-  let stream = await resolveAudio(videoId, { fresh });
+/** the first piece's bytes, then the rest of the range up to end, fetched a piece at a time as they're read */
+export function piecewise(
+  first: ReadableStream<Uint8Array>,
+  url: string,
+  from: number,
+  end: number,
+  signal: AbortSignal,
+  pieceBytes = CHUNK_BYTES,
+): ReadableStream<Uint8Array> {
+  let reader = first.getReader();
+  let at = from;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (!done) {
+          at += value.byteLength;
+          controller.enqueue(value);
+          return;
+        }
+        if (at > end) {
+          controller.close();
+          return;
+        }
+        const upstream = await fetchRange(url, at, Math.min(end, at + pieceBytes - 1), signal);
+        if (upstream.status !== 206 || !upstream.body) {
+          await upstream.body?.cancel();
+          // the audio element sees an error and asks again with a fresh URL
+          controller.error(new Error(`YouTube answered ${upstream.status} part-way through`));
+          return;
+        }
+        reader = upstream.body.getReader();
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
+}
+
+function streamHeaders(stream: AudioStream, start: number, end: number): Record<string, string> {
+  return {
+    "content-type": stream.mimeType,
+    "content-length": String(end - start + 1),
+    "content-range": `bytes ${start}-${end}/${stream.contentLength}`,
+    "accept-ranges": "bytes",
+    "cache-control": "no-store",
+    "access-control-allow-origin": "*",
+  };
+}
+
+async function handleYouTube(request: Request, videoId: string, fresh: boolean, retried = false): Promise<Response> {
+  const stream = await resolveAudio(videoId, { fresh });
   const range = parseRange(request.headers.get("range"), stream.contentLength);
   if (!range) {
     return new Response(null, { status: 416, headers: { "content-range": `bytes */${stream.contentLength}` } });
   }
-  const start = range.start;
-  const end = Math.min(range.end, start + CHUNK_BYTES - 1);
+  const { start, end } = range;
+  const headers = streamHeaders(stream, start, end);
+  if (stream.premium) return new Response(stream.premium.read(start, end), { status: 206, headers });
 
-  let upstream = await fetchRange(stream, start, end, request.signal);
-  if (upstream.status === 403 || upstream.status === 410) {
+  const url = stream.url!;
+  const firstEnd = Math.min(end, start + CHUNK_BYTES - 1);
+  const upstream = await fetchRange(url, start, firstEnd, request.signal);
+  if ((upstream.status === 403 || upstream.status === 410) && !retried) {
     // the URL expired or was revoked; resolve a new one once
     await upstream.body?.cancel();
     forgetAudio(videoId);
-    stream = await resolveAudio(videoId, { fresh: true });
-    upstream = await fetchRange(stream, start, end, request.signal);
+    return handleYouTube(request, videoId, true, true);
   }
-  if (upstream.status !== 206 && upstream.status !== 200) {
+  if (upstream.status !== 206 || !upstream.body) {
     await upstream.body?.cancel();
     return new Response(null, { status: 502 });
   }
-
-  return new Response(upstream.body, {
-    status: 206,
-    headers: {
-      "content-type": stream.mimeType,
-      "content-length": String(end - start + 1),
-      "content-range": `bytes ${start}-${end}/${stream.contentLength}`,
-      "accept-ranges": "bytes",
-      "cache-control": "no-store",
-      "access-control-allow-origin": "*",
-    },
-  });
+  return new Response(piecewise(upstream.body, url, start, end, request.signal), { status: 206, headers });
 }
 
 const IMAGE_TYPES: Record<string, string> = { ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };

@@ -9,6 +9,8 @@ import { SignedOutError, sleep, type AccountAuth, type SignInCode } from "./prov
 
 const TOKEN_URL = "https://www.youtube.com/o/oauth2/token";
 const DEVICE_GRANT = "http://oauth.net/grant_type/device/1.0";
+/** YouTube's player script changes every so often, so the signed-in session is made again after this long */
+const SESSION_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 interface ClientId {
   client_id: string;
@@ -35,6 +37,7 @@ export function refused(error: unknown): boolean {
 
 export class GoogleSignIn implements AccountAuth {
   private session: Promise<Innertube> | null = null;
+  private sessionMadeAt = 0;
   private waiting: { stop(): void; code?: SignInCode } | null = null;
 
   constructor(
@@ -43,6 +46,7 @@ export class GoogleSignIn implements AccountAuth {
       /** show Google's page in the person's browser, with the code ready to paste */
       openPage(code: SignInCode): void;
       fetch?: typeof fetch;
+      /** makes the session; Premium audio needs one with YouTube's player script (youtube/premium.ts) */
       create?: () => Promise<Innertube>;
     },
   ) {}
@@ -134,7 +138,7 @@ export class GoogleSignIn implements AccountAuth {
 
   /** a YouTube session signed in with the saved sign-in; throws SignedOutError without one, or once Google stops taking it */
   readonly client = (): Promise<Innertube> => {
-    if (this.session) return this.session;
+    if (this.session && Date.now() - this.sessionMadeAt < SESSION_MAX_AGE_MS) return this.session;
     const saved = this.options.store.get();
     if (!saved) return Promise.reject(new SignedOutError("Not signed in to YouTube"));
     const tokens = JSON.parse(saved) as GoogleTokens;
@@ -152,6 +156,7 @@ export class GoogleSignIn implements AccountAuth {
       return yt;
     })();
     this.session = session;
+    this.sessionMadeAt = Date.now();
     session.catch(() => {
       if (this.session === session) this.session = null;
     });

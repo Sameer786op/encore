@@ -85,20 +85,48 @@ function edgeColours(edge: Settings["edgeLight"]): string {
   return `in ${(EDGE_PRESETS.find((p) => p.id === edge.colors)?.name ?? "Neon").toLowerCase()}`;
 }
 
+/** a switch under the lyrics: its name lit while it's on, then what it's doing */
+function SwitchPill({ name, on, state, title, onToggle }: { name: string; on: boolean; state: string; title: string; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={on}
+      title={title}
+      className="glass-control pressable inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full py-1 pl-1 pr-3.5 text-[12px] font-semibold text-ink-2 hover:brightness-110"
+    >
+      <b className={cn("rounded-full px-2.5 py-1 font-bold transition-colors duration-300", on ? "bg-ink text-bg" : "bg-[var(--row-on)] text-ink-2")}>{name}</b>
+      {state}
+    </button>
+  );
+}
+
 /** says whether the edge light is on, and switches it */
 function EdgePill() {
   const edge = useSettings((s) => s.edgeLight);
   const update = useSettings((s) => s.update);
   return (
-    <button
-      onClick={() => update({ edgeLight: { ...edge, enabled: !edge.enabled } })}
-      aria-pressed={edge.enabled}
+    <SwitchPill
+      name="Edge light"
+      on={edge.enabled}
+      state={edge.enabled ? `on, ${edgeColours(edge)}` : "off"}
       title={edge.enabled ? "Turn the edge light off" : "Turn the edge light on"}
-      className="glass-control pressable inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full py-1 pl-1 pr-3.5 text-[12px] font-semibold text-ink-2 hover:brightness-110"
-    >
-      <b className={cn("rounded-full px-2.5 py-1 font-bold transition-colors duration-300", edge.enabled ? "bg-ink text-bg" : "bg-[var(--row-on)] text-ink-2")}>Edge light</b>
-      {edge.enabled ? `on, ${edgeColours(edge)}` : "off"}
-    </button>
+      onToggle={() => update({ edgeLight: { ...edge, enabled: !edge.enabled } })}
+    />
+  );
+}
+
+/** shows or hides the Finish rate and the readings round the cover, here and on Home */
+function DetailsPill() {
+  const on = useSettings((s) => s.songDetails);
+  const update = useSettings((s) => s.update);
+  return (
+    <SwitchPill
+      name="Song details"
+      on={on}
+      state={on ? "on" : "off"}
+      title={on ? "Hide the Finish rate, Bass, Loudness and stream quality round the cover" : "Show the Finish rate, Bass, Loudness and stream quality round the cover"}
+      onToggle={() => update({ songDetails: !on })}
+    />
   );
 }
 
@@ -274,7 +302,15 @@ function Fullscreen() {
           <div className="absolute inset-x-[22px] bottom-[140px] top-[84px] z-[1] flex">
             <Column shown={showLyrics} width={lyricsWidth} side="left">
               <Tile label="Lyrics" className="h-full px-7 pb-5 pt-[22px]">
-                <LyricsView track={track} footer={<EdgePill />} />
+                <LyricsView
+                  track={track}
+                  footer={
+                    <div className="flex flex-wrap items-center gap-2">
+                      <EdgePill />
+                      <DetailsPill />
+                    </div>
+                  }
+                />
               </Tile>
             </Column>
             <Stage track={track} />

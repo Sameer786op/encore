@@ -97,6 +97,8 @@ export interface StreamQuality {
   codec: string;
   kbps: number;
   sampleRate: number;
+  /** YouTube Premium's 256 kbps audio, through the person's own account */
+  premium?: boolean;
 }
 
 /** a playlist on YouTube Music, such as a chart */

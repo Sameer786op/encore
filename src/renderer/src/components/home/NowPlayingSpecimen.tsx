@@ -5,6 +5,7 @@ import { Artwork } from "@/components/Artwork";
 import { ArtistLinks } from "@/components/common";
 import { codecName, useLoudness, useStreamQuality } from "@/player/quality";
 import { usePlayer } from "@/player/store";
+import { useSettings } from "@/settings/store";
 import { useView } from "@/ui/view";
 import { Callout, CALLOUT_H, FinishGauge, LeaderLines, leader, Pin, Rings, ScanLine, signed } from "@/components/Specimen";
 import { Chip, Glow, Tile } from "./Tile";
@@ -13,7 +14,9 @@ import { useLiveLevels } from "./hooks";
 // The song that's playing, shown like a specimen under a scanner: the cover
 // floats in its rings while a scan line passes over it, with live readings
 // pinned to it on leader lines, and how often you hear it to the end.
-// With nothing in the queue it shows the song you played last.
+// With nothing in the queue it shows the song you played last. The gauge and
+// the readings can be turned off (the Song details pill in the full-screen
+// player); the cover then moves right and the title gets the room.
 
 const PAD = 30;
 /** the room kept on the right for a callout */
@@ -37,6 +40,7 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
   const quality = useStreamQuality(track);
   const loudness = useLoudness(track);
   const levels = useLiveLevels(8);
+  const details = useSettings((s) => s.songDetails);
   const playing = live && status === "playing";
 
   useLayoutEffect(() => {
@@ -50,10 +54,10 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
   }, []);
 
   const size = height >= 300 ? 150 : 132;
-  const coverX = Math.round(Math.min(width - 22 - CALLOUT_W - 14 - size, width * 0.58));
+  const coverX = Math.round(details ? Math.min(width - 22 - CALLOUT_W - 14 - size, width * 0.58) : Math.min(width - 56 - size, width * 0.66));
   const coverY = Math.round((height - size) / 2);
   const gaugeX = coverX - GAUGE - 22;
-  const textWidth = Math.max(150, gaugeX - PAD - 14);
+  const textWidth = Math.max(150, details ? gaugeX - PAD - 14 : coverX - PAD - 40);
   const dots = [
     { x: coverX + size * 0.8, y: coverY + size * 0.2 },
     { x: coverX + size * 0.72, y: coverY + size * 0.82 },
@@ -68,7 +72,7 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
       paths.push(leader(dots[i], { x: bubble.offsetLeft, y: bubble.offsetTop + CALLOUT_H / 2 }, "right"));
     });
     setLines(paths);
-  }, [width, height, live, qualityKey, coverX, coverY]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [width, height, live, details, qualityKey, coverX, coverY]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const words = track.title.split(/\s+/);
   const fontSize = titleSize(track.title, textWidth);
@@ -138,7 +142,7 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
             </div>
           </div>
 
-          <FinishGauge track={track} style={{ left: gaugeX, top: (height - GAUGE) / 2 }} />
+          {details && <FinishGauge track={track} style={{ left: gaugeX, top: (height - GAUGE) / 2 }} />}
 
           {/* the specimen: rings, the floating cover, the scan line */}
           <Rings x={coverX + size / 2} y={coverY + size / 2} size={size} playing={playing} />
@@ -151,27 +155,31 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
             <Artwork src={track.artwork} className="size-full transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/cover:scale-[1.05]" />
             {playing && <ScanLine />}
           </button>
-          {dots.map((d, i) => (i === 0 && !live ? null : <Pin key={i} x={d.x} y={d.y} delay={i * 0.6} />))}
-          <LeaderLines paths={lines} />
+          {details && (
+            <>
+              {dots.map((d, i) => (i === 0 && !live ? null : <Pin key={i} x={d.x} y={d.y} delay={i * 0.6} />))}
+              <LeaderLines paths={lines} />
 
-          {live && (
-            <Callout
-              ref={bassRef}
-              delay={0.5}
-              style={{ right: 22, top: 28 }}
-              icon={<AudioLines className="size-4" />}
-              title={`Bass ${levels.bass.toFixed(2)}`}
-              note={playing ? "live" : "when it plays"}
-            />
+              {live && (
+                <Callout
+                  ref={bassRef}
+                  delay={0.5}
+                  style={{ right: 22, top: 28 }}
+                  icon={<AudioLines className="size-4" />}
+                  title={`Bass ${levels.bass.toFixed(2)}`}
+                  note={playing ? "live" : "when it plays"}
+                />
+              )}
+              <Callout
+                ref={streamRef}
+                delay={0.7}
+                style={{ right: 22, bottom: 28 }}
+                icon={quality || !live ? <RadioTower className="size-4" /> : <LoaderCircle className="size-4 animate-spin" />}
+                title={quality === "local" ? "Your own file" : quality ? `${codecName(quality)} ${quality.kbps} kbps` : "Stream"}
+                note={quality === "local" ? "plays as it is" : kHz ? `${kHz} kHz, the best on offer` : "checking…"}
+              />
+            </>
           )}
-          <Callout
-            ref={streamRef}
-            delay={0.7}
-            style={{ right: 22, bottom: 28 }}
-            icon={quality || !live ? <RadioTower className="size-4" /> : <LoaderCircle className="size-4 animate-spin" />}
-            title={quality === "local" ? "Your own file" : quality ? `${codecName(quality)} ${quality.kbps} kbps` : "Stream"}
-            note={quality === "local" ? "plays as it is" : kHz ? `${kHz} kHz, the best on offer` : "checking…"}
-          />
         </>
       )}
     </Tile>

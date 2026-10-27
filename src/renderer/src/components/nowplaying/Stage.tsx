@@ -18,7 +18,9 @@ import { cn } from "@/lib/cn";
 // its rings with a scan line passing over it while it plays, live readings
 // pinned to it on leader lines, the Finish-rate gauge, and the song's name
 // under it. Everything is placed from the room the stage has, so it follows
-// the lyrics and the queue opening and closing beside it.
+// the lyrics and the queue opening and closing beside it. The gauge and the
+// readings can be turned off (the Song details pill under the lyrics), leaving
+// the cover alone; they fade out together and come back one by one.
 
 /** the room a callout needs beside the cover */
 const CALLOUT_W = 172;
@@ -26,9 +28,9 @@ const GAUGE = 112;
 /** the title and artist under the cover, with the gap above them */
 const TITLE = 92;
 
-/** where everything goes on a stage this big */
-export function stageLayout(width: number, height: number) {
-  const roomy = width >= 2 * CALLOUT_W + 250;
+/** where everything goes on a stage this big; without details there's no gauge or callouts to make room for */
+export function stageLayout(width: number, height: number, details = true) {
+  const roomy = details && width >= 2 * CALLOUT_W + 250;
   const size = Math.round(Math.max(150, Math.min(330, height - TITLE - 56, roomy ? width - 2 * (CALLOUT_W - 4) : width - 48)));
   const x = Math.round((width - size) / 2);
   const y = Math.round(Math.max(GAUGE * 0.32, (height - size - TITLE) / 2));
@@ -47,7 +49,7 @@ export function stageLayout(width: number, height: number) {
     bassTop: y - 40,
     streamTop: y + size - 6,
     loudnessTop: Math.round(y + size * 0.64 - CALLOUT_H / 2),
-    gauge: x >= GAUGE + 16 ? { left: Math.max(0, x - GAUGE - 26), top: Math.round(y - GAUGE * 0.32) } : null,
+    gauge: details && x >= GAUGE + 16 ? { left: Math.max(0, x - GAUGE - 26), top: Math.round(y - GAUGE * 0.32) } : null,
   };
 }
 
@@ -57,6 +59,7 @@ export function Stage({ track }: { track: Track }) {
   const status = usePlayer((s) => s.status);
   const pure = useSettings((s) => s.pureSound);
   const levelling = useSettings((s) => s.levelling);
+  const details = useSettings((s) => s.songDetails);
   const quality = useStreamQuality(track);
   const loudness = useLoudness(track);
   const levels = useLiveLevels(8);
@@ -74,7 +77,7 @@ export function Stage({ track }: { track: Track }) {
     return () => observer.disconnect();
   }, []);
 
-  const at = stageLayout(room.width, room.height);
+  const at = stageLayout(room.width, room.height, details);
   const kHz = quality && quality !== "local" && quality.sampleRate > 0 ? Number((quality.sampleRate / 1000).toFixed(1)) : null;
   const src = track.artwork ? artAt(track.artwork, 1000) : undefined;
   const lines = at.roomy
@@ -96,18 +99,6 @@ export function Stage({ track }: { track: Track }) {
       {room.width > 0 && (
         <>
           <Rings x={at.x + at.size / 2} y={at.y + at.size / 2} size={at.size} playing={playing} />
-
-          {at.gauge && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.9, delay: 0.35, ease: EASE }}
-              className="absolute"
-              style={{ ...at.gauge, width: GAUGE, height: GAUGE }}
-            >
-              <FinishGauge track={track} size={GAUGE} style={{ left: 0, top: 0 }} />
-            </motion.div>
-          )}
 
           <motion.div
             className="absolute z-[1]"
@@ -139,37 +130,59 @@ export function Stage({ track }: { track: Track }) {
             </div>
           </motion.div>
 
-          {at.roomy && (
-            <>
-              <Pin x={at.pins.bass.x} y={at.pins.bass.y} />
-              <Pin x={at.pins.stream.x} y={at.pins.stream.y} delay={1} />
-              {loudness !== null && <Pin x={at.pins.loudness.x} y={at.pins.loudness.y} delay={0.5} />}
-              <LeaderLines paths={lines} />
-              <Callout
-                delay={0.45}
-                style={{ left: at.right, top: at.bassTop }}
-                icon={<AudioLines className="size-4" />}
-                title={`Bass ${levels.bass.toFixed(2)}`}
-                note={playing ? "live, as it plays" : "when it plays"}
-              />
-              {loudness !== null && (
-                <Callout
-                  delay={0.6}
-                  style={{ right: room.width - at.left, top: at.loudnessTop }}
-                  icon={<Activity className="size-4" />}
-                  title={`Loudness ${signed(loudness)} dB`}
-                  note={!pure && levelling ? "levelled for you" : "as it was mastered"}
-                />
-              )}
-              <Callout
-                delay={0.75}
-                style={{ left: at.right, top: at.streamTop }}
-                icon={quality ? <RadioTower className="size-4" /> : <LoaderCircle className="size-4 animate-spin" />}
-                title={quality === "local" ? "Your own file" : quality ? `${codecName(quality)} ${quality.kbps} kbps` : "Stream"}
-                note={quality === "local" ? "plays as it is" : kHz ? `${kHz} kHz stream` : "checking…"}
-              />
-            </>
-          )}
+          <AnimatePresence>
+            {details && (
+              <motion.div
+                key="details"
+                className="pointer-events-none absolute inset-0 z-[2]"
+                exit={{ opacity: 0, filter: "blur(6px)" }}
+                transition={{ duration: 0.4, ease: EASE }}
+              >
+                {at.gauge && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.9, delay: 0.35, ease: EASE }}
+                    className="pointer-events-auto absolute"
+                    style={{ ...at.gauge, width: GAUGE, height: GAUGE }}
+                  >
+                    <FinishGauge track={track} size={GAUGE} style={{ left: 0, top: 0 }} />
+                  </motion.div>
+                )}
+                {at.roomy && (
+                  <>
+                    <Pin x={at.pins.bass.x} y={at.pins.bass.y} />
+                    <Pin x={at.pins.stream.x} y={at.pins.stream.y} delay={1} />
+                    {loudness !== null && <Pin x={at.pins.loudness.x} y={at.pins.loudness.y} delay={0.5} />}
+                    <LeaderLines paths={lines} />
+                    <Callout
+                      delay={0.45}
+                      style={{ left: at.right, top: at.bassTop }}
+                      icon={<AudioLines className="size-4" />}
+                      title={`Bass ${levels.bass.toFixed(2)}`}
+                      note={playing ? "live, as it plays" : "when it plays"}
+                    />
+                    {loudness !== null && (
+                      <Callout
+                        delay={0.6}
+                        style={{ right: room.width - at.left, top: at.loudnessTop }}
+                        icon={<Activity className="size-4" />}
+                        title={`Loudness ${signed(loudness)} dB`}
+                        note={!pure && levelling ? "levelled for you" : "as it was mastered"}
+                      />
+                    )}
+                    <Callout
+                      delay={0.75}
+                      style={{ left: at.right, top: at.streamTop }}
+                      icon={quality ? <RadioTower className="size-4" /> : <LoaderCircle className="size-4 animate-spin" />}
+                      title={quality === "local" ? "Your own file" : quality ? `${codecName(quality)} ${quality.kbps} kbps` : "Stream"}
+                      note={quality === "local" ? "plays as it is" : kHz ? `${kHz} kHz stream` : "checking…"}
+                    />
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* the song */}
           <div className="absolute text-center" style={{ left: at.x, top: at.y + at.size + 30, width: at.size }}>

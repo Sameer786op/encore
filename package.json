@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.11",
+    "googlevideo": "^5.0.1",
     "music-metadata": "^12.2.2",
     "yauzl": "^3.4.0",
     "youtubei.js": "^18.3.0"

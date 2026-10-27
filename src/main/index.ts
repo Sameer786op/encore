@@ -53,7 +53,8 @@ import { Scrobbler } from "./scrobble/scrobbler";
 import { Updater } from "./updates/updater";
 import { electronVault } from "./scrobble/vault";
 import { album, artist, home, lyricsText, moodPlaylists, moodRadio, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, songMoods, suggestions, trackById } from "./youtube/catalog";
-import { configureYouTube } from "./youtube/client";
+import { configureYouTube, createYouTube } from "./youtube/client";
+import { usePremiumAccount } from "./youtube/premium";
 import { resolveAudio } from "./youtube/streams";
 import icon from "../../resources/icon.png?asset";
 
@@ -329,7 +330,10 @@ function accountConnections(): { providers: Record<AccountService, AccountProvid
       clipboard.writeText(code);
       void shell.openExternal(url);
     },
+    create: createYouTube,
   });
+  // a connected YouTube Music account with Premium streams at 256 kbps
+  usePremiumAccount(google.client);
   return {
     providers: {
       spotify: new SpotifyProvider(web.apiAuth("spotify"), (id) => readSpotify({ service: "spotify", kind: "playlist", id })),
@@ -391,7 +395,7 @@ function registerIpc(): void {
     const [source, videoId] = stringArg(trackId, "track id").split(":");
     if (source !== "youtube" || !videoId) return null;
     const stream = await resolveAudio(videoId).catch(() => null);
-    return stream ? { codec: stream.codec, kbps: Math.round(stream.bitrate / 1000), sampleRate: stream.sampleRate } : null;
+    return stream ? { codec: stream.codec, kbps: Math.round(stream.bitrate / 1000), sampleRate: stream.sampleRate, premium: Boolean(stream.premium) } : null;
   });
   handle(IPC.prefetch, async (trackId: unknown) => {
     const [source, videoId] = stringArg(trackId, "track id").split(":");

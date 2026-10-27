@@ -1,10 +1,14 @@
 import type { Types } from "youtubei.js";
 import { getYouTube, resetYouTube } from "./client";
+import { resolvePremium, type PremiumAudio } from "./premium";
 
 type InnerTubeClient = Types.InnerTubeClient;
 
 export interface AudioStream {
-  url: string;
+  /** a plain file URL, read a range at a time; absent for Premium audio */
+  url?: string;
+  /** Premium audio, fetched into memory over SABR (premium.ts) */
+  premium?: PremiumAudio;
   mimeType: string;
   contentLength: number;
   expiresAt: number;
@@ -27,6 +31,8 @@ const EXPIRY_MARGIN_MS = 10 * 60_000;
 
 const cache = new Map<string, AudioStream>();
 const inFlight = new Map<string, Promise<AudioStream>>();
+/** songs whose Premium audio broke off; they play the usual way from then on */
+const noPremium = new Set<string>();
 
 export class StreamUnavailableError extends Error {}
 
@@ -95,6 +101,17 @@ async function resolveWithClient(videoId: string, client: InnerTubeClient): Prom
 }
 
 async function resolveFresh(videoId: string): Promise<AudioStream> {
+  // with a YouTube Music account that has Premium, its 256 kbps audio comes first
+  if (!noPremium.has(videoId)) {
+    const premium = await resolvePremium(videoId).catch((error: unknown) => {
+      console.warn(`[premium] ${videoId}: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
+      return null;
+    });
+    if (premium) {
+      const { audio, ...format } = premium;
+      return { ...format, premium: audio, client: "TV" };
+    }
+  }
   const failures: string[] = [];
   let videoIsUnplayable = false;
   for (const client of CLIENTS) {
@@ -113,7 +130,13 @@ async function resolveFresh(videoId: string): Promise<AudioStream> {
 }
 
 export function resolveAudio(videoId: string, options: { fresh?: boolean } = {}): Promise<AudioStream> {
-  const cached = cache.get(videoId);
+  let cached = cache.get(videoId);
+  // the player asks afresh after a song fails; when that song was Premium audio, play it the usual way instead
+  if (cached?.premium && (options.fresh || cached.premium.failed)) noPremium.add(videoId);
+  if (cached?.premium?.spent) {
+    cache.delete(videoId);
+    cached = undefined;
+  }
   if (!options.fresh && cached && cached.expiresAt - Date.now() > EXPIRY_MARGIN_MS) return Promise.resolve(cached);
   if (options.fresh) cache.delete(videoId);
 

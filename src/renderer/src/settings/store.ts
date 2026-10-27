@@ -16,6 +16,8 @@ export interface Settings {
   /** playback speed (1 is normal), whether the key stays put when it changes, and reverb from 0 to 1 */
   sound: { speed: number; keepPitch: boolean; reverb: number };
   lyricsSize: "small" | "medium" | "large";
+  /** the Finish-rate gauge and the Bass, Loudness and stream readings pinned round the playing song's cover, on Home and in the full-screen player */
+  songDetails: boolean;
   /**
    * a line of light round the window while the full-screen player shows lyrics:
    * colours is a preset id from visuals/edgeColors, "rainbow", "artwork" or "custom";
@@ -67,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eq: DEFAULT_EQ,
   sound: { speed: 1, keepPitch: false, reverb: 0 },
   lyricsSize: "medium",
+  songDetails: true,
   edgeLight: { enabled: true, colors: "neon", custom: ["#ff2fd0", "#3a8bff"], speed: 50, glow: 50, pulse: true },
   miniPlayer: { showOnMinimize: false, alwaysOnTop: true, corner: "remember" },
   discord: { enabled: false, clientId: "", showWhenPaused: false },

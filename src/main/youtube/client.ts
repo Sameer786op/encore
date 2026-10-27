@@ -17,13 +17,18 @@ export function configureYouTube(options: { cacheDir: string }): void {
   cacheDir = options.cacheDir;
 }
 
-/** one shared session, recreated every few hours or after it breaks */
-export function getYouTube(): Promise<Innertube> {
-  if (current && Date.now() - current.createdAt < SESSION_MAX_AGE_MS) return current.client;
-  const client = Innertube.create({
+/** a new session with YouTube's player script, which deciphers stream URLs; the script is cached on disk */
+export function createYouTube(): Promise<Innertube> {
+  return Innertube.create({
     retrieve_player: true,
     cache: cacheDir ? new UniversalCache(true, cacheDir) : undefined,
   });
+}
+
+/** one shared session, recreated every few hours or after it breaks */
+export function getYouTube(): Promise<Innertube> {
+  if (current && Date.now() - current.createdAt < SESSION_MAX_AGE_MS) return current.client;
+  const client = createYouTube();
   current = { client, createdAt: Date.now() };
   client.catch(() => {
     if (current?.client === client) current = null;

@@ -3,7 +3,8 @@ import type { StreamQuality, Track } from "@shared/types";
 
 // What the song that's playing streams at. YouTube Music gives everyone without
 // Premium the same top format, Opus at about 130-160 kbps, and Vyse Music always
-// takes the best one on offer; your own files play as they are.
+// takes the best one on offer. With a connected account that has Premium, it's
+// Opus or AAC at about 256 kbps. Your own files play as they are.
 
 const asked = new Map<string, Promise<StreamQuality | null>>();
 
@@ -22,9 +23,11 @@ const CODECS: Record<string, string> = { opus: "Opus", "mp4a.40.2": "AAC", "mp4a
 /** "Opus", "AAC" */
 export const codecName = (q: StreamQuality): string => CODECS[q.codec] ?? q.codec;
 
-/** "Opus · 141 kbps · 48 kHz" */
+/** "Opus · 141 kbps · 48 kHz", with "· Premium" for YouTube Premium audio */
 export function describeQuality(q: StreamQuality): string {
-  return [codecName(q), q.kbps > 0 && `${q.kbps} kbps`, q.sampleRate > 0 && `${Number((q.sampleRate / 1000).toFixed(1))} kHz`].filter(Boolean).join(" · ");
+  return [codecName(q), q.kbps > 0 && `${q.kbps} kbps`, q.sampleRate > 0 && `${Number((q.sampleRate / 1000).toFixed(1))} kHz`, q.premium && "Premium"]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** what's happening to the sound right now, in a word or two */
