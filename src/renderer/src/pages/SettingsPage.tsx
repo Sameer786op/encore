@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { ExternalLink, FolderOpen, LoaderCircle, RefreshCw } from "lucide-react";
 import type { DiscordStatus, ScrobbleService, ScrobbleStatus, UpdateStatus } from "@shared/types";
 import { Equalizer } from "@/components/Equalizer";
+import { PausedForPureSound } from "@/components/PureSound";
 import { Segmented, Toggle } from "@/components/common";
 import { describeQuality, useStreamQuality } from "@/player/quality";
 import { useCurrentTrack, usePlayer } from "@/player/store";
@@ -353,8 +354,17 @@ export function SettingsPage() {
             <Toggle checked={settings.crossfadeSameAlbum} onChange={(crossfadeSameAlbum) => settings.update({ crossfadeSameAlbum })} label="Crossfade inside albums" />
           </Row>
           <QualityRow />
-          <Row title="Volume levelling" body="Plays every song at about the same loudness, so a quiet song isn't followed by a loud one.">
-            <Toggle checked={settings.levelling} onChange={(levelling) => settings.update({ levelling })} label="Volume levelling" />
+          <Row
+            title="Pure sound"
+            body="Plays every song exactly as it comes, with nothing in the way: no equalizer, volume levelling, speed or reverb. Their settings come back when you turn it off."
+          >
+            <Toggle checked={settings.pureSound} onChange={(pureSound) => settings.update({ pureSound })} label="Pure sound" />
+          </Row>
+          <Row
+            title="Volume levelling"
+            body={settings.pureSound ? "Paused while Pure sound is on." : "Plays every song at about the same loudness, so a quiet song isn't followed by a loud one."}
+          >
+            <Toggle checked={settings.levelling} onChange={(levelling) => settings.update({ levelling })} label="Volume levelling" disabled={settings.pureSound} />
           </Row>
           <Row title="Autoplay" body="Keep playing similar songs when your queue ends.">
             <Toggle checked={autoplay} onChange={setAutoplay} label="Autoplay" />
@@ -385,8 +395,14 @@ export function SettingsPage() {
         </Card>
       </Group>
 
-      <Group title="Equalizer" action={<Toggle checked={settings.eq.enabled} onChange={(enabled) => settings.updateEq({ enabled })} label="Equalizer" />}>
-        <Equalizer />
+      <Group
+        title="Equalizer"
+        action={<Toggle checked={settings.eq.enabled} onChange={(enabled) => settings.updateEq({ enabled })} label="Equalizer" disabled={settings.pureSound} />}
+      >
+        {settings.pureSound && <PausedForPureSound what="The equalizer" className="mb-3" />}
+        <div inert={settings.pureSound} className={cn("transition-opacity duration-300", settings.pureSound && "opacity-40")}>
+          <Equalizer />
+        </div>
       </Group>
 
       <Group title="Lyrics">

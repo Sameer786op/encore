@@ -1,15 +1,20 @@
 import { mediaUrl, type Track } from "@shared/types";
 import { BAND_Q, bandType, EQ_FREQUENCIES, type EqSettings } from "@/audio/eq";
 import { dbToGain, fadeCurve } from "./transitions";
+import limiterWorklet from "./limiter.worklet.ts?worker&url";
 
 // Two <audio> "decks" feed one Web Audio graph:
 //
-//   deck A ─ level ─ fade ─┐                    ┌─ dry ──────────────┐
-//                          ├─ preamp ─ 10 EQ ───┤                    ├─ limiter ─ analyser ─ volume ─ speakers
-//   deck B ─ level ─ fade ─┘                    └─ reverb ─ wet ─────┘
+//   deck A ─ level ─ fade ─┐       ┌─ preamp ─ 10 EQ ─┐       ┌─ dry ──────────┐
+//                          ├─ in ──┤                  ├─ mix ─┤                ├─ limiter ─ analyser ─ volume ─ speakers
+//   deck B ─ level ─ fade ─┘       └─ (EQ off) ───────┘       └─ reverb ─ wet ─┘
 //
 // One deck plays while the other gets the next song ready, so songs can
 // follow each other without a gap or cross-fade into each other.
+//
+// With Pure sound on, songs reach the speakers untouched: no equalizer,
+// levelling, reverb or speed change. Only the limiter stays, and it does
+// nothing unless a sample would clip.
 
 export interface EngineEvents {
   onTime(seconds: number): void;
@@ -28,6 +33,11 @@ const SWITCH_FADE_S = 0.04;
 const UNKNOWN_LEVEL_DB = -6;
 /** how long the reverb rings on; also how long to wait before switching it off */
 const REVERB_SECONDS = 3.2;
+/** the limiter's ceiling: a little headroom normally, and with Pure sound only enough to stop clipping */
+const CEILING_DB = -0.3;
+const PURE_CEILING_DB = 0;
+/** how long the EQ takes to step in or out of the way, so it never clicks */
+const ROUTE_FADE_S = 0.03;
 
 /**
  * A made-up room for the reverb: stereo noise that dies away and gets darker
@@ -97,15 +107,27 @@ export class AudioEngine {
   private crossfade: { from: Deck; timer: ReturnType<typeof setTimeout> } | null = null;
   private readonly levels = new Map<string, number>();
   private levelling = true;
-  private readonly eqOut: AudioNode;
+  /** the equalized and the untouched way from the decks to the mix; one is open at a time */
+  private readonly eqPath: GainNode;
+  private readonly plainPath: GainNode;
+  private readonly mix: GainNode;
   private readonly dry: GainNode;
   private readonly wet: GainNode;
   private reverb: { node: ConvolverNode; connected: boolean; offTimer?: ReturnType<typeof setTimeout> } | null = null;
+  private readonly limiterIn: GainNode;
+  /** the built-in compressor, used until the look-ahead limiter has loaded, or if it can't */
+  private readonly fallbackLimiter: DynamicsCompressorNode;
+  private limiter: AudioWorkletNode | null = null;
+  private pure = false;
+  private eq: EqSettings | null = null;
   private rate = 1;
+  private keepPitch = false;
+  private reverbAmount = 0;
 
   constructor(private readonly events: EngineEvents) {
     const ctx = new AudioContext({ latencyHint: "playback" });
     this.ctx = ctx;
+    const input = ctx.createGain();
     this.preamp = ctx.createGain();
     this.bands = EQ_FREQUENCIES.map((frequency, i) => {
       const band = ctx.createBiquadFilter();
@@ -115,13 +137,18 @@ export class AudioEngine {
       band.gain.value = 0;
       return band;
     });
+    this.eqPath = ctx.createGain();
+    this.eqPath.gain.value = 0;
+    this.plainPath = ctx.createGain();
+    this.mix = ctx.createGain();
     // catches peaks from EQ boosts and levelling before they clip
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -1;
-    limiter.knee.value = 0;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.003;
-    limiter.release.value = 0.25;
+    this.limiterIn = ctx.createGain();
+    this.fallbackLimiter = ctx.createDynamicsCompressor();
+    this.fallbackLimiter.threshold.value = -1;
+    this.fallbackLimiter.knee.value = 0;
+    this.fallbackLimiter.ratio.value = 20;
+    this.fallbackLimiter.attack.value = 0.003;
+    this.fallbackLimiter.release.value = 0.25;
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.8;
@@ -130,14 +157,44 @@ export class AudioEngine {
     this.wet = ctx.createGain();
     this.wet.gain.value = 0;
 
-    let node: AudioNode = this.preamp;
+    let node: AudioNode = input.connect(this.preamp);
     for (const band of this.bands) node = node.connect(band);
-    this.eqOut = node;
-    node.connect(this.dry).connect(limiter).connect(this.analyser).connect(this.master).connect(ctx.destination);
-    this.wet.connect(limiter);
+    node.connect(this.eqPath).connect(this.mix);
+    input.connect(this.plainPath).connect(this.mix);
+    this.mix.connect(this.dry).connect(this.limiterIn);
+    this.wet.connect(this.limiterIn);
+    this.limiterIn.connect(this.fallbackLimiter).connect(this.analyser);
+    this.analyser.connect(this.master).connect(ctx.destination);
+    void this.loadLimiter();
 
-    this.decks = [new Deck(ctx, this.preamp), new Deck(ctx, this.preamp)];
+    this.decks = [new Deck(ctx, input), new Deck(ctx, input)];
     this.decks.forEach((deck) => this.listen(deck));
+  }
+
+  /** swap the built-in compressor for the look-ahead limiter once its script has loaded on the audio thread */
+  private async loadLimiter(): Promise<void> {
+    try {
+      await this.ctx.audioWorklet.addModule(limiterWorklet);
+      const limiter = new AudioWorkletNode(this.ctx, "peak-limiter", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+        // a mono song comes out of both speakers
+        channelCount: 2,
+        channelCountMode: "explicit",
+        channelInterpretation: "speakers",
+        processorOptions: { ceilingDb: this.pure ? PURE_CEILING_DB : CEILING_DB },
+      });
+      limiter.connect(this.analyser);
+      this.limiterIn.connect(limiter);
+      this.limiterIn.disconnect(this.fallbackLimiter);
+      this.fallbackLimiter.disconnect();
+      this.limiter = limiter;
+      document.documentElement.dataset.limiter = "look-ahead";
+    } catch (error) {
+      console.warn("The look-ahead limiter didn't load, so the built-in one stays.", error);
+      document.documentElement.dataset.limiter = "built-in";
+    }
   }
 
   private get activeDeck(): Deck {
@@ -217,7 +274,7 @@ export class AudioEngine {
   private applyLevel(deck: Deck, initial = false): void {
     if (!deck.track) return;
     const known = this.levels.get(deck.track.id);
-    const db = !this.levelling ? 0 : (known ?? (deck.track.source === "youtube" ? UNKNOWN_LEVEL_DB : 0));
+    const db = !this.levelling || this.pure ? 0 : (known ?? (deck.track.source === "youtube" ? UNKNOWN_LEVEL_DB : 0));
     const now = this.ctx.currentTime;
     deck.level.gain.cancelScheduledValues(now);
     if (initial) deck.level.gain.setValueAtTime(dbToGain(db), now);
@@ -338,21 +395,33 @@ export class AudioEngine {
   /** playback speed; with keepPitch the key stays put, without it the song goes up or down like a record */
   setSpeed(rate: number, keepPitch: boolean): void {
     this.rate = Math.min(4, Math.max(0.25, rate || 1));
+    this.keepPitch = keepPitch;
+    this.applySpeed();
+  }
+
+  private applySpeed(): void {
+    const rate = this.speed;
     for (const { audio } of this.decks) {
-      audio.preservesPitch = keepPitch;
+      audio.preservesPitch = this.keepPitch;
       // a new song resets the speed to the default one, so both are set
-      audio.defaultPlaybackRate = this.rate;
-      audio.playbackRate = this.rate;
+      audio.defaultPlaybackRate = rate;
+      audio.playbackRate = rate;
     }
   }
 
+  /** the speed songs actually play at */
   get speed(): number {
-    return this.rate;
+    return this.pure ? 1 : this.rate;
   }
 
   /** 0 is dry, 1 is drenched; the reverb only runs while it's turned up */
   setReverb(amount: number): void {
-    const mix = Math.min(1, Math.max(0, amount));
+    this.reverbAmount = Math.min(1, Math.max(0, amount));
+    this.applyReverb();
+  }
+
+  private applyReverb(): void {
+    const mix = this.pure ? 0 : this.reverbAmount;
     const now = this.ctx.currentTime;
     if (mix > 0) {
       if (!this.reverb) {
@@ -363,7 +432,7 @@ export class AudioEngine {
       }
       clearTimeout(this.reverb.offTimer);
       if (!this.reverb.connected) {
-        this.eqOut.connect(this.reverb.node);
+        this.mix.connect(this.reverb.node);
         this.reverb.connected = true;
       }
     } else if (this.reverb?.connected) {
@@ -371,7 +440,7 @@ export class AudioEngine {
       const reverb = this.reverb;
       clearTimeout(reverb.offTimer);
       reverb.offTimer = setTimeout(() => {
-        this.eqOut.disconnect(reverb.node);
+        this.mix.disconnect(reverb.node);
         reverb.connected = false;
       }, REVERB_SECONDS * 1000);
     }
@@ -381,9 +450,40 @@ export class AudioEngine {
   }
 
   setEq(eq: EqSettings): void {
+    this.eq = eq;
+    this.applyEq();
+  }
+
+  /** songs go through the EQ only while it's on; otherwise it's out of the way entirely */
+  private applyEq(): void {
+    const eq = this.eq;
+    const on = !!eq?.enabled && !this.pure;
     const now = this.ctx.currentTime;
-    this.preamp.gain.setTargetAtTime(eq.enabled ? dbToGain(eq.preamp) : 1, now, 0.03);
-    this.bands.forEach((band, i) => band.gain.setTargetAtTime(eq.enabled ? (eq.bands[i] ?? 0) : 0, now, 0.03));
+    if (eq?.enabled) {
+      this.preamp.gain.setTargetAtTime(dbToGain(eq.preamp), now, 0.03);
+      this.bands.forEach((band, i) => band.gain.setTargetAtTime(eq.bands[i] ?? 0, now, 0.03));
+    }
+    // linear ramps end exactly on 0 and 1, so the closed way adds nothing at all
+    for (const [path, open] of [
+      [this.eqPath, on],
+      [this.plainPath, !on],
+    ] as const) {
+      path.gain.cancelScheduledValues(now);
+      path.gain.setValueAtTime(path.gain.value, now);
+      path.gain.linearRampToValueAtTime(open ? 1 : 0, now + ROUTE_FADE_S);
+    }
+  }
+
+  /** play songs exactly as they come, skipping the EQ, levelling, reverb and speed; those settings wait for later */
+  setPure(on: boolean): void {
+    if (on === this.pure) return;
+    this.pure = on;
+    this.applyEq();
+    this.decks.forEach((deck) => this.applyLevel(deck));
+    this.applySpeed();
+    this.applyReverb();
+    this.limiter?.port.postMessage({ ceilingDb: on ? PURE_CEILING_DB : CEILING_DB });
+    this.fallbackLimiter.threshold.value = on ? -0.1 : -1;
   }
 
   unload(): void {

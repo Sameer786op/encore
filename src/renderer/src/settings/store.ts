@@ -10,6 +10,8 @@ export interface Settings {
   crossfadeSameAlbum: boolean;
   /** play every song at about the same loudness */
   levelling: boolean;
+  /** play songs exactly as they come: the EQ, levelling, speed and reverb step aside (and keep their settings) */
+  pureSound: boolean;
   eq: EqSettings;
   /** playback speed (1 is normal), whether the key stays put when it changes, and reverb from 0 to 1 */
   sound: { speed: number; keepPitch: boolean; reverb: number };
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   crossfadeSeconds: 0,
   crossfadeSameAlbum: false,
   levelling: true,
+  pureSound: false,
   eq: DEFAULT_EQ,
   sound: { speed: 1, keepPitch: false, reverb: 0 },
   lyricsSize: "medium",

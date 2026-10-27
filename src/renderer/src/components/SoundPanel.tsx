@@ -5,10 +5,11 @@ import { describeQuality, useStreamQuality } from "@/player/quality";
 import { useCurrentTrack } from "@/player/store";
 import { useSettings, type Settings } from "@/settings/store";
 import { cn } from "@/lib/cn";
+import { PausedForPureSound } from "./PureSound";
 import { Slider } from "./Slider";
 import { Toggle } from "./common";
 
-// Speed, key lock and reverb, from a button in the player bar. The presets
+// Speed, key lock, reverb and Pure sound, from a button in the player bar. The presets
 // are the popular edits people make of songs: slowed + reverb, sped up and
 // nightcore.
 
@@ -63,6 +64,7 @@ function QualityLine() {
 
 function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }) {
   const sound = useSettings((s) => s.sound);
+  const pure = useSettings((s) => s.pureSound);
   const update = useSettings((s) => s.update);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, bottom: 0 });
@@ -123,56 +125,68 @@ function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }
         </button>
       </div>
 
-      <div role="radiogroup" aria-label="Presets" className="grid grid-cols-2 gap-1.5">
-        {SOUND_PRESETS.map((p) => {
-          const on = preset === p.id;
-          return (
-            <button
-              key={p.id}
-              role="radio"
-              aria-checked={on}
-              // these edits all move the key with the speed; that's what gives them their sound
-              onClick={() => set(p.id === "normal" ? { speed: 1, reverb: 0 } : { speed: p.speed, reverb: p.reverb, keepPitch: false })}
-              className={cn(
-                "flex flex-col items-start rounded-[12px] px-3 py-2 text-left transition-colors duration-200",
-                on ? "bg-accent text-on-accent" : "bg-white/[0.06] text-ink hover:bg-white/[0.1]",
-              )}
-            >
-              <span className="text-[12.5px] font-semibold leading-tight">{p.name}</span>
-              <span className={cn("text-[11px] tabular-nums", on ? "opacity-80" : "text-ink-3")}>{formatSpeed(p.speed)}</span>
-            </button>
-          );
-        })}
+      {pure && <PausedForPureSound what="Speed and reverb" compact />}
+
+      <div inert={pure} className={cn("space-y-4 transition-opacity duration-300", pure && "opacity-40")}>
+        <div role="radiogroup" aria-label="Presets" className="grid grid-cols-2 gap-1.5">
+          {SOUND_PRESETS.map((p) => {
+            const on = preset === p.id;
+            return (
+              <button
+                key={p.id}
+                role="radio"
+                aria-checked={on}
+                // these edits all move the key with the speed; that's what gives them their sound
+                onClick={() => set(p.id === "normal" ? { speed: 1, reverb: 0 } : { speed: p.speed, reverb: p.reverb, keepPitch: false })}
+                className={cn(
+                  "flex flex-col items-start rounded-[12px] px-3 py-2 text-left transition-colors duration-200",
+                  on ? "bg-accent text-on-accent" : "bg-white/[0.06] text-ink hover:bg-white/[0.1]",
+                )}
+              >
+                <span className="text-[12.5px] font-semibold leading-tight">{p.name}</span>
+                <span className={cn("text-[11px] tabular-nums", on ? "opacity-80" : "text-ink-3")}>{formatSpeed(p.speed)}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <Row label="Speed" value={formatSpeed(sound.speed)}>
+          <Slider
+            value={sound.speed - MIN_SPEED}
+            max={MAX_SPEED - MIN_SPEED}
+            step={SPEED_STEP}
+            label="Speed"
+            formatValue={(v) => formatSpeed(v + MIN_SPEED)}
+            onChange={(v) => set({ speed: Number((Math.round(v / SPEED_STEP) * SPEED_STEP + MIN_SPEED).toFixed(2)) })}
+          />
+        </Row>
+
+        <Row label="Reverb" value={sound.reverb === 0 ? "Off" : `${Math.round(sound.reverb * 100)}%`}>
+          <Slider
+            value={sound.reverb * 100}
+            max={100}
+            step={5}
+            label="Reverb"
+            formatValue={(v) => `${Math.round(v)}%`}
+            onChange={(v) => set({ reverb: Math.round(v) / 100 })}
+          />
+        </Row>
+
+        <div className="flex items-center gap-3 border-t border-white/[0.08] pt-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[12.5px] font-medium text-ink">Key lock</div>
+            <div className="text-[11.5px] leading-snug text-ink-3">{sound.keepPitch ? "The speed changes, the key stays the same" : "The key rises and falls with the speed, like a record"}</div>
+          </div>
+          <Toggle checked={sound.keepPitch} onChange={(keepPitch) => set({ keepPitch })} label="Key lock" />
+        </div>
       </div>
-
-      <Row label="Speed" value={formatSpeed(sound.speed)}>
-        <Slider
-          value={sound.speed - MIN_SPEED}
-          max={MAX_SPEED - MIN_SPEED}
-          step={SPEED_STEP}
-          label="Speed"
-          formatValue={(v) => formatSpeed(v + MIN_SPEED)}
-          onChange={(v) => set({ speed: Number((Math.round(v / SPEED_STEP) * SPEED_STEP + MIN_SPEED).toFixed(2)) })}
-        />
-      </Row>
-
-      <Row label="Reverb" value={sound.reverb === 0 ? "Off" : `${Math.round(sound.reverb * 100)}%`}>
-        <Slider
-          value={sound.reverb * 100}
-          max={100}
-          step={5}
-          label="Reverb"
-          formatValue={(v) => `${Math.round(v)}%`}
-          onChange={(v) => set({ reverb: Math.round(v) / 100 })}
-        />
-      </Row>
 
       <div className="flex items-center gap-3 border-t border-white/[0.08] pt-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[12.5px] font-medium text-ink">Key lock</div>
-          <div className="text-[11.5px] leading-snug text-ink-3">{sound.keepPitch ? "The speed changes, the key stays the same" : "The key rises and falls with the speed, like a record"}</div>
+          <div className="text-[12.5px] font-medium text-ink">Pure sound</div>
+          <div className="text-[11.5px] leading-snug text-ink-3">{pure ? "Songs play exactly as they come" : "Skip the EQ, levelling, speed and reverb"}</div>
         </div>
-        <Toggle checked={sound.keepPitch} onChange={(keepPitch) => set({ keepPitch })} label="Key lock" />
+        <Toggle checked={pure} onChange={(pureSound) => update({ pureSound })} label="Pure sound" />
       </div>
 
       <QualityLine />

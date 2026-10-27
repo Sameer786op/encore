@@ -133,7 +133,7 @@ export function IconButton({ label, onClick, children, active, className }: { la
 }
 
 /** an iOS switch: green when on, the knob stretches while pressed */
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   const [pressed, setPressed] = useState(false);
   // the track is 48 wide with 2px of padding, so the knob travels within 44
   const width = pressed ? 31 : 24;
@@ -144,11 +144,15 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      className={cn("relative h-[28px] w-[48px] shrink-0 rounded-full p-[2px] transition-colors duration-300", checked ? "bg-switch" : "bg-[rgb(120_120_128/0.36)]")}
+      className={cn(
+        "relative h-[28px] w-[48px] shrink-0 rounded-full p-[2px] transition-[background-color,opacity] duration-300 disabled:opacity-40",
+        checked ? "bg-switch" : "bg-[rgb(120_120_128/0.36)]",
+      )}
     >
       <motion.span
         initial={false}

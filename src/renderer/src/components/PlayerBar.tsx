@@ -152,23 +152,25 @@ function NowPlaying() {
 /** opens speed, key lock and reverb; shows the speed while it isn't normal */
 function SoundButton() {
   const sound = useSettings((s) => s.sound);
+  const pure = useSettings((s) => s.pureSound);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
-  const changed = !isNormalSound(sound);
+  const changed = !pure && !isNormalSound(sound);
+  const showSpeed = !pure && sound.speed !== 1;
   return (
     <>
       <Glyph
         ref={setAnchor}
         onClick={() => setOpen(!open)}
-        active={changed || open}
-        aria-label={`Speed and sound${changed ? `: ${formatSpeed(sound.speed)}` : ""}`}
+        active={changed || pure || open}
+        aria-label={`Speed and sound${pure ? ": Pure sound" : changed ? `: ${formatSpeed(sound.speed)}` : ""}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         title="Speed & sound"
-        className={sound.speed !== 1 ? "w-auto px-2" : undefined}
+        className={showSpeed ? "w-auto px-2" : undefined}
       >
-        {sound.speed !== 1 ? <span className="text-[11.5px] font-semibold tabular-nums">{formatSpeed(sound.speed)}</span> : <Gauge className="size-[17px]" />}
+        {showSpeed ? <span className="text-[11.5px] font-semibold tabular-nums">{formatSpeed(sound.speed)}</span> : <Gauge className="size-[17px]" />}
       </Glyph>
       <SoundPanel anchor={anchor} open={open} onClose={close} />
     </>

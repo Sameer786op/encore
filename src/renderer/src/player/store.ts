@@ -266,11 +266,13 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     });
     engine.setVolume(get().volume, get().muted);
     const settings = useSettings.getState();
+    engine.setPure(settings.pureSound);
     engine.setEq(settings.eq);
     engine.setLevelling(settings.levelling);
     engine.setSpeed(settings.sound.speed, settings.sound.keepPitch);
     engine.setReverb(settings.sound.reverb);
     useSettings.subscribe((s, before) => {
+      if (s.pureSound !== before.pureSound) engine?.setPure(s.pureSound);
       if (s.eq !== before.eq) engine?.setEq(s.eq);
       if (s.levelling !== before.levelling) engine?.setLevelling(s.levelling);
       if (s.sound !== before.sound) {
