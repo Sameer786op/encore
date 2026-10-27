@@ -19,14 +19,14 @@ export function effectiveTheme(theme: Settings["theme"]): Theme {
   return theme;
 }
 
-export function accentOf(settings: Pick<Settings, "accent" | "customAccent">): { color: string; logo?: [string, string] } {
+export function accentOf(settings: Pick<Settings, "accent" | "customAccent">): { color: string; logo?: [string, string]; ramp?: [string, string, string] } {
   if (settings.accent === "custom") return { color: settings.customAccent };
   return presetFor(settings.accent) ?? DEFAULT_ACCENT;
 }
 
 export function currentShades(theme: Theme = effectiveTheme(useSettings.getState().theme)): AccentShades {
-  const { color, logo } = accentOf(useSettings.getState());
-  return accentShades(color, theme, logo);
+  const { color, logo, ramp } = accentOf(useSettings.getState());
+  return accentShades(color, theme, logo, ramp);
 }
 
 function applyTheme(theme: Theme): void {
@@ -38,10 +38,13 @@ function applyTheme(theme: Theme): void {
 function applyAccent(shades: AccentShades): void {
   const style = document.documentElement.style;
   style.setProperty("--color-accent", shades.accent);
+  style.setProperty("--color-accent-ink", shades.ink);
   style.setProperty("--color-accent-2", shades.light);
   style.setProperty("--color-accent-deep", shades.deep);
   style.setProperty("--color-on-accent", shades.onAccent);
   style.setProperty("--accent-rgb", shades.rgb);
+  shades.ramp.forEach((c, i) => style.setProperty(`--ramp-${i + 1}`, c));
+  shades.logo.forEach((c, i) => style.setProperty(`--logo-${i + 1}`, c));
 }
 
 function applyGlass(settings: Settings): void {

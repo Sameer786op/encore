@@ -1,13 +1,27 @@
-import { Fragment, useState, type ReactNode } from "react";
-import { motion } from "motion/react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { animate, motion, useInView, useReducedMotion } from "motion/react";
 import { Heart, LoaderCircle, Pause, Play, Shuffle } from "lucide-react";
 import type { ArtistRef, Track } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
 import { cn } from "@/lib/cn";
+import { Eyebrow } from "./home/Tile";
 
 /** a soft spring for small things that pop: hearts, knobs, badges */
 export const SPRING = { type: "spring", stiffness: 520, damping: 34, mass: 0.7 } as const;
+
+/** a number that counts up from zero once it comes into view */
+export function CountUp({ value, format = (n) => Math.round(n).toLocaleString() }: { value: number; format?: (n: number) => string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true });
+  useEffect(() => {
+    if (!inView || !ref.current) return;
+    const el = ref.current;
+    const controls = animate(0, value, { duration: 1.4, ease: [0.16, 1, 0.3, 1], onUpdate: (v) => (el.textContent = format(v)) });
+    return () => controls.stop();
+  }, [inView, value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <span ref={ref}>{format(0)}</span>;
+}
 
 export function ArtistLinks({ artists, className }: { artists: ArtistRef[]; className?: string }) {
   if (artists.length === 0) return <span className={className}>Unknown artist</span>;
@@ -50,7 +64,7 @@ export function LikeButton({ track, className, size = "size-4" }: { track: Track
       onDoubleClick={(e) => e.stopPropagation()}
       aria-label={liked ? "Remove from Liked Songs" : "Add to Liked Songs"}
       aria-pressed={liked}
-      className={cn("grid place-items-center rounded-full p-1.5 transition-colors duration-200", liked ? "text-accent" : "text-ink-3 hover:text-ink", className)}
+      className={cn("grid place-items-center rounded-full p-1.5 transition-colors duration-200", liked ? "text-accent-ink" : "text-ink-3 hover:text-ink", className)}
     >
       <motion.span key={String(liked)} initial={{ scale: liked ? 0.3 : 1 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 700, damping: 14 }}>
         <Heart className={size} fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 0 : 2} />
@@ -94,7 +108,7 @@ export function ShuffleButton({ onClick, className }: { onClick: () => void; cla
       transition={SPRING}
       onClick={onClick}
       aria-label="Shuffle play"
-      className={cn("glass-control inline-flex h-10 min-w-[118px] items-center justify-center gap-2 rounded-full px-6 text-[14.5px] font-semibold text-accent transition-[filter] hover:brightness-125", className)}
+      className={cn("glass-control inline-flex h-10 min-w-[118px] items-center justify-center gap-2 rounded-full px-6 text-[14.5px] font-semibold text-accent-ink transition-[filter] hover:brightness-125", className)}
     >
       <Shuffle className="size-[17px]" strokeWidth={2.4} />
       <span>Shuffle</span>
@@ -125,14 +139,14 @@ export function IconButton({ label, onClick, children, active, className }: { la
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={cn("glass-control grid size-10 place-items-center rounded-full transition-[filter,color] hover:brightness-125 [&_svg]:size-[18px]", active ? "text-accent" : "text-ink", className)}
+      className={cn("glass-control grid size-10 place-items-center rounded-full transition-[filter,color] hover:brightness-125 [&_svg]:size-[18px]", active ? "text-accent-ink" : "text-ink", className)}
     >
       {children}
     </motion.button>
   );
 }
 
-/** an iOS switch: green when on, the knob stretches while pressed */
+/** a switch: lit in the accent when on, the knob stretches while pressed */
 export function Toggle({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   const [pressed, setPressed] = useState(false);
   // the track is 48 wide with 2px of padding, so the knob travels within 44
@@ -151,7 +165,7 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
       onPointerLeave={() => setPressed(false)}
       className={cn(
         "relative h-[28px] w-[48px] shrink-0 rounded-full p-[2px] transition-[background-color,opacity] duration-300 disabled:opacity-40",
-        checked ? "bg-switch" : "bg-[rgb(120_120_128/0.36)]",
+        checked ? "bg-accent shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.35),0_0_16px_-3px_rgb(var(--accent-rgb)/0.75)]" : "bg-[rgb(120_120_128/0.36)]",
       )}
     >
       <motion.span
@@ -167,20 +181,20 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
 /** a row of choices, one picked: iOS segmented control */
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="relative inline-flex rounded-[10px] bg-[rgb(118_118_128/0.24)] p-[2px]">
+    <div role="radiogroup" aria-label={label} className="relative inline-flex rounded-full bg-[var(--well)] p-[3px] shadow-[inset_0_0_0_1px_var(--ring)]">
       {options.map((o) => (
         <button
           key={o.value}
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={cn("relative min-w-[84px] rounded-[8px] px-3 py-1 text-[13px] font-medium transition-colors", value === o.value ? "text-ink" : "text-ink-2 hover:text-ink")}
+          className={cn("relative min-w-[84px] rounded-full px-3.5 py-1 text-[13px] font-semibold transition-colors", value === o.value ? "text-ink" : "text-ink-2 hover:text-ink")}
         >
           {value === o.value && (
             <motion.span
               layoutId={`seg-${label}`}
               transition={{ type: "spring", stiffness: 520, damping: 40 }}
-              className="absolute inset-0 rounded-[8px] bg-[var(--segment-on)] shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04),inset_0_0.5px_0_rgb(255_255_255/0.12)]"
+              className="absolute inset-0 rounded-full bg-[var(--segment-on)] shadow-[0_3px_8px_rgb(0_0_0/0.12),0_3px_1px_rgb(0_0_0/0.04),inset_0_0.5px_0_rgb(255_255_255/0.12)]"
             />
           )}
           <span className="relative">{o.label}</span>
@@ -207,10 +221,59 @@ export function EmptyState({ icon, title, body, action }: { icon: ReactNode; tit
       transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
       className="flex flex-col items-center px-6 py-20 text-center"
     >
-      <div className="glass-control mb-5 grid size-16 place-items-center rounded-[20px] text-ink-2">{icon}</div>
-      <h3 className="font-display text-[20px] font-bold tracking-[-0.02em]">{title}</h3>
+      {/* the icon in a tile, inside a thin ring, lit from behind like the specimen */}
+      <div className="relative isolate mb-6">
+        <span aria-hidden className="pointer-events-none absolute -inset-8 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(var(--accent-rgb)/0.22),transparent)] blur-xl" />
+        <span aria-hidden className="pointer-events-none absolute -inset-[9px] rounded-[30px] border border-[var(--ring)]" />
+        <div className="tile grid size-16 place-items-center text-ink-2">{icon}</div>
+      </div>
+      <h3 className="font-display text-[22px] font-bold tracking-[-0.03em]">{title}</h3>
       <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-ink-2">{body}</p>
       {action && <div className="mt-6">{action}</div>}
     </motion.div>
+  );
+}
+
+/** the dot before a page's kind: a small ember, glowing */
+export function KindDot() {
+  return <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-[linear-gradient(135deg,var(--ramp-1),var(--ramp-2))] shadow-[0_0_10px_rgb(var(--accent-rgb)/0.7)]" />;
+}
+
+/** a big title whose words settle in out of a blur, one after another */
+export function BlurTitle({ text, className, onClick, delay = 0.08 }: { text: string; className?: string; onClick?: () => void; delay?: number }) {
+  const still = useReducedMotion();
+  const words = text.split(/\s+/).filter(Boolean);
+  return (
+    <h1 onClick={onClick} title={onClick ? "Rename" : undefined} aria-label={text} className={className}>
+      {words.map((word, i) => (
+        <span key={`${text}-${i}`}>
+          {i > 0 && " "}
+          <motion.span
+            aria-hidden
+            className="inline-block"
+            initial={still ? false : { opacity: 0, y: "0.22em", filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } }}
+            transition={{ duration: 0.75, delay: delay + Math.min(i, 8) * 0.055, ease: [0.32, 0.72, 0, 1] }}
+          >
+            {word}
+          </motion.span>
+        </span>
+      ))}
+    </h1>
+  );
+}
+
+/** the title at the top of a page: a small label over big Sora words that settle in */
+export function PageTitle({ title, eyebrow, className }: { title: string; eyebrow: string; className?: string }) {
+  return (
+    <div className={cn("min-w-0", className)}>
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}>
+        <Eyebrow className="flex items-center gap-2">
+          <KindDot />
+          {eyebrow}
+        </Eyebrow>
+      </motion.div>
+      <BlurTitle text={title} className="mt-2 truncate pb-[0.06em] font-display text-[40px] font-bold leading-[1.02] tracking-[-0.045em] min-[1180px]:text-[48px]" />
+    </div>
   );
 }

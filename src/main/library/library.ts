@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { AccountService, AlbumSummary, HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, SavedAlbum, SavedArtist, Track } from "@shared/types";
+import type { AccountService, AlbumSummary, HistoryEntry, LibrarySnapshot, LikedTrack, Playlist, PlaylistItem, RecentPlays, SavedAlbum, SavedArtist, Track } from "@shared/types";
 import { ACCOUNT_NAMES } from "@shared/types";
 import { transaction } from "../db";
 
@@ -9,6 +9,8 @@ import { transaction } from "../db";
 // watches them for new releases; they're listed here so Your Library shows them.
 
 const HISTORY_IN_SNAPSHOT = 300;
+/** the most plays handed to Home for its numbers; about a year of heavy listening */
+const RECENT_PLAYS_MAX = 20_000;
 
 interface TrackRow {
   data: string;
@@ -322,6 +324,28 @@ export class Library {
         .run(track.id, playedAt.toISOString(), Math.max(0, Math.round(playedMs)));
     });
     this.changed();
+  }
+
+  /** your own plays since `since`, oldest first, with each song once; the numbers on Home come from these */
+  recentPlays(since: string): RecentPlays {
+    const rows = this.db
+      .prepare(
+        `SELECT p.track_id, p.played_at, p.played_ms, t.data FROM plays p JOIN tracks t ON t.id = p.track_id
+         WHERE p.played_at >= ? ORDER BY p.played_at DESC, p.id DESC LIMIT ?`,
+      )
+      .all(since, RECENT_PLAYS_MAX) as unknown as (TrackRow & { track_id: string; played_at: string; played_ms: number })[];
+    const tracks = new Map<string, Track>();
+    const plays = rows.reverse().map((r) => {
+      if (!tracks.has(r.track_id)) tracks.set(r.track_id, JSON.parse(r.data));
+      return { trackId: r.track_id, playedAt: r.played_at, playedMs: r.played_ms };
+    });
+    return { plays, tracks: [...tracks.values()] };
+  }
+
+  /** how long you listened each time you played a song, newest first */
+  playsOf(trackId: string): number[] {
+    const rows = this.db.prepare("SELECT played_ms FROM plays WHERE track_id = ? ORDER BY played_at DESC LIMIT 500").all(trackId) as unknown as { played_ms: number }[];
+    return rows.map((r) => r.played_ms);
   }
 
   clearHistory(): void {

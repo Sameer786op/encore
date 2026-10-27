@@ -13,6 +13,7 @@ import { Artwork } from "./Artwork";
 import { ArtistLinks, LikeButton, SPRING } from "./common";
 import { LiquidGlass } from "./LiquidGlass";
 import { Slider } from "./Slider";
+import { WaveSeek } from "./WaveSeek";
 import { formatSpeed, isNormalSound, SoundPanel } from "./SoundPanel";
 import { trackMenu } from "./trackMenu";
 
@@ -24,7 +25,7 @@ function Glyph({ children, className, active, ...props }: React.ButtonHTMLAttrib
       transition={SPRING}
       className={cn(
         "grid size-9 place-items-center rounded-full transition-colors duration-200 disabled:pointer-events-none disabled:opacity-30",
-        active ? "bg-accent/15 text-accent" : "text-ink/90 hover:bg-white/[0.08] hover:text-ink",
+        active ? "bg-accent/15 text-accent-ink" : "text-ink/90 hover:bg-white/[0.08] hover:text-ink",
         className,
       )}
       {...(props as object)}
@@ -34,7 +35,7 @@ function Glyph({ children, className, active, ...props }: React.ButtonHTMLAttrib
   );
 }
 
-function Transport() {
+export function Transport() {
   const status = usePlayer((s) => s.status);
   const shuffle = usePlayer((s) => s.queue.shuffle);
   const repeat = usePlayer((s) => s.queue.repeat);
@@ -46,14 +47,22 @@ function Transport() {
   const hint = useHints();
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-0.5 @max-[820px]:self-center">
       <Glyph onClick={toggleShuffle} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title={hint("shuffle", "Shuffle")} className="size-8">
         <Shuffle className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
       <Glyph onClick={previous} disabled={!hasTrack} aria-label="Previous" title={hint("previous", "Previous")}>
         <SkipBack className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
-      <Glyph onClick={togglePlay} disabled={!hasTrack} aria-label={playing || loading ? "Pause" : "Play"} title={hint("playPause", "Play/Pause")} className="size-11">
+      <motion.button
+        whileTap={{ scale: 0.88 }}
+        transition={SPRING}
+        onClick={togglePlay}
+        disabled={!hasTrack}
+        aria-label={playing || loading ? "Pause" : "Play"}
+        title={hint("playPause", "Play/Pause")}
+        className="mx-1 grid size-[46px] place-items-center @max-[820px]:size-10 rounded-full bg-ink text-bg shadow-[0_8px_22px_-6px_rgb(0_0_0/calc(0.6*var(--shadow-k))),inset_0_1px_0.5px_rgb(255_255_255/0.5)] transition-[filter,opacity] duration-200 hover:brightness-110 disabled:opacity-35"
+      >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
             key={loading ? "loading" : playing ? "pause" : "play"}
@@ -64,15 +73,15 @@ function Transport() {
             className="grid place-items-center"
           >
             {loading ? (
-              <LoaderCircle className="size-[22px] animate-spin" />
+              <LoaderCircle className="size-[20px] animate-spin" />
             ) : playing ? (
-              <Pause className="size-[26px]" fill="currentColor" strokeWidth={0} />
+              <Pause className="size-[19px]" fill="currentColor" strokeWidth={0} />
             ) : (
-              <Play className="ml-0.5 size-[26px]" fill="currentColor" strokeWidth={0} />
+              <Play className="ml-0.5 size-[19px]" fill="currentColor" strokeWidth={0} />
             )}
           </motion.span>
         </AnimatePresence>
-      </Glyph>
+      </motion.button>
       <Glyph onClick={next} disabled={!hasTrack} aria-label="Next" title={hint("next", "Next")}>
         <SkipForward className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
@@ -83,16 +92,14 @@ function Transport() {
   );
 }
 
-/** the little screen in the middle: cover, song, artist and where we are in it */
+/** the song: its cover in a ring that breathes while it plays, the title and the artist */
 function NowPlaying() {
   const hint = useHints();
   const track = useCurrentTrack();
-  const position = usePlayer((s) => s.position);
-  const duration = usePlayer((s) => s.duration);
-  const seek = usePlayer((s) => s.seek);
+  const playing = usePlayer((s) => s.status === "playing");
 
   return (
-    <div className="flex h-[54px] min-w-0 flex-1 items-center rounded-[14px] bg-[var(--well)] shadow-[inset_0_0.5px_0_rgb(255_255_255/0.06),inset_0_1px_3px_rgb(0_0_0/calc(0.25*var(--shadow-k)))]">
+    <div className="flex w-[clamp(150px,22cqw,270px)] min-w-0 shrink-0 items-center gap-3 @max-[640px]:w-auto">
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.button
           key={track?.id ?? "none"}
@@ -105,10 +112,11 @@ function NowPlaying() {
           title={hint("nowPlaying", "Full-screen player")}
           className="group/art relative block shrink-0 p-[5px]"
         >
+          <span aria-hidden className={cn("absolute inset-0 rounded-[15px] border border-[var(--ring)]", playing && "animate-ring")} />
           {track ? (
-            <Artwork src={track.artwork} className="size-[44px] rounded-[9px] shadow-[0_2px_8px_rgb(0_0_0/0.35)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/art:scale-[1.06]" />
+            <Artwork src={track.artwork} className="size-[46px] rounded-[11px] shadow-[0_4px_12px_rgb(0_0_0/calc(0.4*var(--shadow-k)))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/art:scale-[1.06]" />
           ) : (
-            <span className="grid size-[44px] place-items-center rounded-[9px] bg-white/[0.06] text-ink-3">
+            <span className="grid size-[46px] place-items-center rounded-[11px] bg-white/[0.06] text-ink-3">
               <AudioLines className="size-5" />
             </span>
           )}
@@ -116,35 +124,37 @@ function NowPlaying() {
       </AnimatePresence>
 
       {track ? (
-        <div className="flex min-w-0 flex-1 flex-col justify-center pl-1.5 pr-1" onContextMenu={(e) => openMenu(e, trackMenu(track))}>
-          <div className="flex min-w-0 items-center gap-1">
-            <div className="min-w-0 flex-1 leading-tight">
-              <button
-                onClick={() => track.album?.id && navigate({ name: "album", id: track.album.id })}
-                className={cn("block max-w-full truncate text-left text-[13px] font-semibold text-ink", track.album?.id && "hover:underline hover:decoration-white/40 hover:underline-offset-2")}
-              >
-                {track.title}
-              </button>
-              <ArtistLinks artists={track.artists} className="block text-[12px] text-ink-2" />
-            </div>
-            <LikeButton track={track} className="shrink-0" size="size-[15px]" />
+        <div className="flex min-w-0 flex-1 items-center gap-1 @max-[640px]:hidden" onContextMenu={(e) => openMenu(e, trackMenu(track))}>
+          <div className="min-w-0 flex-1 leading-tight">
+            <button
+              onClick={() => track.album?.id && navigate({ name: "album", id: track.album.id })}
+              className={cn("block max-w-full truncate text-left font-display text-[14.5px] font-semibold tracking-[-0.02em] text-ink", track.album?.id && "hover:underline hover:decoration-white/40 hover:underline-offset-2")}
+            >
+              {track.title}
+            </button>
+            <ArtistLinks artists={track.artists} className="mt-0.5 block text-[12px] font-semibold text-ink-3" />
           </div>
-          <div className="flex items-center gap-2 pr-1.5">
-            <span className="w-8 text-right text-[10px] font-medium tabular-nums text-ink-3">{formatTime(position)}</span>
-            <Slider value={position} max={duration} label="Seek" onCommit={seek} step={5} formatValue={formatTime} className="h-3 flex-1" thin />
-            <span className="w-8 text-[10px] font-medium tabular-nums text-ink-3">{formatTime(duration)}</span>
-          </div>
+          <LikeButton track={track} className="shrink-0" size="size-[15px]" />
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 flex-col justify-center pl-1.5">
-          <div className="text-[13px] font-semibold text-ink-2">Not playing</div>
-          <div className="text-[12px] text-ink-3">Pick a song to start listening</div>
-          {/* the seek bar is always here, so it can be found before anything plays */}
-          <div className="sr-only">
-            <Slider value={0} max={0} label="Seek" step={5} />
-          </div>
+        <div className="min-w-0 flex-1 leading-tight @max-[640px]:hidden">
+          <div className="font-display text-[14px] font-semibold text-ink-2">Not playing</div>
+          <div className="mt-0.5 truncate text-[12px] font-semibold text-ink-3">Pick a song to start</div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** where we are in the song, on the waveform */
+function Seek() {
+  const position = usePlayer((s) => s.position);
+  const duration = usePlayer((s) => s.duration);
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3 @max-[820px]:flex-none @max-[820px]:gap-2">
+      <span className="w-9 shrink-0 text-right font-display text-[12px] tabular-nums text-ink-2 @max-[820px]:text-[11px]">{formatTime(position)}</span>
+      <WaveSeek className="h-[34px] min-w-0 flex-1 @max-[820px]:h-[16px]" />
+      <span className="w-9 shrink-0 font-display text-[12px] tabular-nums text-ink-3 @max-[820px]:text-[11px]">{formatTime(duration)}</span>
     </div>
   );
 }
@@ -189,7 +199,7 @@ function VolumeControl() {
       <Glyph onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} title={hint("mute", "Mute")} className="size-8">
         <Icon className="size-[17px]" />
       </Glyph>
-      <Slider value={shown * 100} max={100} label="Volume" onChange={(v) => setVolume(v / 100)} step={5} formatValue={(v) => `${Math.round(v)}%`} className="hidden w-[88px] @min-[760px]:flex" />
+      <Slider value={shown * 100} max={100} label="Volume" onChange={(v) => setVolume(v / 100)} step={5} formatValue={(v) => `${Math.round(v)}%`} className="hidden w-[88px] @min-[1040px]:flex" />
     </div>
   );
 }
@@ -213,10 +223,16 @@ export function PlayerBar({ right }: { right: number }) {
           as="footer"
           radius={24}
           sheen
-          className="@container pointer-events-auto flex h-[66px] w-full max-w-[1180px] items-center gap-3 pl-2 pr-2.5"
+          className="@container pointer-events-auto flex h-[74px] w-full max-w-[1320px] items-center gap-3 pl-2 pr-3 @min-[1000px]:gap-4"
         >
-          <Transport />
+          {/* a faint ember glow behind the song, in Ember */}
+          <span aria-hidden className="ember-only pointer-events-none absolute inset-0 -z-[1] rounded-[24px] bg-[radial-gradient(38%_170%_at_0%_50%,rgb(var(--accent-rgb)/0.2),transparent_70%)]" />
           <NowPlaying />
+          {/* side by side; in a narrow player the waveform tucks under the buttons */}
+          <div className="flex min-w-0 flex-1 items-center gap-3 @min-[1000px]:gap-4 @max-[820px]:flex-col @max-[820px]:items-stretch @max-[820px]:gap-0.5">
+            <Transport />
+            <Seek />
+          </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <SoundButton />
             <Glyph

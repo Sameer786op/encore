@@ -67,10 +67,10 @@ function MenuPanel({ entries, x, y, alignRight, onDone }: PanelProps) {
         onPointerDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
         style={{ left: pos.left, top: pos.top }}
-        className="glass-menu fixed z-50 max-h-[70vh] min-w-56 max-w-72 origin-top-left overflow-y-auto rounded-[16px] p-1.5 scrollbar-none"
+        className="glass-menu fixed z-50 max-h-[70vh] min-w-56 max-w-72 origin-top-left overflow-y-auto rounded-[20px] p-1.5 scrollbar-none"
       >
         {entries.map((entry, index) => {
-          if (entry === "divider") return <div key={`divider-${index}`} className="mx-2.5 my-1 h-px bg-white/[0.09]" />;
+          if (entry === "divider") return <div key={`divider-${index}`} className="mx-3 my-1 h-px bg-line" />;
           const Icon = entry.icon;
           return (
             <button
@@ -90,13 +90,13 @@ function MenuPanel({ entries, x, y, alignRight, onDone }: PanelProps) {
                 entry.onSelect?.();
               }}
               className={cn(
-                "flex w-full items-center gap-3 rounded-[10px] px-2.5 py-[7px] text-left text-[13px] outline-none transition-colors duration-100",
+                "flex w-full items-center gap-3 rounded-[14px] px-3 py-[7px] text-left text-[13px] font-semibold outline-none transition-colors duration-100",
                 "hover:bg-white/[0.1] focus-visible:bg-white/[0.1] focus-visible:outline-none disabled:opacity-40",
-                entry.danger ? "text-[#ff453a]" : "text-ink",
+                entry.danger ? "text-bad" : "text-ink",
                 sub?.index === index && "bg-white/[0.1]",
               )}
             >
-              {Icon ? <Icon className={cn("size-4 shrink-0", entry.danger ? "text-[#ff453a]" : "text-ink-2")} strokeWidth={1.9} /> : <span className="size-4 shrink-0" />}
+              {Icon ? <Icon className={cn("size-4 shrink-0", entry.danger ? "text-bad" : "text-ink-2")} strokeWidth={1.9} /> : <span className="size-4 shrink-0" />}
               <span className="min-w-0 flex-1 truncate">{entry.label}</span>
               {entry.submenu && <ChevronRight className="size-4 text-ink-3" />}
             </button>

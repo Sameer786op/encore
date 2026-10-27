@@ -4,7 +4,7 @@ import { History, Import, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import type { HomeSection, Track } from "@shared/types";
 import { AlbumCard, ArtistCard, CardRow, CardSkeletonRow, LikedSongsCard, MixCard, PlaylistCard, RemotePlaylistCard, TrackCard } from "@/components/Cards";
 import { SectionTitle } from "@/components/common";
-import { MoodPicker } from "@/components/MoodPicker";
+import { Bento } from "@/components/home/Bento";
 import { SEARCH_INPUT_ID } from "@/components/TopBar";
 import { useFeed } from "@/feed/store";
 import { useLibrary } from "@/library/store";
@@ -99,7 +99,7 @@ function FeedAction() {
     );
   }
   return (
-    <button onClick={() => void refresh()} title="Make today's mixes again" className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+    <button onClick={() => void refresh()} title="Make today's mixes again" className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10">
       <RefreshCw className="size-3.5" /> Refresh
     </button>
   );
@@ -186,7 +186,7 @@ export function HomePage() {
         </motion.div>
       )}
 
-      <MoodPicker />
+      <Bento />
 
       {mixes.length > 0 ? (
         <Section title="Made for you" action={<FeedAction />}>
@@ -207,7 +207,7 @@ export function HomePage() {
             transition={{ duration: 0.55, ease: [0.32, 0.72, 0, 1] }}
             className="fill-group mt-9 flex items-center gap-5 rounded-[22px] p-5"
           >
-            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
+            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-accent/15 text-accent-ink">
               <History className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
@@ -216,7 +216,7 @@ export function HomePage() {
                 Keep listening, or bring in your history from Spotify, YouTube Music or Apple Music, and Vyse Music will make mixes from the artists you love.
               </div>
             </div>
-            <button onClick={() => navigate({ name: "import" })} className="glass-control pressable h-9 shrink-0 rounded-full px-5 text-[13px] font-semibold text-accent hover:brightness-125">
+            <button onClick={() => navigate({ name: "import" })} className="glass-control pressable h-9 shrink-0 rounded-full px-5 text-[13px] font-semibold text-accent-ink hover:brightness-125">
               Import history
             </button>
           </motion.div>

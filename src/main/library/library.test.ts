@@ -86,6 +86,20 @@ describe("Library", () => {
     expect(library.snapshot().history).toEqual([]);
   });
 
+  it("hands over recent plays oldest first, each song once, and how long each play of a song lasted", () => {
+    library.recordPlay(track(1), 30_000, new Date("2026-01-01T10:00:00Z"));
+    library.recordPlay(track(2), 200_000, new Date("2026-02-01T11:00:00Z"));
+    library.recordPlay(track(1), 180_000, new Date("2026-02-02T11:00:00Z"));
+    const recent = library.recentPlays("2026-01-15T00:00:00Z");
+    expect(recent.plays).toEqual([
+      { trackId: track(2).id, playedAt: "2026-02-01T11:00:00.000Z", playedMs: 200_000 },
+      { trackId: track(1).id, playedAt: "2026-02-02T11:00:00.000Z", playedMs: 180_000 },
+    ]);
+    expect(recent.tracks.map((t) => t.title)).toEqual(["Song 2", "Song 1"]);
+    expect(library.playsOf(track(1).id)).toEqual([180_000, 30_000]);
+    expect(library.playsOf("youtube:nothing")).toEqual([]);
+  });
+
   it("keeps the newest metadata for a track", () => {
     library.setLiked(track(1), true);
     library.recordPlay({ ...track(1), title: "Song 1 (Remastered)" }, 1000);

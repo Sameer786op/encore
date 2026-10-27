@@ -1,10 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { motion } from "motion/react";
 import { ExternalLink, FolderOpen, LoaderCircle, RefreshCw } from "lucide-react";
 import type { DiscordStatus, ScrobbleService, ScrobbleStatus, UpdateStatus } from "@shared/types";
 import { Equalizer } from "@/components/Equalizer";
 import { PausedForPureSound } from "@/components/PureSound";
-import { Segmented, Toggle } from "@/components/common";
+import { PageTitle, Segmented, Toggle } from "@/components/common";
 import { describeQuality, useStreamQuality } from "@/player/quality";
 import { useCurrentTrack, usePlayer } from "@/player/store";
 import { useSettings } from "@/settings/store";
@@ -105,7 +104,7 @@ function DiscordSettings() {
         body={
           <>
             Discord needs an app to show the status. Create one called "Vyse Music" at{" "}
-            <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
+            <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline">
               discord.com/developers <ExternalLink className="size-3" />
             </a>
             , then paste its Application ID here.
@@ -143,7 +142,7 @@ function DiscordSettings() {
 
 function Link({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent-ink hover:underline">
       {children} <ExternalLink className="size-3" />
     </a>
   );
@@ -293,7 +292,7 @@ function ScrobbleSettings() {
       {fmError && <div className="-mt-2 pb-3 text-[12.5px] text-bad">Last.fm: {fmError}</div>}
 
       {(lb.connected || fm.connected) && (
-        <div className="border-t border-white/[0.07] py-3 text-[12.5px] text-ink-3">
+        <div className="border-t border-line py-3 text-[12.5px] text-ink-3">
           A song counts once you've heard half of it or four minutes, whichever comes first.
           {status.queued > 0 && ` ${status.queued === 1 ? "1 play is" : `${status.queued} plays are`} waiting to be sent; Vyse Music keeps trying while it's open.`}
         </div>
@@ -312,14 +311,7 @@ export function SettingsPage() {
 
   return (
     <div className="max-w-3xl px-8 pb-16 pt-[68px]">
-      <motion.h1
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
-        className="font-display text-[34px] font-bold tracking-[-0.026em]"
-      >
-        Settings
-      </motion.h1>
+      <PageTitle eyebrow="Vyse Music" title="Settings" />
 
       <Group id="accounts" title="Connected accounts">
         <AccountSettings />

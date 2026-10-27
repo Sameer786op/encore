@@ -472,6 +472,12 @@ function registerIpc(): void {
   });
 
   handle(IPC.historyInsights, () => history.insights());
+  handle(IPC.historyRecent, (since: unknown) => {
+    const at = new Date(stringArg(since, "time"));
+    if (Number.isNaN(at.getTime())) throw new Error("Expected a time");
+    return library.recentPlays(at.toISOString());
+  });
+  handle(IPC.historyPlaysOf, (trackId: unknown) => library.playsOf(stringArg(trackId, "track id")));
   handle(IPC.historyTopPlaylist, (limit: unknown) => {
     const count = Math.min(200, Math.max(5, Number(limit) || 50));
     const top = history.insights().topSongs.slice(0, count);

@@ -34,8 +34,8 @@ export interface Settings {
   /** a preset id from ui/colors, or "custom" for customAccent */
   accent: string;
   customAccent: string;
-  /** what fills the window behind everything */
-  background: "artwork" | "wallpaper" | "plain";
+  /** what fills the window behind everything: Ember's glows or Moss's floor, the playing cover, a picture of your own, or a plain colour */
+  background: "signature" | "artwork" | "wallpaper" | "plain";
   /** blur in px and dim from 0 to 1, for the artwork wash and for a wallpaper */
   artworkLook: { blur: number; dim: number };
   wallpaper: { url: string | null; blur: number; dim: number };
@@ -51,6 +51,8 @@ export interface Settings {
   shortcuts: Record<string, string[]>;
   /** shortcuts that work while Vyse Music is in the background */
   globalKeys: GlobalKeysConfig;
+  /** which look these settings were last saved under; 2 is Ember & Moss */
+  lookVersion: number;
 }
 
 export type GlassArea = "sidebar" | "player" | "panels";
@@ -76,9 +78,9 @@ export const DEFAULT_SETTINGS: Settings = {
     panels: { opacity: 30, blur: 22 },
   },
   theme: "dark",
-  accent: "encore",
-  customAccent: "#fa2d48",
-  background: "artwork",
+  accent: "ember",
+  customAccent: "#ff5a1f",
+  background: "signature",
   artworkLook: { blur: 90, dim: 0.58 },
   wallpaper: { url: null, blur: 0, dim: 0.3 },
   backgroundPlay: true,
@@ -87,11 +89,23 @@ export const DEFAULT_SETTINGS: Settings = {
   doubleClick: "play",
   shortcuts: {},
   globalKeys: { enabled: true, keys: {} },
+  lookVersion: 2,
 };
+
+/** settings saved before Ember & Moss move to its accent and backdrop once; a picture of your own or a plain colour stays */
+function upgradeLook(saved: Partial<Settings>): Partial<Settings> {
+  if (Object.keys(saved).length === 0 || (saved.lookVersion ?? 1) >= 2) return saved;
+  return {
+    ...saved,
+    accent: "ember",
+    background: saved.background === "wallpaper" || saved.background === "plain" ? saved.background : "signature",
+    lookVersion: 2,
+  };
+}
 
 function load(): Settings {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<Settings>;
+    const saved = upgradeLook(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<Settings>);
     return {
       ...DEFAULT_SETTINGS,
       ...saved,

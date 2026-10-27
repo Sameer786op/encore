@@ -21,11 +21,15 @@ function QueueRow({ item, current, playing, onRemove }: { item: QueueItem; curre
     <div
       onDoubleClick={() => !current && jumpTo(item.uid)}
       onContextMenu={(e) => openMenu(e, trackMenu(item.track))}
-      className={cn("group flex items-center gap-3 rounded-[12px] px-2 py-1.5 transition-colors duration-150", current ? "bg-white/[0.07]" : "hover:bg-white/[0.06]")}
+      className={cn(
+        "group flex items-center gap-3 rounded-[14px] px-2 py-1.5 transition-colors duration-200",
+        // the playing song lit in the accent from the left, as in the track lists
+        current ? "bg-[linear-gradient(90deg,rgb(var(--accent-rgb)/0.16),rgb(var(--accent-rgb)/0.03)_60%,transparent)] shadow-[inset_0_0_0_1px_rgb(var(--accent-rgb)/0.16)]" : "hover:bg-white/[0.06]",
+      )}
     >
-      <Artwork src={item.track.artwork} className="size-10 rounded-[7px] shadow-[0_2px_6px_rgb(0_0_0/0.3)]" />
+      <Artwork src={item.track.artwork} className="size-10 rounded-[10px] shadow-[0_0_0_1px_var(--ring),0_4px_10px_-4px_rgb(0_0_0/calc(0.5*var(--shadow-k)))]" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-ink">{item.track.title}</div>
+        <div className="truncate text-[13px] font-semibold text-ink">{item.track.title}</div>
         <div className="truncate text-[12px] text-ink-2">{artistNames(item.track.artists)}</div>
       </div>
       {!current && <GripVertical className="size-3.5 shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />}
@@ -68,7 +72,7 @@ export function QueuePanel() {
         >
           <LiquidGlass as="aside" area="player" radius={22} sheen className="flex h-full flex-col">
             <div className="flex items-center justify-between pb-2 pl-5 pr-3 pt-3.5">
-              <h2 className="font-display text-[17px] font-bold tracking-[-0.02em]">Playing Next</h2>
+              <h2 className="font-display text-[18px] font-bold tracking-[-0.03em]">Playing Next</h2>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={saveAsPlaylist}
@@ -88,7 +92,7 @@ export function QueuePanel() {
             <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%_-_14px),transparent)]">
               {current ? (
                 <>
-                  <div className="px-2 pb-1.5 pt-1 text-[11.5px] font-semibold text-ink-3">Now playing</div>
+                  <div className="px-2 pb-2 pt-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-3">Now playing</div>
                   <QueueRow item={current} current playing={status === "playing"} />
                 </>
               ) : (
@@ -99,10 +103,10 @@ export function QueuePanel() {
                 <>
                   <div className="mt-4 flex items-center justify-between px-2 pb-1.5">
                     <div className="min-w-0">
-                      <div className="text-[11.5px] font-semibold text-ink-3">Next up</div>
+                      <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-3">Next up</div>
                       {queue.context && <div className="truncate text-[11.5px] text-ink-3">From {queue.context.label}</div>}
                     </div>
-                    <button onClick={clearUpcoming} className="pressable shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold text-accent hover:bg-accent/10">
+                    <button onClick={clearUpcoming} className="pressable shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold text-accent-ink hover:bg-accent/10">
                       Clear
                     </button>
                   </div>

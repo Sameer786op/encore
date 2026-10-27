@@ -1,35 +1,109 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Inter Variable", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+/* a style for one mode only: moss:bg-snow, ember:mix-blend-screen */
+@custom-variant moss (&:where(:root[data-theme="light"] *));
+@custom-variant ember (&:where(:root:not([data-theme="light"]) *));
 
-  /* the window itself; everything else sits on the blurred cover above it */
-  --color-bg: #07070a;
+@theme {
+  /* Ember & Moss: Manrope for reading, Sora for titles and big numbers */
+  --font-sans: "Manrope Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Sora Variable", "Manrope Variable", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+
+  /* the window itself; everything else sits on the backdrop above it */
+  --color-bg: #030303;
   /* fills, Apple style: grey with alpha, so they pick up the colour behind */
   --color-surface: rgb(118 118 128 / 0.2);
   --color-surface-2: rgb(30 30 34 / 0.96);
   --color-surface-3: rgb(255 255 255 / 0.08);
   --color-line: rgb(255 255 255 / 0.09);
-  --color-ink: #ffffff;
-  --color-ink-2: rgb(235 235 245 / 0.64);
-  --color-ink-3: rgb(235 235 245 / 0.4);
+  /* warm white ink; the dimmer two still clear 4.5:1 on the black window */
+  --color-ink: #f7f3ef;
+  --color-ink-2: rgb(247 243 239 / 0.68);
+  --color-ink-3: rgb(247 243 239 / 0.5);
   /* the accent and its partners; ui/appearance.ts swaps them for the chosen colour */
   --color-accent: #fa2d48;
+  /* the accent as text, readable on the window (ui/colors.ts) */
+  --color-accent-ink: #fa2d48;
   --color-accent-2: #ff6b81;
   --color-accent-deep: #a3122d;
   --color-on-accent: #ffffff;
   /* white that stays white in the light theme: over artwork, on switches */
   --color-snow: #ffffff;
-  --color-switch: #30d158;
+  /* connected, found, on: the signature lime */
+  --color-switch: var(--color-lime-deep);
   /* status text: matched, needs a look, failed */
   --color-good: #63e6a0;
   --color-warn: #ffc46b;
   --color-bad: #ff8a9b;
+  /* the signature pair: ember glows and lime light; the themes below retune them */
+  --color-ember: #ff5a1f;
+  --color-peach: #ffd5c2;
+  --color-lime: #cdf35a;
+  --color-lime-deep: #93d920;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   /* the curve iOS uses for sheets and most system motion */
   --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* the specimen: a cover that floats, rings that breathe, a scan line that sweeps */
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-ring: ring 3.2s var(--ease-apple) infinite;
+  --animate-scan: scan 3.6s ease-in-out infinite;
+  --animate-blur-in: blur-in 0.9s var(--ease-apple) both;
+  --animate-drift: drift 26s ease-in-out infinite alternate;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-1.2deg);
+    }
+    50% {
+      transform: translateY(-8px) rotate(1deg);
+    }
+  }
+  @keyframes ring {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.035);
+      opacity: 0.7;
+    }
+  }
+  @keyframes scan {
+    0% {
+      top: -6%;
+      opacity: 0;
+    }
+    12%,
+    88% {
+      opacity: 1;
+    }
+    50% {
+      top: 92%;
+    }
+    100% {
+      top: -6%;
+      opacity: 0;
+    }
+  }
+  @keyframes blur-in {
+    from {
+      opacity: 0;
+      filter: blur(14px);
+      transform: translateY(10px);
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translate3d(-4%, -3%, 0) scale(1);
+    }
+    to {
+      transform: translate3d(5%, 4%, 0) scale(1.12);
+    }
+  }
 }
 
 /* registered so the sidebar can glide between its two widths */
@@ -47,7 +121,16 @@
   --sidebar-blur: 22px;
   --player-alpha: 0.3;
   --player-blur: 22px;
-  --accent-rgb: 250 45 72;
+  --accent-rgb: 255 90 31;
+  /* the signature gradient (meters, seek bar, gradient text) and the logo's colours; ui/appearance.ts sets them from the accent */
+  --ramp-1: #ff5a1f;
+  --ramp-2: #ffc23d;
+  --ramp-3: #93d920;
+  --logo-1: #ffb35c;
+  --logo-2: #ff7f38;
+  --logo-3: #ff4d14;
+  /* fine film grain over the backdrop and the big tiles */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   --sidebar-w: 252px;
   transition: --sidebar-w 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -62,72 +145,109 @@
   --glass-blur: var(--player-blur);
 }
 
-/* ---- Themes ----
-   Dark is the default. The light theme swaps the ink and fill colours, and
-   turns "white" into near-black, so every white tint (hover fills, tracks,
-   hairlines) becomes a dark tint without touching the components. Anything
-   that must stay white uses snow or on-accent instead. */
+/* ---- Themes: Ember (dark) and Moss (light) ----
+   Ember is the default: near-black glass over a black window lit by grainy
+   ember glows. Moss is milky frosted glass over a soft moss floor, with navy
+   ink. Moss swaps the ink and fill colours and turns "white" into navy, so
+   every white tint (hover fills, tracks, hairlines) becomes a dark tint
+   without touching the components. Anything that must stay white uses snow
+   or on-accent instead. */
 
 :root,
 .theme-dark {
   color-scheme: dark;
-  --glass-rgb: 28 28 32;
-  --glass-control-rgb: 40 40 46;
-  --glass-rim: rgb(255 255 255 / 0.13);
-  --menu-rgb: 32 32 37;
-  --menu-alpha: 0.74;
-  --fill-group: rgb(255 255 255 / 0.055);
-  --fill-group-edge: rgb(255 255 255 / 0.06);
+  --glass-rgb: 14 14 16;
+  --glass-control-rgb: 34 34 37;
+  --glass-rim: rgb(255 255 255 / 0.12);
+  --menu-rgb: 22 22 24;
+  --menu-alpha: 0.8;
+  /* the light caught along the top of a tile, fading down it */
+  --tile-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.012) 45%, rgb(255 255 255 / 0.025));
   /* shadows are softer on a light window */
   --shadow-k: 1;
-  --segment-on: rgb(99 99 102);
+  --segment-on: rgb(84 84 88);
   /* the recessed well in the middle of the player */
-  --well: rgb(0 0 0 / 0.22);
-  --backdrop-tint: 8 8 11;
+  --well: rgb(0 0 0 / 0.28);
+  --backdrop-tint: 3 3 3;
   --backdrop-edge: 0 0 0;
+  --grain-opacity: 0.2;
+  /* the thin rings round the specimen cover and its callouts */
+  --ring: rgb(255 255 255 / 0.1);
+  /* the chosen row in the sidebar and in segmented pills */
+  --row-on: rgb(255 255 255 / 0.1);
+  /* a list row under the pointer */
+  --row-hover: rgb(255 255 255 / 0.065);
 }
 
 .theme-dark {
-  --color-bg: #07070a;
+  --color-bg: #030303;
   --color-surface: rgb(118 118 128 / 0.2);
-  --color-surface-2: rgb(30 30 34 / 0.96);
+  --color-surface-2: rgb(20 20 22 / 0.96);
   --color-surface-3: rgb(255 255 255 / 0.08);
   --color-line: rgb(255 255 255 / 0.09);
-  --color-ink: #ffffff;
-  --color-ink-2: rgb(235 235 245 / 0.64);
-  --color-ink-3: rgb(235 235 245 / 0.4);
+  --color-ink: #f7f3ef;
+  --color-ink-2: rgb(247 243 239 / 0.68);
+  --color-ink-3: rgb(247 243 239 / 0.5);
   --color-white: #ffffff;
   --color-good: #63e6a0;
   --color-warn: #ffc46b;
   --color-bad: #ff8a9b;
+  --color-ember: #ff5a1f;
+  --color-peach: #ffd5c2;
+  --color-lime: #cdf35a;
+  --color-lime-deep: #93d920;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-bg: #f2f2f7;
+  --color-bg: #e6e6e1;
   --color-surface: rgb(118 118 128 / 0.12);
-  --color-surface-2: rgb(250 250 252 / 0.97);
-  --color-surface-3: rgb(0 0 0 / 0.05);
-  --color-line: rgb(0 0 0 / 0.1);
-  --color-ink: #1d1d1f;
-  --color-ink-2: rgb(60 60 67 / 0.74);
-  --color-ink-3: rgb(60 60 67 / 0.5);
-  --color-white: #0b0b0f;
-  --glass-rgb: 250 250 253;
+  --color-surface-2: rgb(250 250 248 / 0.97);
+  --color-surface-3: rgb(23 21 59 / 0.05);
+  --color-line: rgb(23 21 59 / 0.1);
+  --color-ink: #17153b;
+  /* the dimmer inks stay at 4.5:1 or better on the milky glass */
+  --color-ink-2: rgb(23 21 59 / 0.78);
+  --color-ink-3: rgb(23 21 59 / 0.62);
+  --color-white: #17153b;
+  --color-ember: #ff6a2b;
+  --color-peach: #ffe0cf;
+  --color-lime: #9fd323;
+  --color-lime-deep: #6db31a;
+  --glass-rgb: 255 255 255;
   --glass-control-rgb: 255 255 255;
-  --glass-rim: rgb(0 0 0 / 0.08);
-  --menu-rgb: 250 250 252;
-  --menu-alpha: 0.82;
-  --fill-group: rgb(255 255 255 / 0.6);
-  --fill-group-edge: rgb(0 0 0 / 0.05);
-  --shadow-k: 0.32;
+  --glass-rim: rgb(255 255 255 / 0.85);
+  --menu-rgb: 250 250 248;
+  --menu-alpha: 0.86;
+  --tile-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(246 249 240 / 0.2) 65%, rgb(214 236 178 / 0.28));
+  --shadow-k: 0.3;
   --segment-on: #ffffff;
-  --well: rgb(0 0 0 / 0.045);
-  --color-good: #138a48;
+  --well: rgb(23 21 59 / 0.045);
+  --color-good: #2f7d12;
   --color-warn: #a35f00;
   --color-bad: #d1123a;
-  --backdrop-tint: 246 246 250;
+  --backdrop-tint: 236 237 231;
   --backdrop-edge: 255 255 255;
+  --grain-opacity: 0.08;
+  --ring: rgb(255 255 255 / 0.8);
+  --row-on: rgb(255 255 255 / 0.78);
+  --row-hover: rgb(255 255 255 / 0.6);
+}
+
+/* parts drawn for one theme only: Ember's glows, Moss's floor */
+:root[data-theme="light"] .ember-only,
+:root:not([data-theme="light"]) .moss-only {
+  display: none;
+}
+
+/* Moss's floor: noise coloured like moss, out of focus, fading out upward */
+.moss-floor {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='.008 .016' numOctaves='5' seed='4'/><feColorMatrix values='.55 0 0 0 .12  .8 0 0 0 .22  .2 0 0 0 .02  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>");
+  background-size: cover;
+  filter: blur(14px) saturate(1.35);
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(to top, #000 25%, transparent);
+  mask-image: linear-gradient(to top, #000 25%, transparent);
 }
 
 /* the theme switch spreads out in a circle from where you clicked (ui/appearance.ts) */
@@ -156,9 +276,9 @@
     background: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-optical-sizing: auto;
-    font-feature-settings: "cv05", "cv08";
-    letter-spacing: -0.006em;
+    /* Manrope reads light at small sizes; a touch of weight brings it level */
+    font-weight: 500;
+    letter-spacing: -0.004em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     user-select: none;
@@ -218,11 +338,20 @@
   }
 }
 
+/* the signature gradient, as text: ember to amber to lime with the Ember accent */
 @utility text-gradient {
-  background: linear-gradient(100deg, var(--color-accent), var(--color-accent-2));
+  background: linear-gradient(100deg, var(--ramp-1), var(--ramp-2), var(--ramp-3));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* a film-grain layer: put it on an absolutely placed element over a picture or a glow */
+@utility grain {
+  background-image: var(--grain);
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  pointer-events: none;
 }
 
 /* ---- Liquid Glass ----
@@ -243,6 +372,20 @@
     inset 0 0 20px rgb(255 255 255 / 0.025),
     0 14px 36px -14px rgb(0 0 0 / calc(0.6 * var(--shadow-k))),
     0 2px 8px -2px rgb(0 0 0 / calc(0.25 * var(--shadow-k)));
+}
+
+/* a bento tile: the same glass, with the theme's sheen (Moss fades it toward the moss below) */
+@utility tile {
+  border-radius: 24px;
+  background-color: rgb(var(--glass-rgb) / var(--glass-alpha));
+  background-image: var(--tile-sheen);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.22),
+    inset 0 0 0 0.5px var(--glass-rim),
+    0 18px 50px -20px rgb(0 0 0 / calc(0.55 * var(--shadow-k))),
+    0 2px 8px -2px rgb(0 0 0 / calc(0.2 * var(--shadow-k)));
 }
 
 /* for small controls: lighter shadow, a little more see-through */
@@ -272,10 +415,11 @@
 }
 
 /* menus, popovers, dialogs and toasts: they float over busy content, so they
-   are always tinted enough to read, whatever the glass setting */
+   are always tinted enough to read, whatever the glass setting. They carry the
+   tiles' sheen and a faint glow of the accent in their top corner. */
 @utility glass-menu {
   background-color: rgb(var(--menu-rgb) / var(--menu-alpha));
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.02) 40%);
+  background-image: radial-gradient(120% 70% at 0% 0%, rgb(var(--accent-rgb) / 0.07), transparent 60%), var(--tile-sheen);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   box-shadow:
@@ -286,10 +430,17 @@
     0 4px 14px -4px rgb(0 0 0 / calc(0.35 * var(--shadow-k)));
 }
 
-/* grouped rows, the way iOS Settings and Apple Music lists sit on the page */
+/* grouped rows (Settings, Import): the same glass as the bento tiles, with the radius left to each use */
 @utility fill-group {
-  background-color: var(--fill-group);
-  box-shadow: inset 0 0 0 0.5px var(--fill-group-edge);
+  background-color: rgb(var(--glass-rgb) / var(--glass-alpha));
+  background-image: var(--tile-sheen);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.22),
+    inset 0 0 0 0.5px var(--glass-rim),
+    0 18px 50px -20px rgb(0 0 0 / calc(0.55 * var(--shadow-k))),
+    0 2px 8px -2px rgb(0 0 0 / calc(0.2 * var(--shadow-k)));
 }
 
 /* press feedback for anything tappable: a quick, springy dip */
@@ -342,8 +493,17 @@
 
 @media (prefers-reduced-motion: reduce) {
   .eq-bar,
-  .skeleton {
+  .skeleton,
+  .animate-float,
+  .animate-ring,
+  .animate-scan,
+  .animate-blur-in,
+  .animate-drift {
     animation: none;
+  }
+  /* a scan line standing still would just be a stripe */
+  .animate-scan {
+    display: none;
   }
 }
 
@@ -392,7 +552,10 @@
 .range::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(to right, var(--color-ink) var(--fill, 0%), color-mix(in srgb, var(--color-white) 18%, transparent) var(--fill, 0%));
+  /* the filled part is the signature gradient, squeezed to fit */
+  background:
+    linear-gradient(90deg, var(--ramp-1), var(--ramp-2), var(--ramp-3)) left / var(--fill, 0%) 100% no-repeat,
+    color-mix(in srgb, var(--color-white) 18%, transparent);
 }
 .range::-webkit-slider-thumb {
   appearance: none;

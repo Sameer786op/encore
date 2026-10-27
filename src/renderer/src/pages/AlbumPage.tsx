@@ -59,7 +59,7 @@ export function AlbumPage({ id }: { id: string }) {
               title={album.title}
               meta={
                 <>
-                  <ArtistLinks artists={album.artists} className="font-semibold text-accent" />
+                  <ArtistLinks artists={album.artists} className="font-semibold text-accent-ink" />
                   {album.year && (
                     <>
                       <Dot />

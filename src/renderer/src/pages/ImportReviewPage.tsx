@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleAlert, ListMusic, LoaderCircle, Play, RotateCcw, Search, X } from "lucide-react";
 import type { ImportItem, ImportItemStatus, ImportJobDetails, Track } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
-import { EmptyState } from "@/components/common";
+import { BlurTitle, EmptyState } from "@/components/common";
 import { ORIGIN_COLOR, ORIGIN_LABEL, destinationLabel } from "@/imports/labels";
 import { useImports } from "@/imports/store";
 import { navigate } from "@/nav/store";
@@ -34,7 +34,7 @@ function StatusPill({ item }: { item: ImportItem }) {
   const map: Record<ImportItemStatus, [string, string]> = {
     pending: ["Matching…", "bg-white/10 text-ink-2"],
     matched: [`Found · ${score}%`, "bg-switch/15 text-good"],
-    accepted: [item.chosen && item.chosen.id !== item.candidates[0]?.track.id ? "Your pick" : `Accepted · ${score}%`, "bg-accent/15 text-accent"],
+    accepted: [item.chosen && item.chosen.id !== item.candidates[0]?.track.id ? "Your pick" : `Accepted · ${score}%`, "bg-accent/15 text-accent-ink"],
     review: [`Check · ${score}%`, "bg-[#ff9f0a]/15 text-warn"],
     missing: ["Not found", "bg-red-400/15 text-bad"],
     skipped: ["Left out", "bg-white/10 text-ink-3"],
@@ -228,7 +228,7 @@ export function ImportReviewPage({ id }: { id: string }) {
           <ArrowRight className="size-3.5 text-ink-3" />
           <span>{destinationLabel(job.destination)}</span>
         </div>
-        <h1 className="mt-3 font-display text-[34px] font-bold leading-tight tracking-[-0.026em]">{job.name}</h1>
+        <BlurTitle text={job.name} className="mt-3 line-clamp-2 pb-[0.06em] font-display text-[40px] font-bold leading-[1.02] tracking-[-0.045em]" />
         <p className="mt-1 text-[14px] text-ink-2">
           {matching
             ? `Matching ${processed} of ${job.total} songs with YouTube Music…`
@@ -288,7 +288,7 @@ export function ImportReviewPage({ id }: { id: string }) {
       </div>
 
       {job.status !== "done" && (
-        <div className="glass-menu sticky bottom-[92px] z-10 mx-6 mt-6 flex items-center gap-3 rounded-[22px] px-6 py-3.5">
+        <div className="glass-menu sticky bottom-[98px] z-10 mx-6 mt-6 flex items-center gap-3 rounded-[22px] px-6 py-3.5">
           <p className="min-w-0 flex-1 text-[13px] text-ink-2">
             {matching ? "You can start checking while the rest are matched." : `${plural(adding, "song")} will be added to ${job.destination.kind === "liked" ? "Liked Songs" : `"${job.destination.name}"`}.`}
           </p>

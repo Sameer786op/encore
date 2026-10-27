@@ -18,7 +18,21 @@ interface SliderProps {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-export function Slider({ value, max, label, onChange, onCommit, step = 1, formatValue, className, thin }: SliderProps) {
+interface ScrubOptions {
+  value: number;
+  max: number;
+  label: string;
+  onChange?: (value: number) => void;
+  onCommit?: (value: number) => void;
+  step?: number;
+  formatValue?: (value: number) => string;
+}
+
+/**
+ * Dragging, hovering and arrow keys for anything you scrub along: the slider
+ * below and the player's waveform seek bar. Spread `props` on the element.
+ */
+export function useScrub({ value, max, label, onChange, onCommit, step = 1, formatValue }: ScrubOptions) {
   const ref = useRef<HTMLDivElement>(null);
   const [dragValue, setDragValue] = useState<number | null>(null);
   const [hoverValue, setHoverValue] = useState<number | null>(null);
@@ -67,29 +81,44 @@ export function Slider({ value, max, label, onChange, onCommit, step = 1, format
   };
 
   const shown = dragValue ?? value;
-  const percent = max > 0 ? clamp(shown / max, 0, 1) * 100 : 0;
-  const active = dragValue !== null;
-  const engaged = active || hoverValue !== null;
   const tip = dragValue ?? hoverValue ?? 0;
+  return {
+    /** 0 to 100, where the value sits */
+    percent: max > 0 ? clamp(shown / max, 0, 1) * 100 : 0,
+    /** being dragged */
+    active: dragValue !== null,
+    /** being dragged or hovered */
+    engaged: dragValue !== null || hoverValue !== null,
+    /** the value under the pointer, for a tooltip */
+    tip,
+    tipPercent: max > 0 ? clamp(tip / max, 0, 1) * 100 : 0,
+    props: {
+      ref,
+      role: "slider",
+      tabIndex: 0,
+      "aria-label": label,
+      "aria-valuemin": 0,
+      "aria-valuemax": max,
+      "aria-valuenow": Math.round(shown),
+      "aria-valuetext": formatValue?.(shown),
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel: () => setDragValue(null),
+      onPointerLeave: () => setHoverValue(null),
+      onKeyDown,
+    } as const,
+  };
+}
+
+export function Slider({ value, max, label, onChange, onCommit, step = 1, formatValue, className, thin }: SliderProps) {
+  const { percent, engaged, tip, tipPercent, props } = useScrub({ value, max, label, onChange, onCommit, step, formatValue });
 
   // Apple style: no knob. The bar swells while you hover or drag it, and the
   // part you've passed stays white.
   return (
     <div
-      ref={ref}
-      role="slider"
-      tabIndex={0}
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={max}
-      aria-valuenow={Math.round(shown)}
-      aria-valuetext={formatValue?.(shown)}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={() => setDragValue(null)}
-      onPointerLeave={() => setHoverValue(null)}
-      onKeyDown={onKeyDown}
+      {...props}
       className={cn("group relative flex h-4 cursor-pointer touch-none items-center", className)}
     >
       <div
@@ -107,7 +136,7 @@ export function Slider({ value, max, label, onChange, onCommit, step = 1, format
       {formatValue && engaged && (
         <div
           className="glass-menu pointer-events-none absolute -top-8 -translate-x-1/2 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums text-ink"
-          style={{ left: `${max > 0 ? clamp(tip / max, 0, 1) * 100 : 0}%` }}
+          style={{ left: `${tipPercent}%` }}
         >
           {formatValue(tip)}
         </div>

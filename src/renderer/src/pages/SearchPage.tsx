@@ -4,7 +4,8 @@ import { Clock3, LoaderCircle, Play, RefreshCw, Search, SearchX, X } from "lucid
 import type { SearchResults, SearchTab } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
 import { AlbumCard, ArtistCard, CardGrid, CardRow, RemotePlaylistCard, TrackCard } from "@/components/Cards";
-import { EmptyState, SectionTitle, SPRING } from "@/components/common";
+import { EmptyState, KindDot, SectionTitle, SPRING } from "@/components/common";
+import { Eyebrow, Glow } from "@/components/home/Tile";
 import { TrackList } from "@/components/TrackList";
 import { navigate } from "@/nav/store";
 import { usePlayer } from "@/player/store";
@@ -17,7 +18,8 @@ function TopResult({ results }: { results: SearchResults }) {
   if (!top) return null;
   const art = top.kind === "track" ? top.track.artwork : top.kind === "album" ? top.album.artwork : top.artist.artwork;
   const title = top.kind === "track" ? top.track.title : top.kind === "album" ? top.album.title : top.artist.name;
-  const subtitle = top.kind === "track" ? `Song • ${artistNames(top.track.artists)}` : top.kind === "album" ? `${top.album.kind ?? "Album"} • ${artistNames(top.album.artists)}` : "Artist";
+  const kind = top.kind === "track" ? "Song" : top.kind === "album" ? (top.album.kind ?? "Album") : "Artist";
+  const byline = top.kind === "track" ? artistNames(top.track.artists) : top.kind === "album" ? artistNames(top.album.artists) : null;
   const open = () => {
     if (top.kind === "track") usePlayer.getState().playTracks([top.track, ...results.tracks.filter((t) => t.id !== top.track.id)], 0, { kind: "search", label: `"${results.query}"` });
     else if (top.kind === "album") navigate({ name: "album", id: top.album.id });
@@ -31,15 +33,25 @@ function TopResult({ results }: { results: SearchResults }) {
       onKeyDown={(e) => e.key === "Enter" && open()}
       whileTap={{ scale: 0.985 }}
       transition={{ type: "spring", stiffness: 500, damping: 34 }}
-      className="glass group relative flex flex-1 items-center gap-5 overflow-hidden rounded-[22px] p-4 pr-20 transition-[filter] duration-300 hover:brightness-110 @3xl:flex-col @3xl:items-start @3xl:justify-end @3xl:gap-0 @3xl:p-5"
+      className="tile group relative isolate flex flex-1 items-center gap-5 overflow-hidden p-4 pr-20 transition-[filter] duration-300 hover:brightness-110 @3xl:flex-col @3xl:items-start @3xl:justify-end @3xl:gap-0 @3xl:p-6"
     >
+      <Glow className="ember-only" style={{ background: "radial-gradient(70% 80% at 100% 100%, rgb(var(--accent-rgb) / 0.28), transparent 70%)" }} />
+      <Glow className="moss-only" style={{ background: "radial-gradient(70% 80% at 100% 100%, rgb(150 210 40 / 0.3), transparent 70%)" }} />
       <Artwork
         src={art}
-        className={cn("size-20 shadow-[0_10px_28px_-8px_rgb(0_0_0/0.6)] @3xl:mb-auto @3xl:size-24", top.kind === "artist" ? "rounded-full" : "rounded-[10px]")}
+        className={cn(
+          "size-20 shadow-[0_0_0_1px_var(--ring),0_14px_30px_-12px_rgb(0_0_0/calc(0.7*var(--shadow-k)))] @3xl:mb-auto @3xl:size-28",
+          // an artist in black and white, back in colour under the pointer
+          top.kind === "artist" ? "rounded-full grayscale transition-[filter] duration-500 group-hover:grayscale-0" : "rounded-[18px]",
+        )}
       />
-      <div className="min-w-0 @3xl:mt-4 @3xl:w-full">
-        <div className="line-clamp-2 font-display text-[24px] font-bold leading-tight tracking-[-0.03em] @3xl:text-[26px]">{title}</div>
-        <div className="mt-0.5 truncate text-[13.5px] text-ink-2">{subtitle}</div>
+      <div className="min-w-0 @3xl:mt-5 @3xl:w-full">
+        <Eyebrow className="flex items-center gap-2">
+          <KindDot />
+          {kind}
+        </Eyebrow>
+        <div className="mt-1.5 line-clamp-2 pb-[0.06em] font-display text-[26px] font-bold leading-[1.04] tracking-[-0.04em] @3xl:text-[34px]">{title}</div>
+        {byline && <div className="mt-1 truncate text-[13.5px] text-ink-2">{byline}</div>}
       </div>
       <div className="absolute bottom-1/2 right-5 grid size-11 translate-y-1/2 scale-90 place-items-center rounded-full bg-accent text-on-accent opacity-0 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4),0_8px_22px_-8px_rgb(var(--accent-rgb)/0.7)] transition-[opacity,scale] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-100 group-hover:opacity-100 @3xl:bottom-5 @3xl:translate-y-0">
         <Play className="ml-0.5 size-5" fill="currentColor" strokeWidth={0} />
@@ -57,7 +69,7 @@ function RefreshResults() {
       onClick={refresh}
       disabled={loading}
       title="Ask YouTube Music again for the newest results"
-      className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-70"
+      className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10 disabled:opacity-70"
     >
       <RefreshCw className={cn("size-3.5", loading && "animate-spin")} /> Refresh
     </button>
@@ -67,11 +79,11 @@ function RefreshResults() {
 function SearchSkeleton() {
   return (
     <div className="mt-2 grid grid-cols-1 gap-6 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="skeleton h-[112px] rounded-[22px] @3xl:h-[236px]" />
+      <div className="skeleton h-[112px] rounded-[24px] @3xl:h-[236px]" />
       <div className="flex flex-col gap-3">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
-            <div className="skeleton size-12 rounded-md" />
+            <div className="skeleton size-10 rounded-[10px]" />
             <div className="flex-1">
               <div className="skeleton h-3.5 w-2/3 rounded" />
               <div className="skeleton mt-2 h-3 w-1/3 rounded" />
@@ -95,7 +107,7 @@ function RecentSearches() {
     <section className="max-w-2xl">
       <SectionTitle
         action={
-          <button onClick={clear} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+          <button onClick={clear} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10">
             Clear all
           </button>
         }
@@ -104,7 +116,7 @@ function RecentSearches() {
       </SectionTitle>
       <div className="flex flex-col">
         {recent.map((q) => (
-          <div key={q} className="group flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/[0.06]">
+          <div key={q} className="group flex items-center gap-3 rounded-[14px] px-3 py-2 transition-colors duration-200 hover:bg-[var(--row-hover)]">
             <Clock3 className="size-4 text-ink-3" />
             <button onClick={() => submit(q)} className="min-w-0 flex-1 truncate text-left text-[14px]">
               {q}
@@ -182,7 +194,7 @@ function Correction({ results }: { results: SearchResults }) {
           submit(meant);
           toTop(e.currentTarget);
         }}
-        className="font-semibold text-accent underline-offset-2 hover:underline"
+        className="font-semibold text-accent-ink underline-offset-2 hover:underline"
       >
         {meant}
       </button>
@@ -255,7 +267,7 @@ function CardsSkeleton() {
     <div className="grid grid-cols-[repeat(auto-fill,minmax(172px,1fr))] gap-x-5 gap-y-6">
       {Array.from({ length: 10 }, (_, i) => (
         <div key={i}>
-          <div className="skeleton aspect-square rounded-[10px]" />
+          <div className="skeleton aspect-square rounded-[18px]" />
           <div className="skeleton mt-3 h-3.5 w-3/4 rounded" />
           <div className="skeleton mt-2 h-3 w-1/2 rounded" />
         </div>
@@ -315,7 +327,7 @@ function AllResults({ results }: { results: SearchResults }) {
             {/* with a top result, Refresh sits by the first songs at the top instead */}
             {!skip && <RefreshResults />}
             {results.tracks.length > skip + 10 && (
-              <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+              <button onClick={() => setShowAllSongs((v) => !v)} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10">
                 {showAllSongs ? "Show less" : "Show all"}
               </button>
             )}

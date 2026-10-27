@@ -105,7 +105,7 @@ function KeyRecorder({
 
 function ResetButton({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-medium text-accent hover:bg-white/[0.06]">
+    <button onClick={onClick} className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-medium text-accent-ink hover:bg-white/[0.06]">
       <RotateCcw className="size-3.5" /> Reset to defaults
     </button>
   );

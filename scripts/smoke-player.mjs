@@ -81,7 +81,8 @@ try {
   await win.waitForSelector('[aria-label="Now playing"]', { timeout: 10000 });
   await win.waitForFunction(() => document.querySelector('[aria-label="Now playing"]')?.textContent?.includes("Lyrics from"), null, { timeout: 30000 });
   await sleep(2500);
-  const energy = await win.evaluate(() => Number(document.querySelector('[data-testid="flow-background"]')?.dataset.energy ?? 0));
+  // the full-screen player's stage reads the analyser (so does the flowing background, when it's on)
+  const energy = await win.evaluate(() => Number(document.querySelector('[aria-label="Now playing"] [data-energy]')?.dataset.energy ?? 0));
   check("real sound flows through the equalizer and visuals", energy > 0.02, `bass energy ${energy}`);
   const lyricInfo = await win.evaluate(() => {
     const view = document.querySelector('[aria-label="Now playing"]');

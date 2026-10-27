@@ -7,9 +7,12 @@ export interface AccentPreset {
   color: string;
   /** a two-colour swatch of its own instead of a flat one */
   logo?: [string, string];
+  /** its own signature gradient, start to end; others run from the accent to its lighter partner */
+  ramp?: [string, string, string];
 }
 
 export const ACCENTS: AccentPreset[] = [
+  { id: "ember", name: "Ember", color: "#ff5a1f", logo: ["#ffb35c", "#ff4d14"], ramp: ["#ff5a1f", "#ffc23d", "#93d920"] },
   { id: "encore", name: "Ruby", color: "#fa2d48" },
   { id: "sunset", name: "Sunset", color: "#ff7a1a" },
   { id: "amber", name: "Amber", color: "#ffb800" },
@@ -69,6 +72,8 @@ function readable(color: Rgb, background: Rgb, minimum: number): Rgb {
 export interface AccentShades {
   /** buttons, highlights and links */
   accent: string;
+  /** the accent as text: deepened on Moss (or lifted on Ember) until it reads at 4.5:1 or better */
+  ink: string;
   /** a lighter partner for gradients */
   light: string;
   /** a deeper one for the bottom of gradients */
@@ -79,24 +84,34 @@ export interface AccentShades {
   onAccent: string;
   /** the logo's gradient, top to bottom */
   logo: [string, string, string];
+  /** the signature gradient for meters, the seek bar and gradient text, start to end */
+  ramp: [string, string, string];
 }
 
 // roughly what sits behind the accent in each theme
 const DARK_SURFACE: Rgb = [24, 24, 28];
 const LIGHT_SURFACE: Rgb = [242, 242, 247];
 
-export function accentShades(color: string, theme: "dark" | "light", logo?: [string, string]): AccentShades {
+export function accentShades(color: string, theme: "dark" | "light", logo?: [string, string], ramp?: [string, string, string]): AccentShades {
   const base = parseHex(color) ?? parseHex(DEFAULT_ACCENT.color)!;
+  const surface = theme === "light" ? LIGHT_SURFACE : DARK_SURFACE;
   // the accent is also used for text and small icons, so it must stand out from the window
-  const accent = readable(base, theme === "light" ? LIGHT_SURFACE : DARK_SURFACE, 2.6);
+  const accent = readable(base, surface, 2.6);
   const onAccent = contrast(WHITE, accent) >= 3 ? "#ffffff" : "#16161a";
+  const light = mix(accent, WHITE, 0.32);
+  // the gradient's bright end (lime, amber) would vanish on Moss, so each stop is deepened until it shows
+  const stops: Rgb[] = ramp ? ramp.map((c) => parseHex(c) ?? accent) : [accent, mix(accent, light, 0.5), light];
+  // Moss's page is a little darker than the glass, so text aims above 4.5:1 against the glass
+  const ink = readable(base, surface, theme === "light" ? 5.2 : 4.5);
   return {
     accent: toHex(accent),
-    light: toHex(mix(accent, WHITE, 0.32)),
+    ink: toHex(ink),
+    light: toHex(light),
     deep: toHex(mix(accent, BLACK, 0.35)),
     rgb: accent.map(Math.round).join(" "),
     onAccent,
     logo: logo ? [logo[0], toHex(mix(parseHex(logo[0])!, parseHex(logo[1])!, 0.5)), logo[1]] : [toHex(mix(base, WHITE, 0.3)), toHex(base), toHex(mix(base, BLACK, 0.22))],
+    ramp: stops.map((c) => toHex(readable(c, surface, 2))) as [string, string, string],
   };
 }
 

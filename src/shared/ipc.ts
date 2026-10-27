@@ -40,6 +40,8 @@ export const IPC = {
   importMatchOne: "imports:match-one",
 
   historyInsights: "history:insights",
+  historyRecent: "history:recent",
+  historyPlaysOf: "history:plays-of",
   historyTopPlaylist: "history:top-playlist",
   historyRemoveImported: "history:remove-imported",
 

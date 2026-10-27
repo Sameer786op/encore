@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, ChevronRight, Clock3, Play, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, LoaderCircle, Play, Search, X } from "lucide-react";
 import type { SearchSuggestions, SuggestedItem } from "@shared/types";
 import { navigate, useNav } from "@/nav/store";
-import { usePlayer } from "@/player/store";
+import { describeQuality, soundLabel, useStreamQuality } from "@/player/quality";
+import { useCurrentTrack, usePlayer } from "@/player/store";
 import { useSearch } from "@/search/store";
 import { useSettings } from "@/settings/store";
 import { comboParts, keysFor } from "@/ui/shortcuts";
 import { cn } from "@/lib/cn";
 import { Artwork } from "./Artwork";
 import { LiquidGlass } from "./LiquidGlass";
+import { PlayingBars } from "./PlayingBars";
+import { SoundPanel } from "./SoundPanel";
 
 export const SEARCH_INPUT_ID = "encore-search";
 
@@ -194,6 +197,41 @@ function SearchBox() {
   );
 }
 
+/** what the sound is doing right now, and what it streams at; opens Speed & sound */
+function SoundStatus() {
+  const track = useCurrentTrack();
+  const status = usePlayer((s) => s.status);
+  const pure = useSettings((s) => s.pureSound);
+  const levelling = useSettings((s) => s.levelling);
+  const quality = useStreamQuality(track);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  if (!track) return null;
+  const loading = status === "loading";
+  const label = soundLabel(loading, pure, levelling);
+  const detail = quality === "local" ? "Your own file" : quality ? describeQuality(quality) : null;
+
+  return (
+    <>
+      <button
+        ref={setAnchor}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={`Sound: ${label}${detail ? `, ${detail}` : ""}`}
+        title="Speed & sound"
+        className="glass-control pressable no-drag ml-auto hidden h-[38px] shrink-0 items-center gap-2.5 rounded-full pl-3.5 pr-4 text-[12.5px] font-semibold hover:brightness-110 lg:flex"
+      >
+        {loading ? <LoaderCircle className="size-3.5 animate-spin text-ink-3" /> : <PlayingBars paused={status !== "playing"} className="h-3" />}
+        <span className="text-ink">{label}</span>
+        {detail && <span className="hidden text-ink-3 xl:inline">{detail}</span>}
+      </button>
+      <SoundPanel anchor={anchor} open={open} onClose={close} />
+    </>
+  );
+}
+
 export function TopBar({ scrolled, right }: { scrolled: boolean; right: number }) {
   const index = useNav((s) => s.index);
   const length = useNav((s) => s.stack.length);
@@ -223,6 +261,7 @@ export function TopBar({ scrolled, right }: { scrolled: boolean; right: number }
         </button>
       </LiquidGlass>
       <SearchBox />
+      <SoundStatus />
     </div>
   );
 }

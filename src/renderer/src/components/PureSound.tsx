@@ -10,9 +10,9 @@ export function PausedForPureSound({ what, compact, className }: { what: string;
       role="status"
       className={cn("flex items-center gap-2.5 rounded-[14px] bg-accent/10 text-ink-2", compact ? "px-3 py-2 text-[11.5px]" : "px-4 py-2.5 text-[12.5px]", className)}
     >
-      <AudioWaveform className={cn("shrink-0 text-accent", compact ? "size-3.5" : "size-4")} />
+      <AudioWaveform className={cn("shrink-0 text-accent-ink", compact ? "size-3.5" : "size-4")} />
       <span className="min-w-0 flex-1 leading-snug">{what} waits while Pure sound is on.</span>
-      <button onClick={() => update({ pureSound: false })} className="pressable shrink-0 rounded-full px-2 py-0.5 font-semibold text-accent hover:bg-accent/10">
+      <button onClick={() => update({ pureSound: false })} className="pressable shrink-0 rounded-full px-2 py-0.5 font-semibold text-accent-ink hover:bg-accent/10">
         Turn off
       </button>
     </div>

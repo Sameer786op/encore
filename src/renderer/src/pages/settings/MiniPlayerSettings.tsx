@@ -28,7 +28,7 @@ function CornerPicker({ value, onChange }: { value: MiniCorner; onChange: (corne
         onClick={() => onChange("remember")}
         className={cn(
           "pressable rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors",
-          value === "remember" ? "bg-accent/15 text-accent ring-1 ring-accent/50" : "bg-white/[0.06] text-ink-2 hover:text-ink",
+          value === "remember" ? "bg-accent/15 text-accent-ink ring-1 ring-accent/50" : "bg-white/[0.06] text-ink-2 hover:text-ink",
         )}
       >
         Where I leave it

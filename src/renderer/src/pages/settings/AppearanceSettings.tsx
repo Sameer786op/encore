@@ -9,9 +9,9 @@ import { effectiveTheme, revealChange } from "@/ui/appearance";
 import { ACCENTS } from "@/ui/colors";
 import { toast } from "@/ui/toast";
 
-// Settings → Appearance: light or dark, the accent colour (which also
-// recolours the logo and the taskbar icon), what fills the background, and
-// how the glass looks.
+// Settings → Appearance: Ember (dark) or Moss (light), the accent colour
+// (which also recolours the logo and the signature gradient), what fills the
+// background, and how the glass looks.
 
 /** a setting whose control needs the full width, below its title */
 function Block({ title, body, action, children }: { title: string; body?: ReactNode; action?: ReactNode; children?: ReactNode }) {
@@ -51,8 +51,8 @@ export function Range({ label, value, min, max, step = 1, format, onChange }: { 
 }
 
 const THEMES: { value: Settings["theme"]; label: string }[] = [
-  { value: "dark", label: "Dark" },
-  { value: "light", label: "Light" },
+  { value: "dark", label: "Ember" },
+  { value: "light", label: "Moss" },
   { value: "system", label: "Match Windows" },
 ];
 
@@ -62,21 +62,28 @@ function ThemePreview({ theme }: { theme: Settings["theme"] }) {
     const line = light ? "bg-[rgb(0_0_0/0.14)]" : "bg-[rgb(255_255_255/0.2)]";
     const faint = light ? "bg-[rgb(0_0_0/0.08)]" : "bg-[rgb(255_255_255/0.1)]";
     return (
-      <div className={cn("absolute inset-0 flex gap-1.5 p-1.5", light ? "bg-[#e9ebf1]" : "bg-[#141418]")}>
-        <div className={cn("flex w-[30%] flex-col gap-1 rounded-[5px] p-1.5", light ? "bg-[rgb(255_255_255/0.9)] shadow-sm" : "bg-[rgb(255_255_255/0.07)]")}>
+      <div
+        className={cn(
+          "absolute inset-0 flex gap-1.5 p-1.5",
+          light
+            ? "bg-[radial-gradient(80%_70%_at_80%_110%,#8cb83a,transparent_70%),linear-gradient(180deg,#ececea,#d8dccf)]"
+            : "bg-[radial-gradient(70%_80%_at_105%_110%,#ff7a3a,#7a2a0c_45%,transparent_75%),#050505]",
+        )}
+      >
+        <div className={cn("flex w-[30%] flex-col gap-1 rounded-[5px] p-1.5", light ? "bg-[rgb(255_255_255/0.78)] shadow-sm" : "bg-[rgb(255_255_255/0.06)]")}>
           <div className="size-2.5 rounded-[3px] bg-accent" />
           <div className={cn("mt-0.5 h-1 w-4/5 rounded-full", line)} />
           <div className={cn("h-1 w-3/5 rounded-full", faint)} />
           <div className={cn("h-1 w-2/3 rounded-full", faint)} />
         </div>
         <div className="flex flex-1 flex-col gap-1 pt-1">
-          <div className={cn("h-1.5 w-1/2 rounded-full", light ? "bg-[rgb(0_0_0/0.25)]" : "bg-[rgb(255_255_255/0.35)]")} />
+          <div className={cn("h-1.5 w-1/2 rounded-full", light ? "bg-[#17153b]/60" : "bg-[rgb(255_255_255/0.5)]")} />
           <div className="mt-0.5 flex gap-1">
-            <div className="aspect-square flex-1 rounded-[4px] bg-gradient-to-br from-accent-2 to-accent-deep" />
+            <div className="aspect-square flex-1 rounded-[4px] bg-gradient-to-br from-[var(--ramp-1)] via-[var(--ramp-2)] to-[var(--ramp-3)]" />
             <div className={cn("aspect-square flex-1 rounded-[4px]", faint)} />
             <div className={cn("aspect-square flex-1 rounded-[4px]", faint)} />
           </div>
-          <div className={cn("mt-auto h-2.5 rounded-full", light ? "bg-[rgb(255_255_255/0.95)] shadow-sm" : "bg-[rgb(255_255_255/0.09)]")} />
+          <div className={cn("mt-auto h-2.5 rounded-full", light ? "bg-[rgb(255_255_255/0.85)] shadow-sm" : "bg-[rgb(255_255_255/0.08)]")} />
         </div>
       </div>
     );
@@ -114,7 +121,7 @@ function ThemePicker() {
               <ThemePreview theme={t.value} />
             </div>
             <div className={cn("mt-2 flex items-center gap-1.5 px-1 text-[12.5px] font-medium", on ? "text-ink" : "text-ink-2")}>
-              {on && <Check className="size-3.5 text-accent" strokeWidth={3} />}
+              {on && <Check className="size-3.5 text-accent-ink" strokeWidth={3} />}
               {t.label}
             </div>
           </button>
@@ -146,12 +153,12 @@ function AccentPicker() {
   const accent = useSettings((s) => s.accent);
   const custom = useSettings((s) => s.customAccent);
   const update = useSettings((s) => s.update);
-  const name = accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === accent)?.name ?? "Ruby");
+  const name = accent === "custom" ? "Custom" : (ACCENTS.find((a) => a.id === accent)?.name ?? "Ember");
 
   return (
     <div className="flex items-center gap-5">
       <div className="relative shrink-0">
-        <Logo className="size-14 drop-shadow-[0_8px_18px_rgb(122_92_255/0.45)]" />
+        <Logo className="size-14 drop-shadow-[0_8px_18px_rgb(var(--accent-rgb)/0.45)]" />
       </div>
       <div className="min-w-0 flex-1">
         <div role="radiogroup" aria-label="Accent color" className="flex flex-wrap items-center gap-3">
@@ -210,7 +217,7 @@ function BackgroundSettings() {
   };
   const remove = () => {
     void window.encore.app.clearWallpaper();
-    update({ background: "artwork", wallpaper: { ...wallpaper, url: null } });
+    update({ background: "signature", wallpaper: { ...wallpaper, url: null } });
   };
   const light = effectiveTheme(useSettings((s) => s.theme)) === "light";
   const percent = (v: number) => `${Math.round(v * 100)}%`;
@@ -219,11 +226,13 @@ function BackgroundSettings() {
     <Block
       title="Background"
       body={
-        background === "artwork"
-          ? "A soft glow from the cover of what's playing, or of the album you're looking at."
-          : background === "wallpaper"
-            ? "A picture or animated GIF of your own fills the window."
-            : "A plain colour, nothing behind the glass."
+        background === "signature"
+          ? "Ember's glows, or Moss's soft floor in the light theme, tinted by the cover of what's playing."
+          : background === "artwork"
+            ? "A soft glow from the cover of what's playing, or of the album you're looking at."
+            : background === "wallpaper"
+              ? "A picture or animated GIF of your own fills the window."
+              : "A plain colour, nothing behind the glass."
       }
       action={
         <Segmented
@@ -231,6 +240,7 @@ function BackgroundSettings() {
           value={background}
           onChange={(value) => (value === "wallpaper" && !wallpaper.url ? void choose() : update({ background: value }))}
           options={[
+            { value: "signature", label: "Ember & Moss" },
             { value: "artwork", label: "Artwork" },
             { value: "wallpaper", label: "Wallpaper" },
             { value: "plain", label: "Plain" },
@@ -328,7 +338,7 @@ function GlassSettings() {
             ))}
             <button
               onClick={() => update({ glassAreas: { sidebar: { ...current }, player: { ...current }, panels: { ...current } } })}
-              className="ml-auto rounded-full px-2.5 py-1 text-[12.5px] font-semibold text-accent hover:bg-accent/10"
+              className="ml-auto rounded-full px-2.5 py-1 text-[12.5px] font-semibold text-accent-ink hover:bg-accent/10"
             >
               Use for all
             </button>
@@ -345,8 +355,8 @@ function GlassSettings() {
 
 export function AppearanceSettings() {
   return (
-    <div className="fill-group rounded-[20px] px-5">
-      <Block title="Theme" body="Dark, light, or whichever Windows is using.">
+    <div className="fill-group rounded-[24px] px-5">
+      <Block title="Theme" body="Ember is dark, Moss is light, or follow whichever Windows is using.">
         <ThemePicker />
       </Block>
       <Block title="Color" body="Recolours buttons and highlights.">

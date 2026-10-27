@@ -26,13 +26,14 @@ function Progress({ state }: { state: NowPlaying }) {
   }, [state]);
   return (
     <div
-      className="no-drag group/bar absolute inset-x-4 bottom-2 h-[3px] cursor-pointer overflow-hidden rounded-full bg-white/15 transition-[height] duration-300 hover:h-[5px]"
+      className="no-drag group/bar absolute inset-x-4 bottom-2 h-[3px] cursor-pointer overflow-hidden rounded-full bg-white/[0.12] transition-[height] duration-300 hover:h-[5px]"
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         window.encore.nowPlaying.command({ kind: "seek", seconds: ((e.clientX - rect.left) / rect.width) * state.duration });
       }}
     >
-      <div ref={bar} className="h-full origin-left rounded-full bg-white/90" />
+      {/* the signature gradient, as in the seek bar */}
+      <div ref={bar} className="h-full origin-left rounded-full bg-[linear-gradient(90deg,var(--ramp-1),var(--ramp-2),var(--ramp-3))]" />
     </div>
   );
 }
@@ -59,8 +60,8 @@ export function MiniApp() {
   const track = state.track;
   return (
     <div className="theme-dark h-screen w-screen p-2">
-      {/* the window can't see the desktop behind it, so the glass is lit by the song's own cover */}
-      <div className="drag group relative flex h-full items-center gap-3 overflow-hidden rounded-[22px] bg-[#101014] pr-3 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.3),inset_0_0_0_0.5px_rgb(255_255_255/0.14),0_8px_30px_rgb(0_0_0/0.6)]">
+      {/* Ember in miniature: a black tile lit by a faint wash of the song's cover and an ember glow, with grain */}
+      <div className="drag group relative isolate flex h-full items-center gap-3 overflow-hidden rounded-[24px] bg-[#060606] pr-3 shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.22),inset_0_0_0_0.5px_rgb(255_255_255/0.12),0_8px_30px_rgb(0_0_0/0.6)]">
         <AnimatePresence initial={false}>
           {track?.artwork && (
             <motion.img
@@ -69,35 +70,41 @@ export function MiniApp() {
               alt=""
               referrerPolicy="no-referrer"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.55 }}
+              animate={{ opacity: 0.3 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 1, ease: [0.32, 0.72, 0, 1] }}
               className="absolute inset-0 size-full scale-150 object-cover blur-[40px] saturate-[1.8]"
             />
           )}
         </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] via-black/25 to-black/45" />
+        <div className="absolute inset-0 bg-[radial-gradient(70%_130%_at_100%_100%,rgb(var(--accent-rgb)/0.42),transparent_70%),linear-gradient(180deg,rgb(255_255_255/0.06),rgb(0_0_0/0.2)_45%,rgb(0_0_0/0.4))]" />
+        <span aria-hidden className="grain absolute inset-0" />
 
         <div className="relative h-full shrink-0 p-2">
-          <Artwork src={track?.artwork} className="aspect-square h-full rounded-[14px] shadow-[0_6px_16px_-4px_rgb(0_0_0/0.5)]" />
+          <Artwork src={track?.artwork} className="aspect-square h-full rounded-[16px] shadow-[0_0_0_1px_rgb(255_255_255/0.1),0_8px_18px_-6px_rgb(0_0_0/0.6)]" />
         </div>
 
         <div className="relative min-w-0 flex-1">
-          <div className="truncate text-[13.5px] font-semibold text-white">{track?.title ?? "Nothing playing"}</div>
-          <div className="truncate text-[12px] text-white/60">{track?.artists.map((a) => a.name).join(", ") ?? "Play something in Vyse Music"}</div>
+          <div className="truncate font-display text-[14px] font-semibold tracking-[-0.02em] text-ink">{track?.title ?? "Nothing playing"}</div>
+          <div className="truncate text-[12px] font-semibold text-ink-2">{track?.artists.map((a) => a.name).join(", ") ?? "Play something in Vyse Music"}</div>
           <div className="no-drag mt-1.5 flex items-center gap-0.5">
             <button onClick={() => send({ kind: "previous" })} aria-label="Previous" className="pressable rounded-full p-1.5 text-white/85 hover:bg-white/10 hover:text-white">
               <SkipBack className="size-4" fill="currentColor" />
             </button>
-            <button onClick={() => send({ kind: "toggle" })} aria-label={state.playing ? "Pause" : "Play"} className="pressable grid size-9 place-items-center rounded-full text-white hover:bg-white/10">
-              {state.playing ? <Pause className="size-[22px]" fill="currentColor" strokeWidth={0} /> : <Play className="ml-0.5 size-[22px]" fill="currentColor" strokeWidth={0} />}
+            {/* the solid round button, as in the player bar */}
+            <button
+              onClick={() => send({ kind: "toggle" })}
+              aria-label={state.playing ? "Pause" : "Play"}
+              className="pressable mx-0.5 grid size-8 place-items-center rounded-full bg-snow text-[#0b0b0b] shadow-[0_4px_14px_-4px_rgb(0_0_0/0.6)] hover:brightness-95"
+            >
+              {state.playing ? <Pause className="size-[15px]" fill="currentColor" strokeWidth={0} /> : <Play className="ml-0.5 size-[15px]" fill="currentColor" strokeWidth={0} />}
             </button>
             <button onClick={() => send({ kind: "next" })} aria-label="Next" className="pressable rounded-full p-1.5 text-white/85 hover:bg-white/10 hover:text-white">
               <SkipForward className="size-4" fill="currentColor" />
             </button>
             {track && (
               <button onClick={() => send({ kind: "like" })} aria-label={state.liked ? "Remove from Liked Songs" : "Add to Liked Songs"} className="pressable ml-1 rounded-full p-1.5 hover:bg-white/10">
-                <Heart className={cn("size-4", state.liked ? "text-accent" : "text-white/70")} fill={state.liked ? "currentColor" : "none"} strokeWidth={state.liked ? 0 : 2} />
+                <Heart className={cn("size-4", state.liked ? "text-accent-ink" : "text-white/70")} fill={state.liked ? "currentColor" : "none"} strokeWidth={state.liked ? 0 : 2} />
               </button>
             )}
           </div>

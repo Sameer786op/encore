@@ -67,13 +67,13 @@ const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, nu
       }}
       onContextMenu={(e) => onMenu(e, track, index)}
       className={cn(
-        // Apple's lists: soft zebra stripes, a brighter fill under the pointer
-        "group grid items-center gap-4 rounded-[10px] px-3 py-[5px] outline-none transition-colors duration-150 hover:bg-white/[0.07] focus-visible:bg-white/[0.07]",
-        index % 2 === 0 && "bg-white/[0.025]",
+        // no stripes: a soft fill under the pointer, and the playing song lit in the accent from the left
+        "group grid items-center gap-4 rounded-[14px] px-3 py-[5px] outline-none transition-colors duration-200 hover:bg-[var(--row-hover)] focus-visible:bg-[var(--row-hover)]",
+        isCurrent && "bg-[linear-gradient(90deg,rgb(var(--accent-rgb)/0.16),rgb(var(--accent-rgb)/0.03)_55%,transparent)] shadow-[inset_0_0_0_1px_rgb(var(--accent-rgb)/0.16)]",
         showAlbum ? "grid-cols-[28px_minmax(0,4fr)_minmax(0,3fr)_auto_auto_auto]" : "grid-cols-[28px_minmax(0,1fr)_auto_auto_auto]",
       )}
     >
-      <div className="relative grid h-10 place-items-center text-[13px] tabular-nums text-ink-3">
+      <div className="relative grid h-10 place-items-center font-display text-[12.5px] tabular-nums text-ink-3">
         {draggable && <GripVertical className="absolute -left-3 size-3.5 cursor-grab text-ink-3 opacity-0 group-hover:opacity-100" />}
         {isCurrent ? (
           <span className="group-hover:hidden">
@@ -88,9 +88,9 @@ const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, nu
       </div>
 
       <div className="flex min-w-0 items-center gap-3">
-        {!numbered && <Artwork src={track.artwork} className="size-10 rounded-[7px] shadow-[0_2px_6px_rgb(0_0_0/0.3)]" />}
+        {!numbered && <Artwork src={track.artwork} className="size-10 rounded-[10px] shadow-[0_0_0_1px_var(--ring),0_4px_10px_-4px_rgb(0_0_0/calc(0.5*var(--shadow-k)))]" />}
         <div className="min-w-0">
-          <div className={cn("flex items-center gap-1.5 truncate text-[13.5px] font-medium leading-snug", isCurrent ? "text-accent" : "text-ink")}>
+          <div className={cn("flex items-center gap-1.5 truncate text-[13.5px] font-semibold leading-snug", isCurrent ? "text-accent-ink" : "text-ink")}>
             <span className="truncate">{track.title}</span>
             {track.explicit && <span className="shrink-0 rounded-[3px] bg-white/15 px-1 text-[9px] font-bold leading-[14px] text-ink-2">E</span>}
           </div>
@@ -114,7 +114,7 @@ const TrackRow = memo(function TrackRow({ track, index, isCurrent, isPlaying, nu
 
       <div className="flex items-center gap-1">
         <LikeButton track={track} className="opacity-0 group-hover:opacity-100 aria-pressed:opacity-100" />
-        <span className="w-12 text-right text-[13px] tabular-nums text-ink-3">{track.durationMs > 0 ? formatTime(track.durationMs / 1000) : ""}</span>
+        <span className="w-12 text-right font-display text-[12.5px] tabular-nums text-ink-3">{track.durationMs > 0 ? formatTime(track.durationMs / 1000) : ""}</span>
       </div>
 
       <button
@@ -179,7 +179,7 @@ export function TrackList({ tracks, context, keys, numbered, showAlbum = true, a
   const header = (
     <div
       className={cn(
-        "mb-1.5 grid items-center gap-4 border-b border-white/[0.07] px-3 pb-2 text-[12px] font-medium text-ink-3",
+        "mb-2 grid items-center gap-4 border-b border-line px-3 pb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-3",
         showAlbum ? "grid-cols-[28px_minmax(0,4fr)_minmax(0,3fr)_auto_auto_auto]" : "grid-cols-[28px_minmax(0,1fr)_auto_auto_auto]",
       )}
     >

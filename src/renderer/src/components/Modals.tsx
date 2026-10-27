@@ -20,7 +20,7 @@ function Dialog({ title, children, onClose }: { title: string; children: ReactNo
 
   return (
     <motion.div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/45"
+      className="fixed inset-0 z-40 grid place-items-center bg-black/45 moss:bg-[rgb(23_21_59/0.22)]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -37,7 +37,7 @@ function Dialog({ title, children, onClose }: { title: string; children: ReactNo
         exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.16, ease: [0.32, 0.72, 0, 1] } }}
         transition={{ type: "spring", stiffness: 460, damping: 32, mass: 0.8 }}
       >
-        <h2 className="font-display text-[19px] font-bold tracking-[-0.02em]">{title}</h2>
+        <h2 className="font-display text-[22px] font-bold tracking-[-0.035em]">{title}</h2>
         {children}
       </motion.div>
     </motion.div>
@@ -55,7 +55,7 @@ function Buttons({ onCancel, confirmLabel, danger, disabled }: { onCancel: () =>
         disabled={disabled}
         className={cn(
           "pressable h-10 rounded-full text-[14px] font-semibold shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.4)] hover:brightness-110 disabled:opacity-40",
-          danger ? "bg-[#ff453a] text-snow" : "bg-accent text-on-accent",
+          danger ? "bg-[#e5243b] text-snow" : "bg-accent text-on-accent",
         )}
       >
         {confirmLabel}
@@ -136,9 +136,9 @@ function PickSong({ initial, onPick, close }: { initial: string; onPick: (track:
               close();
               onPick(track);
             }}
-            className="flex w-full items-center gap-3 rounded-[12px] p-2 text-left transition-colors hover:bg-white/[0.08]"
+            className="flex w-full items-center gap-3 rounded-[14px] p-2 text-left transition-colors hover:bg-white/[0.08]"
           >
-            <Artwork src={track.artwork} className="size-10 rounded-[7px]" />
+            <Artwork src={track.artwork} className="size-10 rounded-[10px] shadow-[0_0_0_1px_var(--ring)]" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[14px] font-medium">{track.title}</span>
               <span className="block truncate text-[12.5px] text-ink-2">{artistNames(track.artists)}</span>

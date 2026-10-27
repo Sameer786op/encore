@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { Volume, Volume1, Volume2, VolumeX } from "lucide-react";
 import { describeQuality, useStreamQuality } from "@/player/quality";
-import { useCurrentTrack } from "@/player/store";
+import { useCurrentTrack, usePlayer } from "@/player/store";
 import { useSettings, type Settings } from "@/settings/store";
 import { cn } from "@/lib/cn";
 import { PausedForPureSound } from "./PureSound";
@@ -62,21 +63,40 @@ function QualityLine() {
   );
 }
 
-function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }) {
+/** the volume, for where the panel stands in for the player bar's slider */
+function VolumeRow() {
+  const volume = usePlayer((s) => s.volume);
+  const muted = usePlayer((s) => s.muted);
+  const { setVolume, toggleMute } = usePlayer.getState();
+  const shown = muted ? 0 : volume;
+  const Icon = shown === 0 ? VolumeX : shown < 0.34 ? Volume : shown < 0.67 ? Volume1 : Volume2;
+  return (
+    <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
+      <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} className="pressable -ml-1 grid size-8 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-white/[0.08] hover:text-ink">
+        <Icon className="size-[17px]" />
+      </button>
+      <Slider value={shown * 100} max={100} label="Volume" onChange={(v) => setVolume(v / 100)} step={5} formatValue={(v) => `${Math.round(v)}%`} className="flex-1" />
+      <span className="w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2">{Math.round(shown * 100)}%</span>
+    </div>
+  );
+}
+
+function Panel({ anchor, onClose, volume }: { anchor: HTMLElement; onClose: () => void; volume: boolean }) {
   const sound = useSettings((s) => s.sound);
   const pure = useSettings((s) => s.pureSound);
   const update = useSettings((s) => s.update);
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: 0, bottom: 0 });
+  // under a button near the top of the window (the top bar's), above one near the bottom (the player's)
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number }>({ left: 0, bottom: 0 });
   const set = (patch: Partial<Sound>) => update({ sound: { ...useSettings.getState().sound, ...patch } });
   const preset = presetOf(sound);
 
-  // sit just above the button, inside the window
+  // sit just beside the button, inside the window
   useLayoutEffect(() => {
     const place = () => {
       const rect = anchor.getBoundingClientRect();
       const left = Math.min(window.innerWidth - WIDTH - MARGIN, Math.max(MARGIN, rect.left + rect.width / 2 - WIDTH / 2));
-      setPos({ left, bottom: window.innerHeight - rect.top + 12 });
+      setPos(rect.top < window.innerHeight / 2 ? { left, top: rect.bottom + 12 } : { left, bottom: window.innerHeight - rect.top + 12 });
     };
     place();
     window.addEventListener("resize", place);
@@ -107,23 +127,25 @@ function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }
       ref={ref}
       role="dialog"
       aria-label="Speed and sound"
-      initial={{ opacity: 0, scale: 0.92, y: 8, filter: "blur(3px)" }}
+      initial={{ opacity: 0, scale: 0.92, y: pos.top !== undefined ? -8 : 8, filter: "blur(3px)" }}
       animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
       exit={{ opacity: 0, scale: 0.96, y: 4, transition: { duration: 0.14, ease: [0.32, 0.72, 0, 1] } }}
       transition={{ type: "spring", stiffness: 560, damping: 38, mass: 0.7, filter: { duration: 0.18, ease: "easeOut" } }}
-      style={{ left: pos.left, bottom: pos.bottom, width: WIDTH }}
-      className="glass-menu fixed z-50 origin-bottom space-y-4 rounded-[20px] p-4"
+      style={{ left: pos.left, top: pos.top, bottom: pos.bottom, width: WIDTH }}
+      className={cn("glass-menu fixed z-50 space-y-4 rounded-[20px] p-4", pos.top !== undefined ? "origin-top" : "origin-bottom")}
     >
       <div className="flex items-center justify-between">
         <h2 className="text-[14px] font-semibold text-ink">Speed &amp; sound</h2>
         <button
           onClick={() => set({ speed: 1, reverb: 0 })}
           disabled={isNormalSound(sound)}
-          className="rounded-full px-2 py-0.5 text-[12.5px] font-medium text-accent transition-opacity hover:bg-white/[0.06] disabled:opacity-0"
+          className="rounded-full px-2 py-0.5 text-[12.5px] font-medium text-accent-ink transition-opacity hover:bg-white/[0.06] disabled:opacity-0"
         >
           Reset
         </button>
       </div>
+
+      {volume && <VolumeRow />}
 
       {pure && <PausedForPureSound what="Speed and reverb" compact />}
 
@@ -194,7 +216,7 @@ function Panel({ anchor, onClose }: { anchor: HTMLElement; onClose: () => void }
   );
 }
 
-/** the speed and sound panel, opened from `anchor` */
-export function SoundPanel({ anchor, open, onClose }: { anchor: HTMLElement | null; open: boolean; onClose: () => void }) {
-  return createPortal(<AnimatePresence>{open && anchor && <Panel anchor={anchor} onClose={onClose} />}</AnimatePresence>, document.body);
+/** the speed and sound panel, opened from `anchor`; with `volume`, the volume too */
+export function SoundPanel({ anchor, open, onClose, volume = false }: { anchor: HTMLElement | null; open: boolean; onClose: () => void; volume?: boolean }) {
+  return createPortal(<AnimatePresence>{open && anchor && <Panel anchor={anchor} onClose={onClose} volume={volume} />}</AnimatePresence>, document.body);
 }

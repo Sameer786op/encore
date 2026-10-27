@@ -70,6 +70,8 @@ const api: EncoreApi = {
   },
   history: {
     insights: () => ipcRenderer.invoke(IPC.historyInsights),
+    recent: (since) => ipcRenderer.invoke(IPC.historyRecent, since),
+    playsOf: (trackId) => ipcRenderer.invoke(IPC.historyPlaysOf, trackId),
     playlistFromTopSongs: (limit) => ipcRenderer.invoke(IPC.historyTopPlaylist, limit),
     removeImported: (origin) => ipcRenderer.invoke(IPC.historyRemoveImported, origin),
   },

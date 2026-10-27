@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "@fontsource-variable/inter/opsz.css";
+import "@fontsource-variable/manrope/wght.css";
+import "@fontsource-variable/sora/wght.css";
 import "./styles.css";
 
 // The same page serves the main window and the floating mini player. Each

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { FolderOpen, FolderPlus, HardDrive, RefreshCw, Search, X } from "lucide-react";
 import type { Track } from "@shared/types";
+import { CollectionHeader } from "@/components/CollectionHeader";
+import { GlowCover } from "@/components/GlowCover";
 import { BigPlayButton, EmptyState, IconButton, PillButton, ShuffleButton } from "@/components/common";
 import { TrackList } from "@/components/TrackList";
 import { useLocal } from "@/imports/store";
@@ -44,23 +46,16 @@ export function LocalFilesPage() {
   return (
     <div className="relative">
       <div className="relative px-8 pb-16 pt-[72px]">
-        <div className="flex items-end gap-8">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 240, damping: 28 }}
-            className="grid size-[200px] shrink-0 place-items-center rounded-[14px] bg-gradient-to-br from-[#64d2ff] to-[#0a64d8] shadow-[0_24px_60px_-18px_rgb(0_0_0/0.75)]"
-          >
-            <HardDrive className="size-16 text-snow drop-shadow-lg" strokeWidth={1.5} />
-          </motion.div>
-          <div className="min-w-0 pb-2">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">On this computer</div>
-            <h1 className="mt-1.5 font-display text-[40px] font-bold leading-[1.06] tracking-[-0.03em]">Local files</h1>
-            <p className="mt-2.5 text-[14px] text-ink-2">
+        <CollectionHeader
+          art={<GlowCover tone="local" icon={<HardDrive className="size-1/3" strokeWidth={1.5} />} className="size-full" />}
+          kind="On this computer"
+          title="Local files"
+          meta={
+            <span>
               {plural(state.tracks, "song")} from {plural(state.folders.length, "folder")}
-            </p>
-          </div>
-        </div>
+            </span>
+          }
+        />
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           {state.folders.map((folder) => (
@@ -103,7 +98,7 @@ export function LocalFilesPage() {
               </span>
             </div>
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
-              <motion.div className="h-full bg-accent" animate={{ width: `${state.found ? (state.processed / state.found) * 100 : 5}%` }} />
+              <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,var(--ramp-1),var(--ramp-2),var(--ramp-3))]" animate={{ width: `${state.found ? (state.processed / state.found) * 100 : 5}%` }} />
             </div>
           </div>
         )}

@@ -7,7 +7,8 @@ import { Mosaic } from "@/components/Artwork";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { AlbumCard, ArtistCard, CardGrid, LikedSongsCard, PlaylistCard } from "@/components/Cards";
 import { CollectionHeader, Dot } from "@/components/CollectionHeader";
-import { BigPlayButton, EmptyState, IconButton, PillButton, SectionTitle, Segmented, ShuffleButton } from "@/components/common";
+import { GlowCover } from "@/components/GlowCover";
+import { BigPlayButton, EmptyState, IconButton, PageTitle, PillButton, SectionTitle, Segmented, ShuffleButton } from "@/components/common";
 import { FindField, SortButton, useListPref, useTrackFinder, type SortOption } from "@/components/ListTools";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { TrackList } from "@/components/TrackList";
@@ -72,9 +73,9 @@ function PlaylistsTab({ query, sort }: { query: string; sort: PlaylistSort }) {
       {!query.trim() && (
         <button
           onClick={() => openModal({ kind: "create-playlist" })}
-          className="pressable m-2.5 grid aspect-square place-items-center rounded-[10px] border border-dashed border-white/15 text-ink-2 transition-colors hover:border-white/30 hover:bg-white/[0.03] hover:text-ink"
+          className="pressable m-2.5 grid aspect-square place-items-center rounded-[18px] border border-dashed border-white/15 text-ink-2 transition-colors duration-300 hover:border-[rgb(var(--accent-rgb)/0.55)] hover:bg-[rgb(var(--accent-rgb)/0.05)] hover:text-ink"
         >
-          <span className="flex flex-col items-center gap-2 text-[13px] font-medium">
+          <span className="flex flex-col items-center gap-2 font-display text-[13.5px] font-semibold tracking-[-0.015em]">
             <Plus className="size-7" strokeWidth={1.5} />
             New playlist
           </span>
@@ -147,7 +148,7 @@ export function LibraryPage() {
   return (
     <div className="px-8 pb-16 pt-[68px]">
       <div className="flex items-end justify-between">
-        <h1 className="font-display text-[34px] font-bold tracking-[-0.026em]">Your Library</h1>
+        <PageTitle eyebrow="Your music" title="Your Library" />
         <PillButton icon={<Plus className="size-4" />} onClick={() => openModal({ kind: "create-playlist" })}>
           New playlist
         </PillButton>
@@ -189,7 +190,7 @@ export function LibraryPage() {
         <section className="mt-12">
           <SectionTitle
             action={
-              <button onClick={() => navigate({ name: "history" })} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+              <button onClick={() => navigate({ name: "history" })} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10">
                 See all
               </button>
             }
@@ -221,9 +222,7 @@ export function LikedPage() {
       <div className="relative px-8 pb-16 pt-[72px]">
         <CollectionHeader
           art={
-            <div className="grid size-full place-items-center bg-gradient-to-br from-accent-2 via-accent to-accent-deep">
-              <Heart className="size-20 text-snow drop-shadow-lg" fill="currentColor" strokeWidth={0} />
-            </div>
+            <GlowCover tone="liked" icon={<Heart className="size-1/3" fill="currentColor" strokeWidth={0} />} className="size-full" />
           }
           kind="Collection"
           title="Liked Songs"
@@ -396,7 +395,7 @@ export function HistoryPage() {
   return (
     <div className="px-8 pb-16 pt-[68px]">
       <div className="flex items-end justify-between">
-        <h1 className="font-display text-[34px] font-bold tracking-[-0.026em]">Recently played</h1>
+        <PageTitle eyebrow="History" title="Recently played" />
         {history.length > 0 && (
           <PillButton
             icon={<Trash2 className="size-4" />}

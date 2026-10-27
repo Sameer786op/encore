@@ -6,6 +6,7 @@ import { useLibrary } from "@/library/store";
 import { navigate, useNav, type Route } from "@/nav/store";
 import { usePlayer } from "@/player/store";
 import { cn } from "@/lib/cn";
+import { plural } from "@/lib/format";
 import { openMenu } from "@/ui/menu";
 import { openModal } from "@/ui/modal";
 import { useUpdates } from "@/ui/updates";
@@ -40,6 +41,8 @@ interface ItemProps {
   route: Route;
   icon: ReactNode;
   label: string;
+  /** a second line under the label, for playlists */
+  sub?: string;
   onClick?: () => void;
   trailing?: ReactNode;
   /** a dot on the icon when there's no room for the trailing badge */
@@ -48,8 +51,8 @@ interface ItemProps {
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-/** one row in the sidebar; the selection is a single highlight that glides between rows */
-function Item({ route, icon, label, onClick, trailing, dot, compact, onContextMenu }: ItemProps) {
+/** one row in the sidebar; the selection is a single highlight that glides between rows, with an ember spark at its end */
+function Item({ route, icon, label, sub, onClick, trailing, dot, compact, onContextMenu }: ItemProps) {
   const current = useNav((s) => s.route);
   const active = isActive(current, route);
   return (
@@ -59,24 +62,33 @@ function Item({ route, icon, label, onClick, trailing, dot, compact, onContextMe
       title={compact ? label : undefined}
       aria-label={compact ? label : undefined}
       className={cn(
-        "group relative flex w-full items-center rounded-[10px] text-left text-[13.5px] font-medium transition-colors duration-200",
-        compact ? "h-10 justify-center" : "h-9 gap-2.5 px-2.5",
-        active ? "text-ink" : "text-ink/85 hover:bg-white/[0.05]",
+        "group relative flex w-full items-center rounded-[14px] text-left text-[13.5px] font-semibold transition-colors duration-200",
+        compact ? "h-10 justify-center" : sub ? "h-[46px] gap-2.5 px-2" : "h-[38px] gap-3 px-2.5",
+        active ? "text-ink" : "text-ink-2 hover:bg-white/[0.05] hover:text-ink",
       )}
     >
       {active && (
         <motion.span
           layoutId="sidebar-selection"
-          className="absolute inset-0 rounded-[10px] bg-white/[0.11] shadow-[inset_0_0.5px_0_rgb(255_255_255/0.12)]"
+          className="absolute inset-0 rounded-[14px] bg-[var(--row-on)] shadow-[inset_0_0_0_0.5px_var(--glass-rim),0_4px_14px_-6px_rgb(0_0_0/calc(0.3*var(--shadow-k)))]"
           transition={{ type: "spring", stiffness: 520, damping: 42, mass: 0.8 }}
         />
       )}
-      <span className="relative grid size-[22px] shrink-0 place-items-center text-accent">
+      <span className={cn("relative grid shrink-0 place-items-center transition-colors duration-200", sub ? "size-[34px]" : "size-[20px]", active ? "text-accent-ink" : "text-ink-2 group-hover:text-ink")}>
         {icon}
         {compact && dot && <span className="absolute -right-1 -top-0.5 size-2 rounded-full bg-accent ring-2 ring-[rgb(var(--glass-rgb))]" />}
       </span>
-      {!compact && <span className="relative min-w-0 flex-1 truncate">{label}</span>}
-      {!compact && trailing && <span className="relative shrink-0">{trailing}</span>}
+      {!compact && (
+        <span className="relative min-w-0 flex-1">
+          <span className="block truncate">{label}</span>
+          {sub && <span className="block truncate text-[11.5px] font-medium text-ink-3">{sub}</span>}
+        </span>
+      )}
+      {!compact && trailing ? (
+        <span className="relative shrink-0">{trailing}</span>
+      ) : (
+        !compact && active && <span aria-hidden className="relative mr-0.5 size-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_10px_rgb(var(--accent-rgb)),0_0_3px_rgb(var(--accent-rgb))]" />
+      )}
     </button>
   );
 }
@@ -92,14 +104,14 @@ function Heading({ children, action, compact }: { children: ReactNode; action?: 
     );
   }
   return (
-    <div className="flex h-8 items-center justify-between pl-2.5 pr-1 pt-3">
-      <span className="text-[11.5px] font-semibold text-ink-3">{children}</span>
+    <div className="flex h-9 items-center justify-between pl-2.5 pr-1 pt-4">
+      <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-3">{children}</span>
       {action}
     </div>
   );
 }
 
-const ICON = "size-[18px]";
+const ICON = "size-[18px] stroke-[1.9]";
 
 export function Sidebar() {
   const playlists = useLibrary((s) => s.snapshot.playlists);
@@ -114,10 +126,16 @@ export function Sidebar() {
   const compact = useCompact();
 
   return (
-    <LiquidGlass as="aside" area="sidebar" radius={22} sheen className="absolute bottom-2 left-2 top-2 z-30 flex w-[var(--sidebar-w)] flex-col overflow-hidden">
-      <div className={cn("drag flex h-[54px] shrink-0 items-center gap-2.5", compact ? "justify-center" : "px-4")}>
-        <Logo className="size-[28px] drop-shadow-[0_4px_10px_rgb(122_92_255/0.45)]" />
-        {!compact && <span className="font-display text-[17px] font-bold tracking-[-0.02em] whitespace-nowrap">Vyse Music</span>}
+    <LiquidGlass as="aside" area="sidebar" radius={24} sheen className="absolute bottom-2 left-2 top-2 z-30 flex w-[var(--sidebar-w)] flex-col overflow-hidden">
+      {/* an ember glow rising from the bottom corner, in Ember */}
+      <span aria-hidden className="ember-only pointer-events-none absolute inset-0 -z-[1] bg-[radial-gradient(95%_38%_at_0%_100%,rgb(var(--accent-rgb)/0.2),transparent_72%)]" />
+      <div className={cn("drag flex h-[62px] shrink-0 items-center gap-2.5", compact ? "justify-center" : "px-[18px]")}>
+        <Logo className="size-[30px] drop-shadow-[0_6px_14px_rgb(var(--accent-rgb)/0.45)]" />
+        {!compact && (
+          <span aria-label="Vyse Music" className="font-display text-[25px] font-bold leading-none tracking-[-0.045em] whitespace-nowrap">
+            vyse
+          </span>
+        )}
       </div>
 
       <div className={cn("min-h-0 flex-1 overflow-y-auto pb-2", compact ? "px-2" : "px-2.5", " scrollbar-none [mask-image:linear-gradient(to_bottom,transparent,black_10px,black_calc(100%_-_16px),transparent)]")}>
@@ -171,8 +189,9 @@ export function Sidebar() {
               compact={compact}
               key={p.id}
               route={{ name: "playlist", id: p.id }}
-              icon={<Mosaic sources={p.items.map((i) => i.track.artwork)} className="size-[22px] rounded-[5px]" fallback={<ListMusic className="size-3" />} />}
+              icon={<Mosaic sources={p.items.map((i) => i.track.artwork)} className={compact ? "size-[24px] rounded-[6px]" : "size-[34px] rounded-[9px]"} fallback={<ListMusic className="size-4" />} />}
               label={p.name}
+              sub={compact ? undefined : plural(p.items.length, "song")}
               trailing={bars(p.id) || (p.synced && <ServiceIcon service={p.synced.service} plain className="size-3 text-ink-3" />)}
               onContextMenu={(e) => openMenu(e, playlistMenu(p))}
             />

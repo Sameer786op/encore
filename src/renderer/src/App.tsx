@@ -14,6 +14,7 @@ import { navigate, useNav, type Route } from "@/nav/store";
 import { connectMediaSession } from "@/player/mediaSession";
 import { connectOutputWatch } from "@/player/outputWatch";
 import { connectPlayerSync } from "@/player/sync";
+import { connectWaveform } from "@/player/waveform";
 import { useView } from "@/ui/view";
 import { connectAppearance } from "@/ui/appearance";
 import { connectUpdates } from "@/ui/updates";
@@ -91,6 +92,7 @@ export default function App() {
     const stopSync = connectPlayerSync();
     const stopMedia = connectMediaSession();
     const stopOutputWatch = connectOutputWatch();
+    const stopWaveform = connectWaveform();
     const stopShortcuts = connectShortcuts();
     const stopGlobalKeys = connectGlobalKeys();
     const stopMini = window.encore.mini.onVisible((miniOpen) => useView.setState({ miniOpen }));
@@ -105,6 +107,7 @@ export default function App() {
       stopSync();
       stopMedia();
       stopOutputWatch();
+      stopWaveform();
       stopShortcuts();
       stopGlobalKeys();
       stopMini();

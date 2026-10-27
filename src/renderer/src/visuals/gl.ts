@@ -1,7 +1,7 @@
 import { getAnalyser } from "@/player/store";
 
 // Shared bits for the WebGL visuals: a quad that covers the canvas, and how
-// loud the low end of the music is.
+// loud the low end (or any band) of the music is.
 
 const VERTEX = `
 attribute vec2 a_pos;
@@ -51,5 +51,22 @@ export function bassMeter(): () => number {
     let level = 0;
     for (let i = 1; i < 12; i++) level += spectrum[i];
     return level / (11 * 255);
+  };
+}
+
+/** a reader for how loud a band of what's playing is right now, from 0 to 1 */
+export function bandMeter(lowHz: number, highHz: number): () => number {
+  let spectrum: Uint8Array<ArrayBuffer> | null = null;
+  return () => {
+    const analyser = getAnalyser();
+    if (!analyser) return 0;
+    if (spectrum?.length !== analyser.frequencyBinCount) spectrum = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(spectrum);
+    const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+    const from = Math.max(1, Math.round(lowHz / hzPerBin));
+    const to = Math.min(spectrum.length, Math.max(from + 1, Math.round(highHz / hzPerBin)));
+    let level = 0;
+    for (let i = from; i < to; i++) level += spectrum[i];
+    return level / ((to - from) * 255);
   };
 }

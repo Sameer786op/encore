@@ -44,7 +44,7 @@ Imported history is saved straight away and powers **Your listening**: total pla
 
 ### Look and sound (Phase 3)
 
-- **Full-screen player** (click the cover, or press F): a moving background painted from the cover's colours that breathes with the bass, a large cover that springs forward when the music plays and sits back when you pause, and all the controls.
+- **Full-screen player** (click the cover, or press F): the song as a specimen in the middle (see Design below), synced lyrics in a tile on the left, the artist and what's up next on the right, and the controls in a glass bar along the bottom. The cover springs forward when the music plays and sits back when you pause. With **Settings → Appearance → Background** set to **Artwork**, it keeps the moving background painted from the cover's colours that breathes with the bass.
 - **Synced lyrics** (press L): lines light up word by word as they're sung, the view follows the song, long instrumental breaks show animated dots, and clicking a line jumps there. Per-song timing can be nudged if lyrics run early or late. Lyrics come from LRCLIB, a free and open lyrics library, with YouTube Music's plain lyrics as a fallback. Local files use a matching `.lrc` file or lyrics inside their tags.
 - **Edge light**: while the full-screen player shows lyrics, a neon line of light runs round the window. Its colours travel round the edge, it swells with the bass and flashes on the beat, and it dims while paused. Settings → Lyrics has the colours (six presets, rainbow, the cover's colours, or two of your own), speed, glow and the pulse, with a live preview.
 - **Equalizer**: 10 bands, a preamp and 11 presets, with a live response curve. A look-ahead peak limiter keeps boosts from clipping: it sees a peak 5 ms before it plays and turns down only that moment, smoothly, and leaves everything under the ceiling bit for bit as it was.
@@ -64,9 +64,30 @@ Imported history is saved straight away and powers **Your listening**: total pla
   - **ListenBrainz**: copy your user token from [listenbrainz.org/settings](https://listenbrainz.org/settings/) into Settings → Scrobbling.
   - **Last.fm**: Last.fm needs its own free API account for Vyse Music. Create one at [last.fm/api/account/create](https://www.last.fm/api/account/create) (any name and description will do), paste the API key and shared secret into Settings → Scrobbling, then approve Vyse Music in the browser page that opens.
 
-### Design
+### Design: Ember & Moss
 
-Vyse Music follows Apple Music on iOS 27 and macOS. The only background is the cover of what's playing (or of the album, artist or mix you're looking at), blown up and blurred into a wash of its colours. Everything on top is Liquid Glass: the sidebar, the toolbar, the floating player, the queue, menus, dialogs and notifications. The larger panes bend the picture behind them at their rounded edges, like thick glass, and catch a highlight that follows the pointer. Text is set in Inter, the accent is Apple Music red, switches are iOS green, and motion uses springs and Apple's own easing curve. **Settings → Appearance** switches the glass between **Clear** and **Tinted**. If transparency effects are off in Windows, the glass turns nearly solid.
+<p>
+  <img src="docs/screenshots/home-ember.jpg" alt="Home in Ember, the dark look" width="49%">
+  <img src="docs/screenshots/home-moss.jpg" alt="Home in Moss, the light look" width="49%">
+  <img src="docs/screenshots/now-playing-ember.jpg" alt="The full-screen player in Ember, with synced lyrics" width="49%">
+  <img src="docs/screenshots/now-playing-moss.jpg" alt="The full-screen player in Moss" width="49%">
+  <img src="docs/screenshots/artist-ember.jpg" alt="An artist page in Ember" width="49%">
+  <img src="docs/screenshots/listening-moss.jpg" alt="Your listening in Moss" width="49%">
+</p>
+
+Vyse Music has two looks built from one design. It follows Windows between them unless you pick one in **Settings → Appearance**.
+
+- **Ember** is the dark look: a black window lit by slow, grainy ember glows that take a tint from the cover that's playing. Artists appear in black and white, lit from behind.
+- **Moss** is the light look: milky frosted glass over a soft moss floor, with navy text.
+
+Both share the same pieces:
+
+- **The specimen.** The song that's playing is shown like a scanned specimen. Its cover floats inside thin rings with a scan line passing over it, and callouts on leader lines read out the live bass, the loudness and the stream quality. A ring gauge shows how often you play the song to the end.
+- **The signature gradient.** An ember → amber → lime gradient runs through the meters, the waveform seek bar, the charts in Your listening and the lyrics as they're sung. With another accent colour, it runs from that colour to a lighter partner.
+- **Tiles.** Home is a bento of glass tiles built from your own listening, and the same glass holds the lyrics, the settings, the stats and the menus. **Settings → Appearance** switches the glass between **Clear** and **Tinted**.
+- **Type.** Titles and big numbers are set in Sora and everything else in Manrope; both come with the app.
+
+Every number on screen is real: it comes from your history, the music as it plays or the stream itself. Vyse Music also follows your Windows settings. With transparency effects off, the glass turns nearly solid. With animations off, the floating, the scanning and the blur-ins stop. Text keeps at least 4.5:1 contrast in both looks, accent-coloured text included.
 
 ### Keyboard
 

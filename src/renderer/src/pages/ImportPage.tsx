@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check, ChevronDown, CircleAlert, FileArchive, Link2, ListMusic, LoaderCircle, Trash2, Upload, X } from "lucide-react";
 import type { ExportSummary, HistorySource, ImportJob } from "@shared/types";
-import { EmptyState, SectionTitle } from "@/components/common";
+import { EmptyState, PageTitle, SectionTitle } from "@/components/common";
 import { ORIGIN_COLOR, ORIGIN_LABEL, destinationLabel, guessService, yearRange } from "@/imports/labels";
 import { useImports } from "@/imports/store";
 import { navigate } from "@/nav/store";
@@ -45,9 +45,9 @@ function LinkCard() {
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col fill-group rounded-[20px] p-6">
+    <form onSubmit={submit} className="flex flex-col fill-group rounded-[24px] p-6">
       <div className="flex items-center gap-3">
-        <div className="grid size-10 place-items-center rounded-xl bg-accent/15 text-accent">
+        <div className="grid size-10 place-items-center rounded-xl bg-accent/15 text-accent-ink">
           <Link2 className="size-5" />
         </div>
         <div>
@@ -127,7 +127,7 @@ function ExportCard({ onSummary }: { onSummary: (summary: ExportSummary) => void
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="grid size-10 place-items-center rounded-xl bg-[#ff9f0a]/15 text-[#ff9f0a]">
+        <div className="grid size-10 place-items-center rounded-xl bg-[var(--ramp-2)]/15 text-[var(--ramp-2)]">
           <FileArchive className="size-5" />
         </div>
         <div>
@@ -138,7 +138,7 @@ function ExportCard({ onSummary }: { onSummary: (summary: ExportSummary) => void
       <div className="mt-5 grid flex-1 place-items-center rounded-xl bg-white/[0.04] px-4 py-7 text-center">
         {busy ? (
           <div className="flex flex-col items-center gap-2 text-sm text-ink-2">
-            <LoaderCircle className="size-6 animate-spin text-accent" />
+            <LoaderCircle className="size-6 animate-spin text-accent-ink" />
             Reading your export…
           </div>
         ) : (
@@ -201,7 +201,7 @@ function Guides() {
   return (
     <div className="grid grid-cols-1 gap-3 @4xl:grid-cols-3">
       {GUIDES.map((g) => (
-        <div key={g.origin} className="fill-group rounded-[20px]">
+        <div key={g.origin} className="fill-group rounded-[24px]">
           <button onClick={() => setOpen(open === g.origin ? null : g.origin)} className="flex w-full items-center gap-3 px-5 py-4 text-left">
             <span className="size-2 rounded-full" style={{ background: ORIGIN_COLOR[g.origin] }} />
             <span className="flex-1 text-[14px] font-medium">{g.title}</span>
@@ -218,7 +218,7 @@ function Guides() {
                     </li>
                   ))}
                 </ol>
-                <a href={g.link} target="_blank" rel="noreferrer" className="mx-5 mb-4 inline-flex text-[13px] font-medium text-accent hover:underline">
+                <a href={g.link} target="_blank" rel="noreferrer" className="mx-5 mb-4 inline-flex text-[13px] font-medium text-accent-ink hover:underline">
                   Open {new URL(g.link).hostname.replace(/^www\./, "")}
                 </a>
               </motion.div>
@@ -279,7 +279,7 @@ function ExportChooser({ summary, onClose }: { summary: ExportSummary; onClose: 
   };
 
   return (
-    <motion.div className="fixed inset-0 z-40 grid place-items-center bg-black/45" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div className="fixed inset-0 z-40 grid place-items-center bg-black/45 moss:bg-[rgb(23_21_59/0.22)]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <motion.div
         role="dialog"
         aria-modal="true"
@@ -293,7 +293,7 @@ function ExportChooser({ summary, onClose }: { summary: ExportSummary; onClose: 
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
           <div className="min-w-0">
             <OriginChip origin={summary.origin} />
-            <h2 className="mt-2 font-display text-[19px] font-bold tracking-[-0.02em]">Here's what's in your export</h2>
+            <h2 className="mt-2 font-display text-[22px] font-bold tracking-[-0.035em]">Here's what's in your export</h2>
             <p className="mt-0.5 truncate text-[13px] text-ink-3">{summary.fileName}</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="pressable grid size-7 place-items-center rounded-full bg-white/[0.08] text-ink-2 hover:bg-white/[0.14] hover:text-ink">
@@ -375,9 +375,9 @@ export function JobCard({ job }: { job: ImportJob }) {
         });
 
   return (
-    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group flex items-center gap-4 fill-group rounded-[20px] p-4">
+    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group flex items-center gap-4 fill-group rounded-[24px] p-4">
       <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/[0.06]">
-        {job.status === "matching" ? <LoaderCircle className="size-5 animate-spin text-accent" /> : job.status === "done" ? <Check className="size-5 text-switch" /> : <ListMusic className="size-5 text-ink-2" />}
+        {job.status === "matching" ? <LoaderCircle className="size-5 animate-spin text-accent-ink" /> : job.status === "done" ? <Check className="size-5 text-good" /> : <ListMusic className="size-5 text-ink-2" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -387,7 +387,7 @@ export function JobCard({ job }: { job: ImportJob }) {
         {job.status === "matching" ? (
           <div className="mt-2 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2" animate={{ width: `${percent}%` }} transition={{ ease: "easeOut" }} />
+              <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,var(--ramp-1),var(--ramp-2),var(--ramp-3))]" animate={{ width: `${percent}%` }} transition={{ ease: "easeOut" }} />
             </div>
             <span className="shrink-0 text-[12px] tabular-nums text-ink-3">
               {done} of {job.total}
@@ -430,7 +430,7 @@ function HistorySources() {
     <section className="mt-12">
       <SectionTitle
         action={
-          <button onClick={() => navigate({ name: "listening" })} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+          <button onClick={() => navigate({ name: "listening" })} className="pressable rounded-full px-2.5 py-1 text-[13px] font-semibold text-accent-ink hover:bg-accent/10">
             See your listening
           </button>
         }
@@ -439,7 +439,7 @@ function HistorySources() {
       </SectionTitle>
       <div className="flex flex-col gap-2">
         {sources.map((s) => (
-          <div key={s.origin} className="group flex items-center gap-4 fill-group rounded-[20px] p-4">
+          <div key={s.origin} className="group flex items-center gap-4 fill-group rounded-[24px] p-4">
             <OriginChip origin={s.origin} />
             <span className="flex-1 text-[13px] text-ink-2">
               {plural(s.plays, "play")}, {yearRange(s.firstAt, s.lastAt)}
@@ -473,13 +473,11 @@ export function ImportPage() {
 
   return (
     <div className="@container px-8 pb-16 pt-[68px]">
-      <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="font-display text-[34px] font-bold tracking-[-0.026em]">
-        Bring your music
-      </motion.h1>
-      <p className="mt-1 max-w-2xl text-[15px] text-ink-2">
+      <PageTitle eyebrow="Import" title="Bring your music" />
+      <p className="mt-2 max-w-2xl text-[15px] text-ink-2">
         Import playlists from a link, or everything you've listened to from your data export. To keep your playlists up to date by themselves,{" "}
         {/* Connected accounts is the first thing in Settings */}
-        <button onClick={() => navigate({ name: "settings" })} className="font-semibold text-accent hover:underline">
+        <button onClick={() => navigate({ name: "settings" })} className="font-semibold text-accent-ink hover:underline">
           connect your account
         </button>{" "}
         instead.

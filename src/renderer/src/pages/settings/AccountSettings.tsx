@@ -102,7 +102,7 @@ function AccountRow({ account }: { account: AccountStatus }) {
 
       {syncing && progress !== null && (
         <div className="ml-14 mt-3 h-1 overflow-hidden rounded-full bg-white/10">
-          <motion.div className="h-full rounded-full bg-accent" initial={false} animate={{ width: `${Math.max(3, progress * 100)}%` }} transition={{ type: "spring", stiffness: 140, damping: 26 }} />
+          <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,var(--ramp-1),var(--ramp-2),var(--ramp-3))]" initial={false} animate={{ width: `${Math.max(3, progress * 100)}%` }} transition={{ type: "spring", stiffness: 140, damping: 26 }} />
         </div>
       )}
       {connecting && service !== "youtube" && (
@@ -138,7 +138,7 @@ function AccountRow({ account }: { account: AccountStatus }) {
           )}
         </div>
       )}
-      {account.error && !syncing && <p className="ml-14 mt-2 text-[12.5px] leading-relaxed text-[#ff6961]">{account.error}</p>}
+      {account.error && !syncing && <p className="ml-14 mt-2 text-[12.5px] leading-relaxed text-bad">{account.error}</p>}
 
       {account.connected && account.playlists.length > 0 && (
         <div className="ml-14">

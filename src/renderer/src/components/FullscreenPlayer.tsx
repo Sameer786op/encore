@@ -1,131 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronDown, Expand, LoaderCircle, MicVocal, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
-import { navigate } from "@/nav/store";
+import { ChevronDown, Expand, LoaderCircle } from "lucide-react";
+import type { Track } from "@shared/types";
 import { useCurrentTrack, usePlayer } from "@/player/store";
 import { LyricsView } from "@/lyrics/LyricsView";
-import { useSettings } from "@/settings/store";
-import { edgeLook } from "@/visuals/edgeColors";
+import { useLyrics } from "@/lyrics/useLyrics";
+import { useSettings, type Settings } from "@/settings/store";
+import { EDGE_PRESETS, edgeLook } from "@/visuals/edgeColors";
 import { EdgeLight } from "@/visuals/EdgeLight";
 import { FlowBackground } from "@/visuals/FlowBackground";
-import type { RGB } from "@/visuals/palette";
+import { forGlow, type RGB } from "@/visuals/palette";
 import { usePalette } from "@/visuals/usePalette";
 import { useHints } from "@/ui/shortcuts";
 import { useView } from "@/ui/view";
 import { cn } from "@/lib/cn";
-import { formatTime } from "@/lib/format";
-import { Artwork } from "./Artwork";
-import { LikeButton } from "./common";
-import { Slider } from "./Slider";
+import { Tile } from "./home/Tile";
+import { BottomBar } from "./nowplaying/Bottom";
+import { SideColumn } from "./nowplaying/Side";
+import { Stage } from "./nowplaying/Stage";
+import { PlayingBars } from "./PlayingBars";
+import { EASE } from "./Specimen";
 
-/** the cover sits back while paused and springs forward when the music starts, like Apple Music */
-function Cover({ src, title }: { src?: string; title: string }) {
-  const playing = usePlayer((s) => s.status === "playing" || s.status === "loading");
-  return (
-    <motion.div
-      animate={{ scale: playing ? 1 : 0.86 }}
-      transition={{ type: "spring", stiffness: 210, damping: 22, mass: 0.9 }}
-      className="will-change-transform"
-    >
-      <AnimatePresence mode="popLayout" initial={false}>
-        <motion.div
-          key={src ?? title}
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ type: "spring", stiffness: 180, damping: 24 }}
-        >
-          <Artwork
-            src={src?.replace(/=w544-h544/, "=w1200-h1200")}
-            alt={title}
-            className={cn(
-              "aspect-square w-full rounded-[18px] transition-shadow duration-700",
-              playing ? "shadow-[0_40px_90px_-20px_rgb(0_0_0/0.75)]" : "shadow-[0_16px_40px_-16px_rgb(0_0_0/0.6)]",
-            )}
-          />
-        </motion.div>
-      </AnimatePresence>
-    </motion.div>
-  );
-}
+// The full-screen player, in the mode the app is in. The lyrics on the left,
+// the cover as a specimen in the middle, the artist and what's next on the
+// right, and the controls along the bottom. Behind it, Ember's glow (with the
+// lyrics as a faint texture) or Moss's floor, or the cover's own colours
+// flowing when the background is set to Artwork.
 
-/** a white glyph with no border; a soft circle shows under it on hover */
-function Glyph({ className, active, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.84 }}
-      transition={{ type: "spring", stiffness: 520, damping: 30 }}
-      className={cn("grid place-items-center rounded-full transition-colors duration-200", active ? "bg-white/20 text-white" : "text-white/90 hover:bg-white/10 hover:text-white", className)}
-      {...(props as object)}
-    >
-      {children}
-    </motion.button>
-  );
-}
+const GAP = 18;
+/** narrower than this, the artist and Up next only show when the queue is opened */
+const WIDE = 1180;
+const SLIDE = { type: "spring", stiffness: 260, damping: 34, mass: 0.9 } as const;
 
-function Controls() {
-  const status = usePlayer((s) => s.status);
-  const shuffle = usePlayer((s) => s.queue.shuffle);
-  const repeat = usePlayer((s) => s.queue.repeat);
-  const position = usePlayer((s) => s.position);
-  const duration = usePlayer((s) => s.duration);
-  const volume = usePlayer((s) => s.volume);
-  const muted = usePlayer((s) => s.muted);
-  const p = usePlayer.getState();
-  const playing = status === "playing";
-  const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
+const clamp = (min: number, value: number, max: number) => Math.round(Math.min(max, Math.max(min, value)));
+const rgb = ([r, g, b]: RGB, alpha: number) => `rgb(${r} ${g} ${b} / ${alpha})`;
 
-  return (
-    <div className="w-full">
-      <Slider value={position} max={duration} label="Seek" onCommit={p.seek} step={5} formatValue={formatTime} />
-      <div className="mt-1 flex justify-between text-[12px] font-medium tabular-nums text-white/55">
-        <span>{formatTime(position)}</span>
-        <span>-{formatTime(Math.max(0, duration - position))}</span>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <Glyph onClick={p.toggleShuffle} aria-label="Shuffle" aria-pressed={shuffle} active={shuffle} className="size-10">
-          <Shuffle className="size-[18px]" strokeWidth={2.3} />
-        </Glyph>
-        <Glyph onClick={p.previous} aria-label="Previous" className="size-14">
-          <SkipBack className="size-8" fill="currentColor" strokeWidth={1} />
-        </Glyph>
-        <Glyph onClick={p.togglePlay} aria-label={playing ? "Pause" : "Play"} className="size-[72px]">
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={status === "loading" ? "loading" : playing ? "pause" : "play"}
-              initial={{ opacity: 0, scale: 0.4, filter: "blur(4px)" }}
-              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, scale: 0.4, filter: "blur(4px)" }}
-              transition={{ type: "spring", stiffness: 600, damping: 32, filter: { duration: 0.16, ease: "easeOut" } }}
-              className="grid place-items-center"
-            >
-              {status === "loading" ? (
-                <LoaderCircle className="size-9 animate-spin" />
-              ) : playing ? (
-                <Pause className="size-11" fill="currentColor" strokeWidth={0} />
-              ) : (
-                <Play className="ml-1 size-11" fill="currentColor" strokeWidth={0} />
-              )}
-            </motion.span>
-          </AnimatePresence>
-        </Glyph>
-        <Glyph onClick={p.next} aria-label="Next" className="size-14">
-          <SkipForward className="size-8" fill="currentColor" strokeWidth={1} />
-        </Glyph>
-        <Glyph onClick={p.cycleRepeat} aria-label={`Repeat: ${repeat}`} active={repeat !== "off"} className="size-10">
-          <RepeatIcon className="size-[18px]" strokeWidth={2.3} />
-        </Glyph>
-      </div>
-      <div className="mt-5 flex items-center gap-3 text-white/55">
-        <button onClick={p.toggleMute} aria-label={muted ? "Unmute" : "Mute"} className="pressable hover:text-white">
-          {muted || volume === 0 ? <VolumeX className="size-4" /> : <Volume1 className="size-4" />}
-        </button>
-        <Slider value={(muted ? 0 : volume) * 100} max={100} label="Volume" onChange={(v) => p.setVolume(v / 100)} step={5} className="flex-1" />
-        <Volume2 className="size-4" />
-      </div>
-    </div>
-  );
+function useWindowWidth(): number {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return width;
 }
 
 /** Windows 11 rounds a window's corners, except when it fills the screen */
@@ -143,7 +61,7 @@ function useWindowRadius(): number {
   return square ? 0 : 8;
 }
 
-/** the line of light round the window, while the lyrics show */
+/** the line of light round the window, while the lyrics show; it adds light in Ember and lies on top in Moss */
 function WindowEdgeLight({ palette }: { palette: RGB[] }) {
   const edge = useSettings((s) => s.edgeLight);
   const radius = useWindowRadius();
@@ -153,9 +71,146 @@ function WindowEdgeLight({ palette }: { palette: RGB[] }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="pointer-events-none absolute inset-0 z-20 mix-blend-plus-lighter"
+      className="pointer-events-none absolute inset-0 z-20 mix-blend-plus-lighter moss:mix-blend-normal"
     >
       <EdgeLight {...edgeLook(edge, palette)} speed={edge.speed} glow={edge.glow} pulse={edge.pulse} radius={radius} />
+    </motion.div>
+  );
+}
+
+function edgeColours(edge: Settings["edgeLight"]): string {
+  if (edge.colors === "rainbow") return "in every colour";
+  if (edge.colors === "artwork") return "in the cover's colours";
+  if (edge.colors === "custom") return "in your colours";
+  return `in ${(EDGE_PRESETS.find((p) => p.id === edge.colors)?.name ?? "Neon").toLowerCase()}`;
+}
+
+/** says whether the edge light is on, and switches it */
+function EdgePill() {
+  const edge = useSettings((s) => s.edgeLight);
+  const update = useSettings((s) => s.update);
+  return (
+    <button
+      onClick={() => update({ edgeLight: { ...edge, enabled: !edge.enabled } })}
+      aria-pressed={edge.enabled}
+      title={edge.enabled ? "Turn the edge light off" : "Turn the edge light on"}
+      className="glass-control pressable inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full py-1 pl-1 pr-3.5 text-[12px] font-semibold text-ink-2 hover:brightness-110"
+    >
+      <b className={cn("rounded-full px-2.5 py-1 font-bold transition-colors duration-300", edge.enabled ? "bg-ink text-bg" : "bg-[var(--row-on)] text-ink-2")}>Edge light</b>
+      {edge.enabled ? `on, ${edgeColours(edge)}` : "off"}
+    </button>
+  );
+}
+
+/** what the player's doing, and where in the queue it is */
+function ListeningPill() {
+  const status = usePlayer((s) => s.status);
+  const index = usePlayer((s) => s.queue.index);
+  const count = usePlayer((s) => s.queue.items.length);
+  const label = status === "loading" ? "Loading…" : status === "playing" ? "Playing" : "Paused";
+  return (
+    <span className="glass-control hidden h-10 items-center gap-2.5 whitespace-nowrap rounded-full py-1 pl-1 pr-3.5 text-[12px] font-semibold text-ink-2 md:inline-flex">
+      <b className="rounded-full bg-ink px-3 py-[7px] font-bold leading-none text-bg">{label}</b>
+      {count > 0 && index >= 0 && (
+        <span className="tabular-nums">
+          Song {index + 1} of {count.toLocaleString()}
+        </span>
+      )}
+      {status === "loading" ? <LoaderCircle className="size-3.5 animate-spin text-ink-3" /> : <PlayingBars paused={status !== "playing"} className="h-3" />}
+    </span>
+  );
+}
+
+/** the words of the song (or its name, before they come), as faint type across the background */
+function LyricRain({ track }: { track: Track | null }) {
+  const state = useLyrics(track);
+  const words = useMemo(() => {
+    const lyrics = state.status === "ready" ? state.lyrics : null;
+    const lines = lyrics?.synced ? lyrics.synced.map((l) => l.text).filter((t) => t !== "♪") : lyrics?.plain ? lyrics.plain.split("\n") : [];
+    const fallback = track ? [track.title, ...track.artists.map((a) => a.name), track.album?.title ?? ""] : [];
+    return (lines.length > 0 ? lines : fallback)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join("  ·  ")
+      .toUpperCase();
+  }, [state, track]);
+  if (!words) return null;
+  // long enough to run off the side of any window
+  const row = `${words}  ·  `.repeat(Math.ceil(900 / (words.length + 5)));
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 select-none overflow-hidden whitespace-pre font-mono text-[10px] leading-[13px] text-ink opacity-[0.075] [mask-image:radial-gradient(70%_70%_at_50%_50%,transparent_30%,#000)] moss:opacity-[0.05]"
+    >
+      {Array.from({ length: 96 }, (_, i) => (
+        <div key={i} style={{ transform: `translateX(${-((i * 211) % 1300)}px)` }}>
+          {row}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** what's behind it all */
+function Scenery({ track, palette }: { track: Track | null; palette: RGB[] }) {
+  const background = useSettings((s) => s.background);
+  const [tint] = forGlow(palette, 1);
+  if (background === "artwork") {
+    return (
+      <>
+        <FlowBackground colors={palette} className="absolute inset-0" />
+        {track?.artwork && <img src={track.artwork} alt="" referrerPolicy="no-referrer" className="absolute inset-0 size-full scale-125 object-cover opacity-[0.18] mix-blend-soft-light blur-3xl" />}
+        {/* washed out in Moss, so the navy reads */}
+        <div className="moss-only absolute inset-0 bg-[rgb(var(--backdrop-tint)/0.6)]" />
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="ember-only absolute inset-0 bg-[#030303]">
+        <div className="absolute left-1/2 top-[54%] h-[125%] w-[105%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgb(var(--accent-rgb)/0.34),rgb(var(--accent-rgb)/0.1)_55%,transparent)]" />
+        <div className="absolute -bottom-[32%] -right-[16%] h-[75%] w-[55%] animate-drift rounded-full bg-[radial-gradient(closest-side,rgb(255_196_170/0.3),transparent)]" />
+        <motion.div
+          animate={{ background: `radial-gradient(closest-side, ${rgb(tint, 0.16)}, transparent)` }}
+          transition={{ duration: 1.6, ease: EASE }}
+          className="absolute -left-[22%] -top-[38%] h-[90%] w-[70%] animate-drift rounded-full [animation-delay:-14s] [animation-direction:alternate-reverse]"
+        />
+      </div>
+      <div className="moss-only absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(55%_60%_at_50%_55%,rgb(255_255_255/0.85),transparent_70%),radial-gradient(45%_50%_at_85%_100%,rgb(120_170_40/0.45),transparent_70%),radial-gradient(35%_40%_at_0%_100%,rgb(90_140_30/0.4),transparent_70%),linear-gradient(#e3e4de,#e3e4de)]" />
+        <div className="moss-floor absolute inset-x-0 bottom-0 h-[45%]" />
+        <motion.div
+          animate={{ background: `radial-gradient(closest-side, ${rgb(tint, 0.2)}, transparent)` }}
+          transition={{ duration: 1.6, ease: EASE }}
+          className="absolute -right-[15%] -top-[30%] h-[85%] w-[60%] animate-drift rounded-full [animation-delay:-6s]"
+        />
+      </div>
+      <LyricRain track={track} />
+      <div className="grain absolute inset-0" />
+    </>
+  );
+}
+
+/** a column that slides open beside the stage; the stage gives it room as it goes */
+function Column({ shown, width, side, children }: { shown: boolean; width: number; side: "left" | "right"; children: ReactNode }) {
+  const away = { opacity: 0, x: side === "left" ? -36 : 36, filter: "blur(8px)" };
+  return (
+    <motion.div initial={false} animate={{ width: shown ? width + GAP : 0 }} transition={SLIDE} className="relative h-full shrink-0">
+      <AnimatePresence initial={false}>
+        {shown && (
+          <motion.div
+            key={side}
+            initial={away}
+            animate={{ opacity: 1, x: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } }}
+            exit={away}
+            transition={{ duration: 0.55, ease: EASE }}
+            className={cn("absolute inset-y-0", side === "left" ? "left-0" : "right-0")}
+            style={{ width }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -165,9 +220,13 @@ function Fullscreen() {
   const context = usePlayer((s) => s.queue.context);
   const showLyrics = useView((s) => s.lyrics);
   const edgeLight = useSettings((s) => s.edgeLight.enabled);
-  const { closeFullscreen, setLyrics } = useView.getState();
+  const { closeFullscreen } = useView.getState();
   const palette = usePalette(track?.artwork);
+  const width = useWindowWidth();
+  const [queueOpen, setQueueOpen] = useState(false);
   const hint = useHints();
+  const lyricsWidth = clamp(300, width * 0.25, 380);
+  const sideWidth = clamp(290, width * 0.23, 340);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -185,75 +244,54 @@ function Fullscreen() {
       animate={{ y: 0, borderRadius: 0 }}
       exit={{ y: "100%", borderRadius: 40, transition: { type: "spring", stiffness: 300, damping: 36 } }}
       transition={{ type: "spring", stiffness: 240, damping: 32, mass: 0.9 }}
-      className="theme-dark fixed inset-0 z-30 overflow-hidden bg-black text-white"
+      className="fixed inset-0 z-30 overflow-hidden bg-bg text-ink"
     >
-      <FlowBackground colors={palette} className="absolute inset-0" />
-      {track?.artwork && <img src={track.artwork} alt="" referrerPolicy="no-referrer" className="absolute inset-0 size-full scale-125 object-cover opacity-[0.18] mix-blend-soft-light blur-3xl" />}
+      <Scenery track={track} palette={palette} />
 
-      <div className="drag absolute inset-x-0 top-0 z-10 flex h-14 items-center gap-3 pl-5 pr-[150px]">
-        <button onClick={closeFullscreen} aria-label="Close full-screen player" className="glass-clear pressable no-drag grid size-9 place-items-center rounded-full text-white hover:brightness-125">
-          <ChevronDown className="size-5" strokeWidth={2.4} />
+      <div className="drag absolute inset-x-0 top-0 z-10 flex h-[76px] items-center gap-3 pl-[22px] pr-[150px]">
+        <button onClick={closeFullscreen} aria-label="Close full-screen player" title="Close (Esc)" className="glass-control pressable no-drag grid size-10 shrink-0 place-items-center rounded-full text-ink hover:brightness-110">
+          <ChevronDown className="size-5" strokeWidth={2.2} />
         </button>
-        {context && (
-          <span className="truncate text-[12.5px] font-medium text-white/60">
-            Playing from <span className="font-semibold text-white/85">{context.label}</span>
-          </span>
-        )}
-        <div className="glass-clear no-drag ml-auto flex items-center gap-0.5 rounded-full p-0.5">
+        <div className="min-w-0 leading-tight">
+          <small className="block text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-3">Playing from</small>
+          <b className="block truncate font-display text-[14px] font-semibold tracking-[-0.01em]">{context?.label ?? "Your queue"}</b>
+        </div>
+        <div className="no-drag ml-auto flex shrink-0 items-center gap-2">
+          <ListeningPill />
           <button
-            onClick={() => setLyrics(!showLyrics)}
-            aria-pressed={showLyrics}
-            title="Lyrics"
-            className={cn("pressable grid size-8 place-items-center rounded-full transition-colors", showLyrics ? "bg-white text-black" : "text-white/80 hover:bg-white/10 hover:text-white")}
+            onClick={() => void window.encore.app.toggleFullScreen()}
+            aria-label="Full screen"
+            title={hint("fullScreen", "Full screen")}
+            className="glass-control pressable grid size-10 place-items-center rounded-full text-ink hover:brightness-110"
           >
-            <MicVocal className="size-4" />
-          </button>
-          <button onClick={() => void window.encore.app.toggleFullScreen()} title={hint("fullScreen", "Full screen")} className="pressable grid size-8 place-items-center rounded-full text-white/80 hover:bg-white/10 hover:text-white">
             <Expand className="size-4" />
           </button>
         </div>
       </div>
 
-      <div className={cn("relative z-[1] mx-auto flex h-full max-w-[1500px] items-center gap-[6vw] px-[6vw] pb-10 pt-20", !showLyrics && "justify-center")}>
-        <motion.div layout transition={{ type: "spring", stiffness: 200, damping: 30 }} className={cn("flex shrink-0 flex-col", showLyrics ? "w-[min(38vw,460px)]" : "w-[min(52vh,520px)]")}>
-          <Cover src={track?.artwork} title={track?.title ?? ""} />
-          <div className="mt-8 flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate font-display text-[26px] font-bold leading-tight tracking-[-0.025em]">{track?.title ?? "Nothing playing"}</h2>
-              <button
-                onClick={() => {
-                  const artist = track?.artists.find((a) => a.id);
-                  if (artist?.id) {
-                    closeFullscreen();
-                    navigate({ name: "artist", id: artist.id });
-                  }
-                }}
-                className="max-w-full truncate text-left text-[17px] text-white/65 transition-colors hover:text-white"
-              >
-                {track?.artists.map((a) => a.name).join(", ")}
-              </button>
-            </div>
-            {track && <LikeButton track={track} size="size-6" className="mt-1 text-white/70" />}
+      {track ? (
+        <>
+          <div className="absolute inset-x-[22px] bottom-[140px] top-[84px] z-[1] flex">
+            <Column shown={showLyrics} width={lyricsWidth} side="left">
+              <Tile label="Lyrics" className="h-full px-7 pb-5 pt-[22px]">
+                <LyricsView track={track} footer={<EdgePill />} />
+              </Tile>
+            </Column>
+            <Stage track={track} />
+            <Column shown={width >= WIDE || queueOpen} width={sideWidth} side="right">
+              <SideColumn track={track} expanded={queueOpen} onToggle={() => setQueueOpen(!queueOpen)} />
+            </Column>
           </div>
-          <div className="mt-6">
-            <Controls />
+          <BottomBar track={track} queueOpen={queueOpen} onQueue={() => setQueueOpen(!queueOpen)} />
+        </>
+      ) : (
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <div>
+            <p className="font-display text-[28px] font-bold tracking-[-0.03em]">Nothing playing</p>
+            <p className="mt-2 text-[14px] font-semibold text-ink-3">Pick a song to start</p>
           </div>
-        </motion.div>
-
-        <AnimatePresence>
-          {showLyrics && (
-            <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
-              className="h-full min-w-0 flex-1"
-            >
-              <LyricsView track={track} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+        </div>
+      )}
 
       <AnimatePresence>{showLyrics && edgeLight && <WindowEdgeLight key="edge-light" palette={palette} />}</AnimatePresence>
     </motion.div>

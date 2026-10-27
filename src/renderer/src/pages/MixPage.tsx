@@ -85,7 +85,7 @@ export function MixPage({ id }: { id: string }) {
       <AmbientBackground src={mix.artists.find((a) => a.artwork)?.artwork ?? (mood ? tracks.find((t) => t.artwork)?.artwork : undefined)} />
       <div className="relative px-8 pb-16 pt-[72px]">
         <CollectionHeader
-          art={<MixCover mix={mix} className="size-full" />}
+          art={<MixCover mix={mix} className="size-full" live />}
           kind={mood ? "Mood mix" : "Made for you"}
           title={mix.title}
           meta={

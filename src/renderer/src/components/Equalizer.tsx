@@ -76,7 +76,7 @@ export function Equalizer() {
   };
 
   return (
-    <div className={cn("fill-group rounded-[20px] p-5 transition-opacity", !eq.enabled && "opacity-80")}>
+    <div className={cn("fill-group rounded-[24px] p-5 transition-opacity", !eq.enabled && "opacity-80")}>
       <div className="flex flex-wrap gap-1.5">
         {Object.keys(EQ_PRESETS).map((name) => (
           <button
@@ -91,7 +91,7 @@ export function Equalizer() {
             <span className="relative">{name}</span>
           </button>
         ))}
-        {eq.preset === "Custom" && <span className="rounded-full bg-accent/20 px-3 py-1 text-[12.5px] font-medium text-accent">Custom</span>}
+        {eq.preset === "Custom" && <span className="rounded-full bg-accent/20 px-3 py-1 text-[12.5px] font-medium text-accent-ink">Custom</span>}
       </div>
 
       <div className="mt-5">
@@ -109,7 +109,7 @@ export function Equalizer() {
 
       <div className="mt-4 flex items-center justify-between text-[12px] text-ink-3">
         <span>Drag a band, or double-click it to reset. Boosts are limited so they never clip.</span>
-        <button onClick={() => choosePreset("Flat")} className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold text-accent hover:bg-accent/10">
+        <button onClick={() => choosePreset("Flat")} className="pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold text-accent-ink hover:bg-accent/10">
           <RotateCcw className="size-3.5" /> Reset
         </button>
       </div>

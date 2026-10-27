@@ -200,6 +200,13 @@ export interface HistoryEntry {
   playedMs: number;
 }
 
+/** your own plays over a stretch of time, for the numbers on Home */
+export interface RecentPlays {
+  plays: { trackId: string; playedAt: string; playedMs: number }[];
+  /** each song in `plays`, once */
+  tracks: Track[];
+}
+
 export interface SavedAlbum {
   album: AlbumSummary;
   savedAt: string;
@@ -525,6 +532,10 @@ export interface EncoreApi {
   };
   history: {
     insights(): Promise<ListeningInsights>;
+    /** your own plays since `since` (an ISO time), oldest first */
+    recent(since: string): Promise<RecentPlays>;
+    /** how long you listened each time you played a song, in ms, newest first */
+    playsOf(trackId: string): Promise<number[]>;
     playlistFromTopSongs(limit: number): Promise<ImportJob>;
     removeImported(origin: ImportOrigin): Promise<void>;
   };
