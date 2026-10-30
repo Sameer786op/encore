@@ -323,6 +323,13 @@ export async function searchSongs(query: string): Promise<Track[]> {
   return uniqueById(compact(((results.songs?.contents ?? []) as Loose[]).map((i) => mapTrack(i))));
 }
 
+/** music videos and uploads for a query, leaving out ones about a song (reactions, lessons, karaoke, compilations) */
+export async function searchVideos(query: string): Promise<Track[]> {
+  const yt = await getYouTube();
+  const results = await yt.music.search(query, { type: "video" });
+  return uniqueById(compact(((results.videos?.contents ?? []) as Loose[]).map((i) => mapTrack(i)))).filter((t) => !aboutTheSong(t.title, query));
+}
+
 /** a saved YouTube or YouTube Music playlist, following "load more" pages */
 async function playlistPages(id: string, maxTracks: number): Promise<{ header: Loose; items: Loose[] }> {
   const yt = await getYouTube();
@@ -340,7 +347,11 @@ async function playlistPages(id: string, maxTracks: number): Promise<{ header: L
 
 export async function playlist(id: string, maxTracks = 5000): Promise<{ name: string; tracks: Track[] }> {
   const { header, items } = await playlistPages(id, maxTracks);
-  return { name: text(header.title) || "YouTube playlist", tracks: compact(items.map((i) => mapTrack(i))) };
+  const tracks = compact(items.map((i) => mapTrack(i)));
+  // an album shared as a playlist (OLAK5uy_…) comes without a header, but every song names the album
+  const albums = new Set(tracks.map((t) => t.album?.title).filter(Boolean));
+  const album = albums.size === 1 ? [...albums][0] : undefined;
+  return { name: text(header.title) || album || "YouTube playlist", tracks };
 }
 
 /** who made a playlist, from a header like "Playlist • YouTube Music • 2026"; the page counts the songs itself */

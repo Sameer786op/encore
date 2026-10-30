@@ -22,6 +22,35 @@ export function stripFeatures(title: string): string {
   return title.replace(FEATURE_BRACKETS, " ").replace(FEATURE_TRAILING, " ").replace(/\s+/g, " ").trim();
 }
 
+/** the artists a title credits: "Danza Kuduro (feat. Don Omar)" -> ["Don Omar"] */
+export function featuredIn(title: string): string[] {
+  const credits = [...title.matchAll(FEATURE_BRACKETS)].map((m) => m[0].slice(1, -1));
+  const trailing = FEATURE_TRAILING.exec(title.replace(FEATURE_BRACKETS, " "))?.[0];
+  if (trailing) credits.push(trailing);
+  return credits.flatMap((credit) => splitArtists(credit.replace(/^\s*(?:feat\.?|ft\.?|featuring|with)\s+/i, "")));
+}
+
+// what video titles add round the song's name: "(Official Video)", "[Lyrics]", "(Audio)", "| Hindi Song 2025";
+// only brackets of nothing but these words go, so "(8D Audio)" or "(Slowed + Reverb)" still says what it is
+const NOISE_WORDS = "official|music|lyrics?|lyrical|video|audio|visuali[sz]er|hd|hq|4k|full|song|mv|m/v";
+const VIDEO_NOISE = new RegExp(`\\s*[([]\\s*(?:(?:${NOISE_WORDS})[\\s:,-]*)+[)\\]]`, "gi");
+
+/**
+ * The ways a music video's title can name its song, best guess first: "Drake - Hotline Bling (Official Audio)"
+ * on the "Drake Media" channel is Hotline Bling by Drake, but "Kesariya - Arijit Singh" puts the song first.
+ */
+export function videoReadings(title: string, channel: string[]): { title: string; artists: string[] }[] {
+  const clean = title.replace(VIDEO_NOISE, " ").replace(/\s[|｜].*$/, "").replace(/\s+/g, " ").trim() || title;
+  const dash = /^(.+?)\s[-–—]\s(.+)$/.exec(clean);
+  if (!dash) return [{ title: stripFeatures(clean), artists: [...channel, ...featuredIn(clean)] }];
+  const [, left, right] = dash;
+  return [
+    { title: stripFeatures(right), artists: [...splitArtists(left), ...featuredIn(right)] },
+    { title: stripFeatures(left), artists: [...splitArtists(stripFeatures(right)), ...featuredIn(right), ...featuredIn(left)] },
+    { title: stripFeatures(clean), artists: channel },
+  ];
+}
+
 /**
  * Tags that make a recording a different version of a song. Only these
  * count when comparing; neutral ones like "remastered" are ignored.

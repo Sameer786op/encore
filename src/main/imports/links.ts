@@ -8,7 +8,9 @@ export type ParsedLink =
   | { service: "apple"; kind: "playlist" | "album" | "song"; url: string; songId?: string }
   | { service: "youtube"; kind: "playlist"; id: string }
   | { service: "youtube"; kind: "album"; id: string }
-  | { service: "youtube"; kind: "video"; id: string };
+  | { service: "youtube"; kind: "video"; id: string }
+  /** a mix YouTube makes as you listen, or someone's liked songs: neither can be read from a link */
+  | { service: "youtube"; kind: "mix" | "liked"; id: string };
 
 export interface LinkContents {
   name: string;
@@ -19,8 +21,17 @@ export interface LinkContents {
 
 export class LinkError extends Error {}
 
-export function parseLink(raw: string): ParsedLink | null {
+/** the link in what was pasted, which is sometimes a whole message: "Check out this playlist on Spotify! https://…" */
+export function findLink(raw: string): string {
   const text = raw.trim();
+  const uri = /\bspotify:(?:playlist|album|track):[A-Za-z0-9]{22}\b/.exec(text);
+  if (uri) return uri[0];
+  const url = /https?:\/\/\S+/i.exec(text);
+  return url ? url[0].replace(/[)\].,!?'"»]+$/, "") : text;
+}
+
+export function parseLink(raw: string): ParsedLink | null {
+  const text = findLink(raw);
   const spotifyUri = /^spotify:(playlist|album|track):([A-Za-z0-9]{22})$/.exec(text);
   if (spotifyUri) return { service: "spotify", kind: spotifyUri[1] as "playlist", id: spotifyUri[2] };
 
@@ -51,6 +62,8 @@ export function parseLink(raw: string): ParsedLink | null {
 
   if (host === "music.youtube.com" || host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
     const list = url.searchParams.get("list");
+    // Liked Music (LM) and liked videos (LL) only show to their owner
+    if (list === "LM" || list === "LL") return { service: "youtube", kind: "liked", id: list };
     // personal mixes (RD...) are generated on the fly, not saved playlists, except YouTube Music's curated RDCLAK lists
     if (list && (!list.startsWith("RD") || list.startsWith("RDCLAK"))) return { service: "youtube", kind: "playlist", id: list };
     if (path[0] === "browse" && path[1]) {
@@ -59,9 +72,26 @@ export function parseLink(raw: string): ParsedLink | null {
     }
     const video = host === "youtu.be" ? path[0] : url.searchParams.get("v");
     if (video && /^[\w-]{11}$/.test(video)) return { service: "youtube", kind: "video", id: video };
+    if (list) return { service: "youtube", kind: "mix", id: list };
     return null;
   }
   return null;
+}
+
+const SHORT_HOSTS = /^(?:spotify\.link|spotify\.app\.link|spoti\.fi)$/i;
+
+/** Spotify's share sheet sometimes gives a spotify.link short link; the page it leads to holds the full link */
+export async function expandShortLink(link: string): Promise<string> {
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    return link;
+  }
+  if (!SHORT_HOSTS.test(url.hostname)) return link;
+  const full = /https:\/\/open\.spotify\.com\/(?:[\w-]+\/)?(?:playlist|album|track)\/[A-Za-z0-9]{22}/.exec(await fetchPage(url.toString()))?.[0];
+  if (!full) throw new LinkError("Couldn't follow that Spotify short link. In Spotify, use Share → Copy link and paste that instead.");
+  return full;
 }
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
@@ -81,6 +111,8 @@ interface SpotifyEntity {
   subtitle?: string;
   duration?: number;
   uri?: string;
+  /** a song's page names its artists here instead of in the subtitle */
+  artists?: { name?: string }[];
   trackList?: { title?: string; subtitle?: string; duration?: number; uri?: string }[];
 }
 
@@ -94,7 +126,8 @@ export function spotifyFromEmbed(html: string, kind: "playlist" | "album" | "tra
   const name = entity.name ?? entity.title ?? "Spotify playlist";
 
   if (kind === "track") {
-    return { name, tracks: [{ title: name, artists: splitArtists(entity.subtitle ?? ""), durationMs: entity.duration, externalId: entity.uri }] };
+    const artists = (entity.artists ?? []).map((a) => a.name?.trim() ?? "").filter(Boolean);
+    return { name, tracks: [{ title: name, artists: artists.length > 0 ? artists : splitArtists(entity.subtitle ?? ""), durationMs: entity.duration, externalId: entity.uri }] };
   }
   const tracks = (entity.trackList ?? [])
     .filter((t) => t.title)

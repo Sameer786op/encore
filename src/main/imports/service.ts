@@ -5,7 +5,7 @@ import type { ListeningHistory } from "../history/history";
 import { songKey } from "../matching/text";
 import { readExport } from "./exports/analyze";
 import type { ParsedExport } from "./exports/types";
-import { LinkError, parseLink, readApple, readSpotify, type LinkContents } from "./links";
+import { expandShortLink, findLink, LinkError, parseLink, readApple, readSpotify, type LinkContents, type ParsedLink } from "./links";
 import type { ImportManager } from "./manager";
 
 export interface YouTubeReader {
@@ -36,8 +36,8 @@ export class ImportService {
     private readonly youtube: YouTubeReader,
   ) {}
 
-  async fromLink(url: string): Promise<ImportJob> {
-    const link = parseLink(url);
+  async fromLink(pasted: string): Promise<ImportJob> {
+    const link = parseLink(await expandShortLink(findLink(pasted)));
     if (!link) throw new LinkError("Paste a link to a Spotify, Apple Music or YouTube playlist or album.");
 
     let contents: LinkContents;
@@ -50,18 +50,15 @@ export class ImportService {
       contents = await readApple(link);
     } else {
       origin = "youtube";
-      if (link.kind === "playlist") {
-        const list = await this.youtube.playlist(link.id);
-        contents = { name: list.name, tracks: list.tracks.map(asSource) };
-      } else if (link.kind === "album") {
-        const album = await this.youtube.album(link.id);
-        contents = { name: album.title, tracks: album.tracks.map(asSource) };
-      } else {
-        const track = await this.youtube.trackById(link.id);
-        contents = { name: track.title, tracks: [asSource(track)] };
-      }
+      contents = await this.readYouTube(link);
     }
-    if (contents.tracks.length === 0) throw new LinkError("That playlist looks empty, or it isn't public.");
+    if (contents.tracks.length === 0) {
+      throw new LinkError(
+        origin === "youtube"
+          ? "That playlist looks empty, or it's private. Set it to Public or Unlisted on YouTube, or connect YouTube Music in Settings → Connected accounts to bring over your own playlists."
+          : "That playlist looks empty, or it isn't public.",
+      );
+    }
     return this.manager.create({
       name: contents.name,
       origin,
@@ -69,6 +66,30 @@ export class ImportService {
       tracks: contents.tracks,
       note: contents.note,
     });
+  }
+
+  private async readYouTube(link: Extract<ParsedLink, { service: "youtube" }>): Promise<LinkContents> {
+    if (link.kind === "mix") {
+      throw new LinkError("That's a mix YouTube Music makes as you listen, so it has no fixed list of songs. Save the songs you want to a playlist, then import that.");
+    }
+    if (link.kind === "liked") {
+      throw new LinkError("Liked songs only show to you. Connect YouTube Music in Settings → Connected accounts and they come over by themselves.");
+    }
+    try {
+      if (link.kind === "playlist") {
+        const list = await this.youtube.playlist(link.id);
+        return { name: list.name, tracks: list.tracks.map(asSource) };
+      }
+      if (link.kind === "album") {
+        const album = await this.youtube.album(link.id);
+        return { name: album.title, tracks: album.tracks.map(asSource) };
+      }
+      const track = await this.youtube.trackById(link.id);
+      return { name: track.title, tracks: [asSource(track)] };
+    } catch {
+      // YouTube's own errors ("No contents found in the response") mean nothing to anyone
+      throw new LinkError("YouTube Music couldn't open that link. Check it's copied whole, then try again.");
+    }
   }
 
   async analyze(path: string): Promise<ExportSummary> {

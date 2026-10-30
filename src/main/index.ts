@@ -52,7 +52,7 @@ import { Lastfm, ListenBrainz } from "./scrobble/clients";
 import { Scrobbler } from "./scrobble/scrobbler";
 import { Updater } from "./updates/updater";
 import { electronVault } from "./scrobble/vault";
-import { album, artist, home, lyricsText, moodPlaylists, moodRadio, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, songMoods, suggestions, trackById } from "./youtube/catalog";
+import { album, artist, home, lyricsText, moodPlaylists, moodRadio, playlist, radio, remotePlaylist, search, searchArtists, searchKind, searchMore, searchSongs, searchVideos, songMoods, suggestions, trackById } from "./youtube/catalog";
 import { configureYouTube, createYouTube } from "./youtube/client";
 import { usePremiumAccount } from "./youtube/premium";
 import { resolveAudio } from "./youtube/streams";
@@ -622,7 +622,7 @@ app.whenReady().then(() => {
     },
   });
   library = new Library(db);
-  matcher = new Matcher(db, { searchSongs, trackById });
+  matcher = new Matcher(db, { searchSongs, searchVideos, trackById });
   imports = new ImportManager(db, library, matcher);
   history = new ListeningHistory(db, matcher);
   importService = new ImportService(imports, history, { playlist, album, trackById });

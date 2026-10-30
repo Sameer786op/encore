@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appleFromPage, parseLink, spotifyFromEmbed } from "./links";
+import { appleFromPage, expandShortLink, findLink, parseLink, spotifyFromEmbed } from "./links";
 
 describe("parseLink", () => {
   it("understands Spotify links and URIs", () => {
@@ -22,6 +22,25 @@ describe("parseLink", () => {
     expect(parseLink("https://youtu.be/J7p4bzqLvCw")).toEqual({ service: "youtube", kind: "video", id: "J7p4bzqLvCw" });
   });
 
+  it("finds the link in a whole shared message", () => {
+    expect(findLink("Check out this playlist on Spotify! https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=1")).toBe("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=1");
+    expect(findLink("listen (https://youtu.be/J7p4bzqLvCw).")).toBe("https://youtu.be/J7p4bzqLvCw");
+    expect(parseLink("my mix spotify:album:4yP0hdKOZPNshxUOjY0cZj")).toEqual({ service: "spotify", kind: "album", id: "4yP0hdKOZPNshxUOjY0cZj" });
+  });
+
+  it("tells mixes and liked songs apart from playlists", () => {
+    expect(parseLink("https://music.youtube.com/playlist?list=RDTMAK5uy_kset8DisdE7LSD4TNjEVvrKRTmG7a56sY")).toEqual({ service: "youtube", kind: "mix", id: "RDTMAK5uy_kset8DisdE7LSD4TNjEVvrKRTmG7a56sY" });
+    expect(parseLink("https://music.youtube.com/playlist?list=LM")).toEqual({ service: "youtube", kind: "liked", id: "LM" });
+    expect(parseLink("https://music.youtube.com/playlist?list=OLAK5uy_l4UqNJCpAF3kNaV37LHdRc_A07MmVdiSU&si=x")).toMatchObject({ kind: "playlist" });
+    // a song played from a mix is still the song
+    expect(parseLink("https://music.youtube.com/watch?v=J7p4bzqLvCw&list=RDAMVMJ7p4bzqLvCw")).toEqual({ service: "youtube", kind: "video", id: "J7p4bzqLvCw" });
+  });
+
+  it("leaves links that aren't Spotify short links alone", async () => {
+    expect(await expandShortLink("https://open.spotify.com/album/4yP0hdKOZPNshxUOjY0cZj")).toBe("https://open.spotify.com/album/4yP0hdKOZPNshxUOjY0cZj");
+    expect(await expandShortLink("hello")).toBe("hello");
+  });
+
   it("rejects everything else", () => {
     expect(parseLink("hello")).toBeNull();
     expect(parseLink("https://soundcloud.com/someone/sets/mix")).toBeNull();
@@ -40,6 +59,12 @@ describe("page readers", () => {
     expect(contents.name).toBe("Big playlist");
     expect(contents.tracks[0]).toEqual({ title: "Song 0", artists: ["Daft Punk", "Pharrell Williams"], album: undefined, durationMs: 200000, externalId: "spotify:track:0" });
     expect(contents.note).toContain("first 100 songs");
+  });
+
+  it("reads a Spotify song page, which lists its artists separately", () => {
+    const entity = { name: "Blinding Lights", artists: [{ name: "The Weeknd", uri: "spotify:artist:1" }], duration: 200040, uri: "spotify:track:0VjIjW4GlUZAMYd2vXMi3b" };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    expect(spotifyFromEmbed(html, "track").tracks).toEqual([{ title: "Blinding Lights", artists: ["The Weeknd"], durationMs: 200040, externalId: "spotify:track:0VjIjW4GlUZAMYd2vXMi3b" }]);
   });
 
   it("reads an Apple Music page and notices a cut-off list", () => {

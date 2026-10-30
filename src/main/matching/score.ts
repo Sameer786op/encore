@@ -1,6 +1,6 @@
 import { CONFIDENT, PLAUSIBLE } from "@shared/matching";
 import type { ImportItemStatus, MatchCandidate, SourceTrack, Track } from "@shared/types";
-import { cleanArtistName, coreTitle, fold, similarity, splitArtists, stripFeatures, versionTags } from "./text";
+import { cleanArtistName, coreTitle, featuredIn, fold, similarity, splitArtists, stripFeatures, versionTags, videoReadings } from "./text";
 
 export interface ScoreParts {
   title: number;
@@ -27,7 +27,10 @@ export function artistScore(source: string[], candidate: string[]): number {
   const primary = best(a[0]);
   const others = a.length > 1 ? a.slice(1).map(best).reduce((s, v) => s + v, 0) / (a.length - 1) : primary;
   // "Artist - Topic" channels sometimes list only the main artist; never punish missing extras much
-  return Math.min(1, primary * 0.85 + others * 0.15);
+  const credited = Math.min(1, primary * 0.85 + others * 0.15);
+  // services credit differently (a film song's composer first on Spotify, its singer first on YouTube), so any artist in common counts
+  const shared = Math.max(...a.map(best));
+  return Math.max(credited, shared * 0.85);
 }
 
 export function titleScore(source: string, candidate: string): number {
@@ -58,9 +61,10 @@ export function versionPenalty(source: string, candidate: string): number {
 
 export function scoreCandidate(source: SourceTrack, candidate: Track): ScoreParts {
   const title = titleScore(source.title, candidate.title);
+  // a "(feat. X)" in either title is a credit too
   const artist = artistScore(
-    source.artists,
-    candidate.artists.map((a) => a.name),
+    [...source.artists, ...featuredIn(source.title)],
+    [...candidate.artists.map((a) => a.name), ...featuredIn(candidate.title)],
   );
   const duration = durationScore(source.durationMs, candidate.durationMs);
   const penalty = versionPenalty(source.title, candidate.title);
@@ -78,6 +82,18 @@ export function rankCandidates(source: SourceTrack, tracks: Track[], limit = 5):
     .sort((a, b) => b.parts.total - a.parts.total)
     .slice(0, limit)
     .map(({ track, parts }) => ({ track, score: Math.round(parts.total * 1000) / 1000 }));
+}
+
+/** a music video or upload as the song it holds, read from its title the way that fits the song best */
+export function videoAsSong(source: SourceTrack, video: Track): Track {
+  const channel = video.artists.map((a) => a.name);
+  const readings = videoReadings(video.title, channel).map((reading): Track => ({
+    ...video,
+    title: reading.title,
+    // the channel's id only belongs to the artist it is
+    artists: reading.artists.map((name) => ({ name, id: video.artists.find((a) => fold(a.name) === fold(name))?.id })),
+  }));
+  return readings.reduce((best, reading) => (scoreCandidate(source, reading).total > scoreCandidate(source, best).total ? reading : best));
 }
 
 export function classify(source: SourceTrack, best: MatchCandidate | undefined): ImportItemStatus {

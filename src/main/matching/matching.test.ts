@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SourceTrack, Track } from "@shared/types";
-import { classify, rankCandidates, scoreCandidate, searchQueries } from "./score";
-import { cleanArtistName, coreTitle, fold, songKey, splitArtists, stripFeatures, versionTags } from "./text";
+import { classify, rankCandidates, scoreCandidate, searchQueries, videoAsSong } from "./score";
+import { cleanArtistName, coreTitle, featuredIn, fold, songKey, splitArtists, stripFeatures, versionTags } from "./text";
 
 let n = 0;
 function yt(title: string, artists: string[], seconds: number): Track {
@@ -20,6 +20,13 @@ describe("text helpers", () => {
   it("keeps non-Latin scripts", () => {
     expect(fold("केसरिया")).toBe("केसरिया".normalize("NFKD").replace(/\p{M}+/gu, ""));
     expect(fold("夜に駆ける")).toBe("夜に駆ける".normalize("NFKD").replace(/\p{M}+/gu, ""));
+  });
+
+  it("finds the artists a title credits", () => {
+    expect(featuredIn("Danza Kuduro (feat. Don Omar)")).toEqual(["Don Omar"]);
+    expect(featuredIn("One Dance ft. Wizkid & Kyla")).toEqual(["Wizkid", "Kyla"]);
+    expect(featuredIn("STAY (with Justin Bieber)")).toEqual(["Justin Bieber"]);
+    expect(featuredIn("Yellow")).toEqual([]);
   });
 
   it("strips featured artists", () => {
@@ -133,6 +140,33 @@ describe("matching", () => {
     const parts = scoreCandidate(src("A", []), yt("B", [], 0));
     expect(parts.total).toBeGreaterThanOrEqual(0);
     expect(parts.total).toBeLessThanOrEqual(1);
+  });
+
+  it("counts any artist in common, since services credit film songs differently", () => {
+    const saiyaara = src('Saiyaara (From "Saiyaara")', ["Tanishk Bagchi", "Faheem Abdullah", "Arslan Nizami", "Irshad Kamil"], 371);
+    expect(classify(saiyaara, rankCandidates(saiyaara, [yt("Saiyaara (Movie: Saiyaara)", ["Faheem Abdullah", "Arslan Nizami", "Irshad Kamil"], 371)])[0])).toBe("matched");
+    const kuduro = src("Danza Kuduro", ["Don Omar", "Lucenzo"], 199);
+    expect(classify(kuduro, rankCandidates(kuduro, [yt("Danza Kuduro (feat. Don Omar)", ["Lucenzo"], 197)])[0])).toBe("matched");
+    // a cover by someone else still isn't taken
+    expect(classify(kuduro, rankCandidates(kuduro, [yt("Danza Kuduro", ["Party Band"], 199)])[0])).not.toBe("matched");
+  });
+
+  it("reads a music video's title as its song", () => {
+    const oneDance = src("One Dance", ["Drake", "Wizkid", "Kyla"], 174);
+    const lyricVideo = videoAsSong(oneDance, yt("Drake - One Dance (Lyrics) ft. Wizkid & Kyla", ["Billion Stars"], 175));
+    expect(lyricVideo.title).toBe("One Dance");
+    expect(lyricVideo.artists.map((a) => a.name)).toEqual(["Drake", "Wizkid", "Kyla"]);
+    expect(classify(oneDance, rankCandidates(oneDance, [lyricVideo])[0])).toBe("matched");
+
+    const hotline = src("Hotline Bling", ["Drake"], 267);
+    const audio = videoAsSong(hotline, yt("Drake - Hotline Bling (Official Audio)", ["Drake Media"], 268));
+    expect(classify(hotline, rankCandidates(hotline, [audio])[0])).toBe("matched");
+    // song first, singer second
+    const kesariya = src("Kesariya", ["Arijit Singh"], 268);
+    expect(videoAsSong(kesariya, yt("Kesariya - Arijit Singh | Brahmastra", ["Sony Music India"], 268)).title).toBe("Kesariya");
+    // an edit keeps saying it's an edit
+    const eightD = videoAsSong(oneDance, yt("Drake - One Dance (8D Audio)", ["8D Tunes"], 174));
+    expect(classify(oneDance, rankCandidates(oneDance, [eightD])[0])).not.toBe("matched");
   });
 
   it("builds a precise query and a looser fallback", () => {
