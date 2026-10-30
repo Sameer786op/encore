@@ -4,6 +4,7 @@ import type { Track } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { useSettings } from "@/settings/store";
 import { toast } from "@/ui/toast";
+import { correction } from "@/jam/timing";
 import { AudioEngine } from "./engine";
 import { fadeLength, levellingDb, shouldCrossfade, shouldPreload } from "./transitions";
 import {
@@ -23,6 +24,7 @@ import {
   setShuffle,
   upcomingItems,
   type PlayContext,
+  type QueueItem,
   type QueueState,
 } from "./queue";
 
@@ -72,6 +74,67 @@ let failuresInARow = 0;
 let preparedFor = "";
 let crossfadedFrom = "";
 let radioAskedFor = "";
+
+// In a Jam, a guest's player follows the host's: its own presses go through
+// these instead, and the host's songs come in through followHost.
+export interface JamGuestHooks {
+  /** songs for the host's queue */
+  add(tracks: Track[], next: boolean): void;
+  /** pause or carry on, for this guest only */
+  togglePlay(): void;
+  /** a press only the host can make */
+  refuse(): void;
+}
+
+/** where a Jam guest's player should be: the host's queue, and where its song is right now */
+export interface HostPlayback {
+  items: QueueItem[];
+  index: number;
+  context: PlayContext;
+  position: number;
+  playing: boolean;
+  rate: number;
+  keepPitch: boolean;
+  /** the song can't play here: a song file on the host's computer that isn't on YouTube Music */
+  silent: boolean;
+}
+
+let jamGuest: JamGuestHooks | null = null;
+let following = false;
+let followImpl: ((host: HostPlayback | null) => void) | null = null;
+/** while hosting a Jam, the name songs you add are put down to */
+let jamAddedBy: string | null = null;
+
+export function setJamGuest(hooks: JamGuestHooks | null): void {
+  jamGuest = hooks;
+}
+
+export function setJamAddedBy(name: string | null): void {
+  jamAddedBy = name;
+}
+
+/** a Jam guest's player goes where the host's is; null stops following and pauses */
+export function followHost(host: HostPlayback | null): void {
+  followImpl?.(host);
+}
+
+/** while hosting, a guest's songs go into the queue under their name */
+export function addFromJam(tracks: Track[], next: boolean, by: string): void {
+  const own = jamAddedBy;
+  jamAddedBy = by;
+  try {
+    if (next) usePlayer.getState().playNext(tracks);
+    else usePlayer.getState().addToQueue(tracks);
+  } finally {
+    jamAddedBy = own;
+  }
+}
+
+/** where the song is to the millisecond, how fast it plays, and whether it keeps its key */
+export function playbackClock(): { position: number; rate: number; keepPitch: boolean } {
+  if (!engine?.currentTrack) return { position: usePlayer.getState().position, rate: 1, keepPitch: true };
+  return { position: engine.currentTime, rate: engine.speed, keepPitch: engine.keepsPitch };
+}
 
 // how much of the current song was actually heard, for play history and scrobbling
 const listening = { trackId: "", track: null as Track | null, ms: 0, lastPosition: 0, startedAt: 0, scrobbled: false };
@@ -213,7 +276,7 @@ export const usePlayer = create<PlayerStore>((set, get) => {
         let next = upcomingAuto();
 
         // the queue is about to run out: find similar songs early so the handover is smooth
-        if (!next && current && get().autoplay && shouldPreload(remaining, settings.crossfadeSeconds) && radioAskedFor !== current.uid) {
+        if (!next && current && !following && get().autoplay && shouldPreload(remaining, settings.crossfadeSeconds) && radioAskedFor !== current.uid) {
           radioAskedFor = current.uid;
           void extendWithRadio();
         }
@@ -227,6 +290,8 @@ export const usePlayer = create<PlayerStore>((set, get) => {
           requestLevel(next.track);
         }
 
+        // a Jam guest moves on when the host does
+        if (following) return;
         const fade = fadeLength(settings.crossfadeSeconds, duration, next.track.durationMs / 1000);
         if (
           current &&
@@ -251,8 +316,12 @@ export const usePlayer = create<PlayerStore>((set, get) => {
       },
       onPaused: () => set({ status: get().queue.index >= 0 ? "paused" : "idle" }),
       onWaiting: () => set({ status: "loading" }),
-      onEnded: () => void advance(true),
+      onEnded: () => !following && void advance(true),
       onFailed(track) {
+        if (following) {
+          toast(`Couldn't play "${track.title}" here`, { kind: "error" });
+          return;
+        }
         failuresInARow += 1;
         if (failuresInARow >= MAX_FAILURES_IN_A_ROW) {
           failuresInARow = 0;
@@ -345,6 +414,62 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     if (get().queue.context?.kind === "radio" && upcomingItems(get().queue).length <= 2) void extendWithRadio();
   }
 
+  followImpl = (host) => {
+    const e = getEngine();
+    if (!host) {
+      following = false;
+      e.follow(null);
+      if (!e.isPaused) e.pause();
+      return;
+    }
+    following = true;
+    const before = currentItem(get().queue);
+    set({ queue: { items: host.items, index: host.index, shuffle: false, repeat: "off", unshuffled: null, context: host.context } });
+    const item = currentItem(get().queue);
+    const speed = { rate: host.rate, keepPitch: host.keepPitch };
+    if (!item) {
+      e.follow({ ...speed, nudge: 1 });
+      if (e.currentTrack) loadCurrent(false);
+      return;
+    }
+    if (host.silent) {
+      if (e.currentTrack) {
+        startListening(null);
+        e.unload();
+      }
+      set({ status: "paused", position: host.position, duration: item.track.durationMs / 1000 });
+      return;
+    }
+    if (before?.uid !== item.uid || e.currentTrack?.id !== item.track.id) {
+      e.follow({ ...speed, nudge: 1 });
+      loadCurrent(host.playing, host.position);
+      return;
+    }
+    // the same song: line it up once it has loaded
+    if (get().status === "loading") return;
+    if (!host.playing) {
+      e.follow({ ...speed, nudge: 1 });
+      if (!e.isPaused) e.pause();
+      if (Math.abs(host.position - e.currentTime) > 0.25) moveTo(host.position);
+      return;
+    }
+    if (e.isPaused) {
+      e.follow({ ...speed, nudge: 1 });
+      moveTo(host.position);
+      e.play();
+      return;
+    }
+    const fix = correction(host.position, e.currentTime);
+    e.follow({ ...speed, nudge: fix.kind === "nudge" ? fix.rate : 1 });
+    if (fix.kind === "seek") moveTo(fix.to);
+  };
+
+  function moveTo(seconds: number): void {
+    listening.lastPosition = seconds;
+    getEngine().seek(seconds);
+    set({ position: seconds });
+  }
+
   const restored = saved.queue ? currentItem(saved.queue) : null;
   return {
     queue: saved.queue ?? emptyQueue,
@@ -359,11 +484,13 @@ export const usePlayer = create<PlayerStore>((set, get) => {
 
     playTracks(tracks, startIndex, context) {
       if (tracks.length === 0) return;
+      if (jamGuest) return jamGuest.add([tracks[Math.min(Math.max(0, startIndex), tracks.length - 1)]], false);
       set({ queue: loadQueue(get().queue, tracks, startIndex, context) });
       loadCurrent(true);
     },
 
     togglePlay() {
+      if (jamGuest) return jamGuest.togglePlay();
       const { status, queue, position } = get();
       const e = getEngine();
       if (queue.index < 0) return;
@@ -376,9 +503,10 @@ export const usePlayer = create<PlayerStore>((set, get) => {
       else e.play();
     },
 
-    next: () => void advance(false),
+    next: () => (jamGuest ? jamGuest.refuse() : void advance(false)),
 
     previous() {
+      if (jamGuest) return jamGuest.refuse();
       const { position, queue } = get();
       if (position > 3 || (queue.index <= 0 && queue.repeat === "off")) {
         get().seek(0);
@@ -389,6 +517,7 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     },
 
     seek(seconds) {
+      if (jamGuest) return jamGuest.refuse();
       const e = getEngine();
       const target = Math.max(0, Math.min(seconds, get().duration || seconds));
       if (!e.currentTrack && get().queue.index >= 0) {
@@ -416,35 +545,41 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     },
 
     toggleShuffle() {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: setShuffle(get().queue, !get().queue.shuffle) });
       scheduleSave();
     },
 
     cycleRepeat() {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: { ...get().queue, repeat: cycleRepeat(get().queue.repeat) } });
       scheduleSave();
     },
 
     playNext(tracks) {
+      if (jamGuest) return jamGuest.add(tracks, true);
       const wasEmpty = get().queue.index < 0;
-      set({ queue: playNext(get().queue, tracks) });
+      set({ queue: playNext(get().queue, tracks, jamAddedBy ?? undefined) });
       if (wasEmpty) loadCurrent(true);
       scheduleSave();
     },
 
     addToQueue(tracks) {
+      if (jamGuest) return jamGuest.add(tracks, false);
       const wasEmpty = get().queue.index < 0;
-      set({ queue: addToQueue(get().queue, tracks) });
+      set({ queue: addToQueue(get().queue, tracks, jamAddedBy ?? undefined) });
       if (wasEmpty) loadCurrent(true);
       scheduleSave();
     },
 
     jumpTo(uid) {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: jumpTo(get().queue, uid) });
       loadCurrent(true);
     },
 
     removeFromQueue(uid) {
+      if (jamGuest) return jamGuest.refuse();
       const { state, removedCurrent } = removeItem(get().queue, uid);
       set({ queue: state });
       if (removedCurrent) loadCurrent(get().status === "playing" || get().status === "loading");
@@ -452,16 +587,19 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     },
 
     reorderUpcoming(uids) {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: reorderUpcoming(get().queue, uids) });
       scheduleSave();
     },
 
     clearUpcoming() {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: clearUpcoming(get().queue) });
       scheduleSave();
     },
 
     async startRadio(track) {
+      if (jamGuest) return jamGuest.refuse();
       set({ queue: loadQueue({ ...get().queue, shuffle: false, unshuffled: null }, [track], 0, { kind: "radio", label: `${track.title} Radio`, id: track.id }) });
       loadCurrent(true);
       const added = await extendWithRadio();

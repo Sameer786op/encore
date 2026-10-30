@@ -1,5 +1,6 @@
 import { AnimatePresence, Reorder, motion } from "motion/react";
 import { GripVertical, ListPlus, LoaderCircle, X } from "lucide-react";
+import { useJam } from "@/jam/store";
 import { usePlayer } from "@/player/store";
 import { currentItem, upcomingItems, type QueueItem } from "@/player/queue";
 import { cn } from "@/lib/cn";
@@ -8,6 +9,7 @@ import { openMenu } from "@/ui/menu";
 import { openModal } from "@/ui/modal";
 import { Artwork } from "./Artwork";
 import { Toggle } from "./common";
+import { JamAvatar, useJamGuest } from "./JamPanel";
 import { LiquidGlass } from "./LiquidGlass";
 import { PlayingBars } from "./PlayingBars";
 import { trackMenu } from "./trackMenu";
@@ -15,7 +17,7 @@ import { trackMenu } from "./trackMenu";
 /** rows beyond this are summarised so huge queues stay fast */
 const SHOWN_UPCOMING = 80;
 
-function QueueRow({ item, current, playing, onRemove }: { item: QueueItem; current?: boolean; playing?: boolean; onRemove?: () => void }) {
+function QueueRow({ item, current, playing, onRemove, fixed }: { item: QueueItem; current?: boolean; playing?: boolean; onRemove?: () => void; fixed?: boolean }) {
   const jumpTo = usePlayer((s) => s.jumpTo);
   return (
     <div
@@ -32,7 +34,13 @@ function QueueRow({ item, current, playing, onRemove }: { item: QueueItem; curre
         <div className="truncate text-[13px] font-semibold text-ink">{item.track.title}</div>
         <div className="truncate text-[12px] text-ink-2">{artistNames(item.track.artists)}</div>
       </div>
-      {!current && <GripVertical className="size-3.5 shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />}
+      {/* in a Jam, who put it in the queue */}
+      {item.by && (
+        <span title={`Added by ${item.by}`} className="shrink-0">
+          <JamAvatar name={item.by} className="size-5 text-[10px]" />
+        </span>
+      )}
+      {!current && !fixed && <GripVertical className="size-3.5 shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />}
       {current && <PlayingBars paused={!playing} className="mr-1" />}
       {onRemove && (
         <button onClick={onRemove} aria-label={`Remove ${item.track.title} from the queue`} className="pressable rounded-full p-1 text-ink-3 opacity-0 hover:bg-white/10 hover:text-ink group-hover:opacity-100">
@@ -50,6 +58,12 @@ export function QueuePanel() {
   const autoplay = usePlayer((s) => s.autoplay);
   const radioLoading = usePlayer((s) => s.radioLoading);
   const { setQueueOpen, removeFromQueue, reorderUpcoming, clearUpcoming, setAutoplay } = usePlayer.getState();
+  const jamOn = useJam((s) => s.status !== "off" && s.status !== "joining");
+  const people = useJam((s) => s.people);
+  const hostName = useJam((s) => s.hostName);
+  const jam = jamOn ? { people, hostName } : null;
+  // a guest sees the host's queue, but the host arranges it
+  const guest = useJamGuest();
 
   const current = currentItem(queue);
   const upcoming = upcomingItems(queue);
@@ -89,6 +103,20 @@ export function QueuePanel() {
               </div>
             </div>
 
+            {jam && (
+              <div className="mx-2.5 mb-1 flex items-center gap-3 rounded-[16px] bg-accent/10 px-3.5 py-2.5">
+                <div className="flex -space-x-1.5">
+                  {jam.people.slice(0, 5).map((p) => (
+                    <JamAvatar key={p.id} name={p.name} className="size-6 text-[11px]" />
+                  ))}
+                </div>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-[13px] font-semibold">{guest ? `${jam.hostName}'s Jam` : "Your Jam"}</div>
+                  <div className="text-[11.5px] leading-snug text-ink-3">{guest ? `${jam.hostName} chooses what plays. You can add songs.` : `${jam.people.length} listening. Anyone can add songs.`}</div>
+                </div>
+              </div>
+            )}
+
             <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%_-_14px),transparent)]">
               {current ? (
                 <>
@@ -106,17 +134,27 @@ export function QueuePanel() {
                       <div className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-3">Next up</div>
                       {queue.context && <div className="truncate text-[11.5px] text-ink-3">From {queue.context.label}</div>}
                     </div>
-                    <button onClick={clearUpcoming} className="pressable shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold text-accent-ink hover:bg-accent/10">
-                      Clear
-                    </button>
+                    {!guest && (
+                      <button onClick={clearUpcoming} className="pressable shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold text-accent-ink hover:bg-accent/10">
+                        Clear
+                      </button>
+                    )}
                   </div>
-                  <Reorder.Group axis="y" values={shown.map((i) => i.uid)} onReorder={(uids) => reorderUpcoming(uids)} className="flex flex-col">
-                    {shown.map((item) => (
-                      <Reorder.Item key={item.uid} value={item.uid} whileDrag={{ scale: 1.03, zIndex: 1 }} transition={{ type: "spring", stiffness: 500, damping: 40 }} className="relative">
-                        <QueueRow item={item} onRemove={() => removeFromQueue(item.uid)} />
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
+                  {guest ? (
+                    <div className="flex flex-col">
+                      {shown.map((item) => (
+                        <QueueRow key={item.uid} item={item} fixed />
+                      ))}
+                    </div>
+                  ) : (
+                    <Reorder.Group axis="y" values={shown.map((i) => i.uid)} onReorder={(uids) => reorderUpcoming(uids)} className="flex flex-col">
+                      {shown.map((item) => (
+                        <Reorder.Item key={item.uid} value={item.uid} whileDrag={{ scale: 1.03, zIndex: 1 }} transition={{ type: "spring", stiffness: 500, damping: 40 }} className="relative">
+                          <QueueRow item={item} onRemove={() => removeFromQueue(item.uid)} />
+                        </Reorder.Item>
+                      ))}
+                    </Reorder.Group>
+                  )}
                   {upcoming.length > shown.length && <p className="px-2 pt-2 text-[12px] text-ink-3">and {upcoming.length - shown.length} more</p>}
                 </>
               )}
@@ -128,7 +166,7 @@ export function QueuePanel() {
               )}
             </div>
 
-            <div className="mx-2.5 mb-2.5 flex items-center gap-3 rounded-[16px] bg-white/[0.05] px-3.5 py-3">
+            <div className={cn("mx-2.5 mb-2.5 flex items-center gap-3 rounded-[16px] bg-white/[0.05] px-3.5 py-3", guest && "hidden")}>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-medium">Autoplay</div>
                 <div className="text-[11.5px] leading-snug text-ink-3">Keep playing similar songs when your queue ends</div>

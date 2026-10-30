@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AudioLines, Gauge, ListMusic, LoaderCircle, MicVocal, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume, Volume1, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Gauge, ListMusic, LoaderCircle, MicVocal, Pause, PictureInPicture2, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, UsersRound, Volume, Volume1, Volume2, VolumeX } from "lucide-react";
+import { useJam } from "@/jam/store";
 import { useView } from "@/ui/view";
 import { navigate } from "@/nav/store";
 import { useCurrentTrack, usePlayer } from "@/player/store";
@@ -14,6 +15,7 @@ import { ArtistLinks, LikeButton, SPRING } from "./common";
 import { LiquidGlass } from "./LiquidGlass";
 import { Slider } from "./Slider";
 import { WaveSeek } from "./WaveSeek";
+import { JamPanel, useJamGuest } from "./JamPanel";
 import { formatSpeed, isNormalSound, SoundPanel } from "./SoundPanel";
 import { trackMenu } from "./trackMenu";
 
@@ -45,13 +47,16 @@ export function Transport() {
   const loading = status === "loading";
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
   const hint = useHints();
+  // in someone else's Jam, the host chooses what plays
+  const guest = useJamGuest();
+  const hostOnly = guest ? "The host chooses what plays in this Jam" : undefined;
 
   return (
     <div className="flex items-center gap-0.5 @max-[820px]:self-center">
-      <Glyph onClick={toggleShuffle} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title={hint("shuffle", "Shuffle")} className="size-8">
+      <Glyph onClick={toggleShuffle} disabled={guest} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title={hostOnly ?? hint("shuffle", "Shuffle")} className="size-8">
         <Shuffle className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
-      <Glyph onClick={previous} disabled={!hasTrack} aria-label="Previous" title={hint("previous", "Previous")}>
+      <Glyph onClick={previous} disabled={!hasTrack || guest} aria-label="Previous" title={hostOnly ?? hint("previous", "Previous")}>
         <SkipBack className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
       <motion.button
@@ -82,10 +87,10 @@ export function Transport() {
           </motion.span>
         </AnimatePresence>
       </motion.button>
-      <Glyph onClick={next} disabled={!hasTrack} aria-label="Next" title={hint("next", "Next")}>
+      <Glyph onClick={next} disabled={!hasTrack || guest} aria-label="Next" title={hostOnly ?? hint("next", "Next")}>
         <SkipForward className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
-      <Glyph onClick={cycleRepeat} active={repeat !== "off"} aria-label={`Repeat: ${repeat}`} title={hint("repeat", "Repeat")} className="size-8">
+      <Glyph onClick={cycleRepeat} disabled={guest} active={repeat !== "off"} aria-label={`Repeat: ${repeat}`} title={hostOnly ?? hint("repeat", "Repeat")} className="size-8">
         <RepeatIcon className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
     </div>
@@ -187,6 +192,37 @@ function SoundButton() {
   );
 }
 
+/** start or join a Jam; while in one, how many are in it */
+function JamButton() {
+  const status = useJam((s) => s.status);
+  const count = useJam((s) => s.people.length);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const on = status !== "off";
+  return (
+    <>
+      <Glyph
+        ref={setAnchor}
+        onClick={() => setOpen(!open)}
+        active={on || open}
+        aria-label={on ? `Jam, ${count} ${count === 1 ? "person" : "people"}` : "Jam"}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title="Jam: listen together"
+        className={cn("relative size-8", on && count > 1 && "w-auto gap-1 px-2")}
+      >
+        <span className="flex items-center gap-1">
+          <UsersRound className="size-[17px]" />
+          {on && count > 1 && <span className="text-[11.5px] font-semibold tabular-nums">{count}</span>}
+        </span>
+        {status === "joining" || status === "reconnecting" ? <LoaderCircle aria-hidden className="absolute -right-0.5 -top-0.5 size-3 animate-spin text-accent-ink" /> : null}
+      </Glyph>
+      <JamPanel anchor={anchor} open={open} onClose={close} />
+    </>
+  );
+}
+
 function VolumeControl() {
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
@@ -234,6 +270,7 @@ export function PlayerBar({ right }: { right: number }) {
             <Seek />
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
+            <JamButton />
             <SoundButton />
             <Glyph
               onClick={() => (lyricsOpen ? useView.getState().closeFullscreen() : useView.getState().openFullscreen(true))}

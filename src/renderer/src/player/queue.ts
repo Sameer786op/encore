@@ -6,7 +6,7 @@ import type { Track } from "@shared/types";
 export type RepeatMode = "off" | "all" | "one";
 
 export interface PlayContext {
-  kind: "search" | "album" | "artist" | "playlist" | "liked" | "history" | "radio" | "home" | "track" | "mix";
+  kind: "search" | "album" | "artist" | "playlist" | "liked" | "history" | "radio" | "home" | "track" | "mix" | "jam";
   label: string;
   id?: string;
 }
@@ -14,6 +14,8 @@ export interface PlayContext {
 export interface QueueItem {
   uid: string;
   track: Track;
+  /** in a Jam, the name of who added it */
+  by?: string;
 }
 
 export interface QueueState {
@@ -32,8 +34,11 @@ export type Random = () => number;
 export const emptyQueue: QueueState = { items: [], index: -1, shuffle: false, repeat: "off", unshuffled: null, context: null };
 
 let uidCounter = 0;
-export function makeItems(tracks: Track[]): QueueItem[] {
-  return tracks.map((track) => ({ uid: `q${Date.now().toString(36)}${(uidCounter++).toString(36)}`, track }));
+export function makeItems(tracks: Track[], by?: string): QueueItem[] {
+  return tracks.map((track) => {
+    const uid = `q${Date.now().toString(36)}${(uidCounter++).toString(36)}`;
+    return by ? { uid, track, by } : { uid, track };
+  });
 }
 
 function shuffled<T>(list: T[], random: Random): T[] {
@@ -99,16 +104,16 @@ function insertIntoUnshuffled(state: QueueState, afterUid: string | null, uids: 
 }
 
 /** insert right after the current song */
-export function playNext(state: QueueState, tracks: Track[]): QueueState {
-  if (state.index < 0) return addToQueue(state, tracks);
-  const added = makeItems(tracks);
+export function playNext(state: QueueState, tracks: Track[], by?: string): QueueState {
+  if (state.index < 0) return addToQueue(state, tracks, by);
+  const added = makeItems(tracks, by);
   const items = [...state.items];
   items.splice(state.index + 1, 0, ...added);
   return { ...state, items, unshuffled: insertIntoUnshuffled(state, items[state.index].uid, added.map((a) => a.uid)) };
 }
 
-export function addToQueue(state: QueueState, tracks: Track[]): QueueState {
-  const added = makeItems(tracks);
+export function addToQueue(state: QueueState, tracks: Track[], by?: string): QueueState {
+  const added = makeItems(tracks, by);
   const items = [...state.items, ...added];
   return {
     ...state,

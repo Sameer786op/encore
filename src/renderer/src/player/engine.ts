@@ -122,6 +122,8 @@ export class AudioEngine {
   private eq: EqSettings | null = null;
   private rate = 1;
   private keepPitch = false;
+  /** in a Jam as a guest: the host's speed, and how much faster or slower to play to keep up with it */
+  private jam: { rate: number; keepPitch: boolean; nudge: number } | null = null;
   private reverbAmount = 0;
 
   constructor(private readonly events: EngineEvents) {
@@ -244,6 +246,12 @@ export class AudioEngine {
 
   get isPaused(): boolean {
     return this.activeDeck.audio.paused;
+  }
+
+  /** where the current song is, in seconds, to the millisecond */
+  get currentTime(): number {
+    const deck = this.activeDeck;
+    return deck.audio.readyState === 0 ? (deck.seekOnLoad ?? 0) : deck.audio.currentTime;
   }
 
   private resume(): void {
@@ -399,10 +407,20 @@ export class AudioEngine {
     this.applySpeed();
   }
 
+  /** a Jam guest plays at the host's speed, `nudge` times faster to catch up with it; null goes back to its own */
+  follow(host: { rate: number; keepPitch: boolean; nudge: number } | null): void {
+    const same = host && this.jam && host.rate === this.jam.rate && host.keepPitch === this.jam.keepPitch && host.nudge === this.jam.nudge;
+    if (same || (!host && !this.jam)) return;
+    this.jam = host && { ...host };
+    this.applySpeed();
+  }
+
   private applySpeed(): void {
-    const rate = this.speed;
+    const rate = this.speed * (this.jam?.nudge ?? 1);
+    // catching up keeps the key, so it isn't heard
+    const keepPitch = this.jam ? this.jam.keepPitch || this.jam.rate === 1 : this.keepPitch;
     for (const { audio } of this.decks) {
-      audio.preservesPitch = this.keepPitch;
+      audio.preservesPitch = keepPitch;
       // a new song resets the speed to the default one, so both are set
       audio.defaultPlaybackRate = rate;
       audio.playbackRate = rate;
@@ -411,7 +429,13 @@ export class AudioEngine {
 
   /** the speed songs actually play at */
   get speed(): number {
+    if (this.jam) return this.jam.rate;
     return this.pure ? 1 : this.rate;
+  }
+
+  /** whether a sped-up song keeps its key */
+  get keepsPitch(): boolean {
+    return this.keepPitch;
   }
 
   /** 0 is dry, 1 is drenched; the reverb only runs while it's turned up */
