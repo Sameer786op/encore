@@ -4,12 +4,12 @@ import { ACCOUNT_NAMES } from "@shared/types";
 import type { ApiAuth } from "./http";
 import { SignedOutError, sleep, type AccountAuth } from "./provider";
 
-// Signing in to Spotify and Apple Music happens on their own pages, in a
-// window with its own browser storage per service; Vyse Music never sees the
-// password. Later, a hidden window opens the service's web app now and then:
-// that keeps the sign-in fresh the way a browser tab would, and the app's own
-// API calls carry the token Vyse Music then reads with. (YouTube Music signs
-// in through the person's own browser instead: see google.ts.)
+// Signing in to Apple Music happens on its own pages, in a window with its own
+// browser storage; Vyse Music never sees the password. Later, a hidden window
+// opens the web app now and then: that keeps the sign-in fresh the way a browser
+// tab would, and the app's own API calls carry the token Vyse Music then reads
+// with. (Spotify and YouTube Music sign in through the person's own browser
+// instead: see spotifyAuth.ts and google.ts.)
 
 const MAJOR = process.versions.chrome.split(".")[0];
 // some sign-in pages turn away browsers they don't recognise, so these windows present themselves as Chrome
@@ -28,17 +28,9 @@ interface Site {
   keepMs: number;
 }
 
-export type WebService = Exclude<AccountService, "youtube">;
+export type WebService = Exclude<AccountService, "youtube" | "spotify">;
 
 const SITES: Record<WebService, Site> = {
-  spotify: {
-    signIn: `https://accounts.spotify.com/login?continue=${encodeURIComponent("https://open.spotify.com/")}`,
-    app: "https://open.spotify.com/",
-    signedIn: { url: "https://open.spotify.com", name: "sp_dc" },
-    token: { url: /^https:\/\/(api|api-partner)\.spotify\.com\/|^https:\/\/[\w.-]+\.spclient\.spotify\.com\//, headers: ["authorization"] },
-    // Spotify's tokens last an hour
-    keepMs: 45 * 60_000,
-  },
   apple: {
     // the Sign In button is at the top of the page
     signIn: "https://music.apple.com/",
@@ -208,7 +200,6 @@ export class AccountWeb {
   /** the headers an API call needs, from what the web app sent */
   private async tokenHeaders(service: WebService): Promise<Record<string, string> | null> {
     const seen = this.seen.get(service) ?? {};
-    if (service === "spotify") return /^Bearer \S+/i.test(seen.authorization ?? "") ? { authorization: seen.authorization, "user-agent": CHROME_UA } : null;
     if (service === "apple") {
       const user = seen["media-user-token"] ?? (await this.cookie(service, "media-user-token"));
       if (!seen.authorization || !user) return null;
@@ -218,8 +209,8 @@ export class AccountWeb {
     return null;
   }
 
-  /** sign-in headers for Spotify's or Apple's API */
-  apiAuth(service: "spotify" | "apple"): ApiAuth {
+  /** sign-in headers for Apple's API */
+  apiAuth(service: WebService): ApiAuth {
     return {
       headers: async (fresh) => {
         const held = this.held.get(service);

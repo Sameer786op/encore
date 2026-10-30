@@ -1,9 +1,10 @@
 import type { LinkContents } from "../imports/links";
 import { getJson, type ApiAuth, type Fetch } from "./http";
-import { SignedOutError, type AccountProvider, type RemoteArtist, type RemotePlaylist, type RemoteSong } from "./provider";
+import { AccountRefusedError, SignedOutError, type AccountProvider, type RemoteArtist, type RemotePlaylist, type RemoteSong } from "./provider";
 
-// Reads a Spotify account through the Web API, with the token Spotify's own web
-// player holds (the official route for other apps needs Premium since 2026).
+// Reads a Spotify account through the Web API, signed in through Spotify's
+// official sign-in (spotifyAuth.ts). Since 2026 Spotify only lets an app like
+// this read accounts added in its developer dashboard, while its owner has Premium.
 
 const API = "https://api.spotify.com/v1";
 const LIKED = "liked";
@@ -56,11 +57,24 @@ export class SpotifyProvider implements AccountProvider {
     /** the public embed page: other people's playlists only share their first 100 songs that way */
     private readonly readEmbed: (id: string) => Promise<LinkContents>,
     private readonly fetchImpl: Fetch = fetch,
+    /** a stand-in for api.spotify.com/v1, for tests */
+    private readonly api = API,
   ) {}
 
   private get<T>(pathOrUrl: string): Promise<T | null> {
     // Spotify says 401 for a token that ran out; 403 only means that one thing isn't yours to read
-    return getJson<T>(pathOrUrl.startsWith("https://") ? pathOrUrl : `${API}${pathOrUrl}`, this.auth, this.fetchImpl, [401]);
+    return getJson<T>(/^https?:\/\//.test(pathOrUrl) ? pathOrUrl : `${this.api}${pathOrUrl}`, this.auth, this.fetchImpl, [401]);
+  }
+
+  /** why Spotify won't say who's signed in: an account that isn't on the app's list, or an owner without Premium */
+  private async refusal(): Promise<Error> {
+    const res = await this.fetchImpl(`${this.api}/me`, { headers: await this.auth.headers(), signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    if (res?.status !== 403) return new SignedOutError("No Spotify account");
+    const said = await res.text().catch(() => "");
+    if (/premium/i.test(said)) return new AccountRefusedError("Spotify has paused Vyse Music's Spotify app: the app's owner needs Spotify Premium for it to work.");
+    return new AccountRefusedError(
+      "Spotify hasn't let this account in yet. An app like Vyse Music can only read Spotify accounts added by email in its Spotify developer dashboard, up to 5. Ask whoever set up its Spotify app to add your Spotify email, then connect again.",
+    );
   }
 
   /** every item across "next" pages */
@@ -80,7 +94,7 @@ export class SpotifyProvider implements AccountProvider {
 
   async whoAmI(): Promise<{ name?: string }> {
     const me = await this.get<{ id?: string; display_name?: string | null }>("/me");
-    if (!me?.id) throw new SignedOutError("No Spotify account");
+    if (!me?.id) throw await this.refusal();
     return { name: me.display_name || me.id };
   }
 

@@ -91,6 +91,8 @@ export const IPC = {
   accountsDisconnect: "accounts:disconnect",
   accountsSync: "accounts:sync",
   accountsSetPlaylistEnabled: "accounts:set-playlist-enabled",
+  accountsSpotifyApp: "accounts:spotify-app",
+  accountsSetSpotifyApp: "accounts:set-spotify-app",
 
   scrobbleStatus: "scrobble:status",
   scrobbleStatusChanged: "scrobble:status-changed",

@@ -37,6 +37,9 @@ export interface AccountProvider {
 /** the service no longer accepts the sign-in: it ran out, or the password changed */
 export class SignedOutError extends Error {}
 
+/** the service turned Vyse Music away for a reason the person can do something about; the message says what, and is shown as it is */
+export class AccountRefusedError extends Error {}
+
 /** a sign-in finished in the person's own browser: the code to enter there, and the page to enter it on */
 export interface SignInCode {
   code: string;

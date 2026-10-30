@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronDown, Copy, ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, FileArchive, Import, Link2, LoaderCircle, RefreshCw } from "lucide-react";
 import type { AccountService, AccountStatus, SyncedPlaylistInfo } from "@shared/types";
 import { ACCOUNT_NAMES, ACCOUNT_SERVICES } from "@shared/types";
 import { useAccounts } from "@/accounts/store";
 import { Toggle } from "@/components/common";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { plural, timeAgo } from "@/lib/format";
+import { navigate } from "@/nav/store";
 import { openModal } from "@/ui/modal";
 import { toast } from "@/ui/toast";
 import { cn } from "@/lib/cn";
 import { Card } from "./parts";
+import { needsSpotifyApp, SpotifyAppSetup, useSpotifyApp, type SpotifyApp } from "./SpotifyAppSettings";
 
 const WHAT: Record<AccountService, string> = {
   spotify: "Your playlists and Liked Songs, kept up to date here.",
@@ -38,7 +40,43 @@ function playlistLine(p: SyncedPlaylistInfo): string {
 const pill = "glass-control pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium hover:brightness-125 disabled:opacity-60";
 const accentPill = "pressable inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-70";
 
-function AccountRow({ account }: { account: AccountStatus }) {
+function Way({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-[9px] bg-white/[0.08] text-ink-2">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-ink">{title}</span>
+        {children}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Spotify only lets an app read accounts through a Spotify app whose owner has Premium, so without one
+ * (none built in, none of the person's own) its playlists come over by import instead
+ */
+function SpotifyByImport({ connected }: { connected: boolean }) {
+  return (
+    <div className="ml-14 mt-3 rounded-[14px] bg-white/[0.06] px-4 py-3.5 text-[12.5px] leading-relaxed text-ink-2">
+      <p>
+        {connected
+          ? "Spotify only lets apps like Vyse Music stay connected through a Spotify app whose owner has Premium, so this connection can't look for changes any more. The playlists that came over stay in your library. To bring new songs over:"
+          : "Spotify only lets apps like Vyse Music connect through a Spotify app whose owner has Premium, for 5 people at most, so this copy can't connect to Spotify. Your playlists still come over:"}
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        <Way icon={<Link2 className="size-3.5" />} title="Paste a playlist link">
+          In Spotify, use Share → Copy link on a playlist or album and paste it on the Import page. Spotify shares the first 100 songs of a playlist this way.
+        </Way>
+        <Way icon={<FileArchive className="size-3.5" />} title="Import your Spotify data export">
+          Every playlist and your Liked Songs, in full. Ask for it at spotify.com/account/privacy (Spotify emails it within a few days), then drop the .zip on the Import page.
+        </Way>
+      </ul>
+    </div>
+  );
+}
+
+function AccountRow({ account, spotifyApp }: { account: AccountStatus; spotifyApp?: SpotifyApp }) {
   const [open, setOpen] = useState(false);
   const { service } = account;
   const name = ACCOUNT_NAMES[service];
@@ -47,6 +85,14 @@ function AccountRow({ account }: { account: AccountStatus }) {
   const synced = account.playlists.filter((p) => p.enabled);
   const songs = synced.reduce((n, p) => n + p.songs, 0);
   const progress = account.progress && account.progress.total > 0 ? account.progress.done / account.progress.total : null;
+  // Spotify can't be connected until there's a Spotify app to sign in with; till then its playlists come over by import
+  const noApp = needsSpotifyApp(spotifyApp);
+  const importSpotify = (
+    <button onClick={() => navigate({ name: "import" })} className={accentPill}>
+      <Import className="size-4" />
+      Import from Spotify
+    </button>
+  );
 
   const connect = async () => {
     if (await window.encore.accounts.connect(service)) toast(`${name} is connected. Your playlists are on their way.`);
@@ -67,11 +113,15 @@ function AccountRow({ account }: { account: AccountStatus }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-medium">{name}</div>
-          <div className="mt-0.5 truncate text-[12.5px] text-ink-3">{account.connected ? statusLine(account) : WHAT[service]}</div>
+          <div className="mt-0.5 truncate text-[12.5px] text-ink-3">
+            {noApp ? "Bring your playlists over with a link or your data export." : account.connected ? statusLine(account) : WHAT[service]}
+          </div>
         </div>
         {account.connected ? (
           <div className="flex shrink-0 items-center gap-2">
-            {account.state === "signed-out" ? (
+            {noApp ? (
+              importSpotify
+            ) : account.state === "signed-out" ? (
               <button onClick={() => void connect()} className={accentPill}>
                 Connect again
               </button>
@@ -85,6 +135,8 @@ function AccountRow({ account }: { account: AccountStatus }) {
               Disconnect
             </button>
           </div>
+        ) : noApp ? (
+          <div className="flex shrink-0 items-center gap-2">{importSpotify}</div>
         ) : (
           <div className="flex shrink-0 items-center gap-2">
             {connecting && (
@@ -105,11 +157,23 @@ function AccountRow({ account }: { account: AccountStatus }) {
           <motion.div className="h-full rounded-full bg-[linear-gradient(90deg,var(--ramp-1),var(--ramp-2),var(--ramp-3))]" initial={false} animate={{ width: `${Math.max(3, progress * 100)}%` }} transition={{ type: "spring", stiffness: 140, damping: 26 }} />
         </div>
       )}
-      {connecting && service !== "youtube" && (
+      {connecting && service === "apple" && (
         <p className="ml-14 mt-2 text-[12.5px] leading-relaxed text-ink-3">
-          {service === "apple" ? "Click Sign In on the left of the Apple Music window that opened, then sign in." : `Sign in to ${name} in the window that opened.`} It closes by
-          itself when you're done.
+          Click Sign In on the left of the Apple Music window that opened, then sign in. It closes by itself when you're done.
         </p>
+      )}
+      {connecting && service === "spotify" && (
+        <div className="ml-14 mt-3 rounded-[14px] bg-white/[0.06] px-4 py-3.5">
+          <p className="text-[12.5px] leading-relaxed text-ink-2">
+            Spotify's page is open in your browser. Sign in there if it asks, then click Agree. Vyse Music connects by itself, with no password to type here.
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <button onClick={() => void window.encore.accounts.reopenSignIn(service)} className={pill}>
+              <ExternalLink className="size-3.5" />
+              Open the page again
+            </button>
+          </div>
+        </div>
       )}
       {connecting && service === "youtube" && (
         <div className="ml-14 mt-3 rounded-[14px] bg-white/[0.06] px-4 py-3.5">
@@ -138,9 +202,10 @@ function AccountRow({ account }: { account: AccountStatus }) {
           )}
         </div>
       )}
-      {account.error && !syncing && <p className="ml-14 mt-2 text-[12.5px] leading-relaxed text-bad">{account.error}</p>}
+      {noApp && <SpotifyByImport connected={account.connected} />}
+      {account.error && !syncing && !noApp && <p className="ml-14 mt-2 text-[12.5px] leading-relaxed text-bad">{account.error}</p>}
 
-      {account.connected && account.playlists.length > 0 && (
+      {account.connected && account.playlists.length > 0 && !noApp && (
         <div className="ml-14">
           <button
             onClick={() => setOpen((v) => !v)}
@@ -175,18 +240,20 @@ function AccountRow({ account }: { account: AccountStatus }) {
           </AnimatePresence>
         </div>
       )}
+      {spotifyApp?.info && !connecting && <SpotifyAppSetup app={spotifyApp} />}
     </div>
   );
 }
 
 export function AccountSettings() {
   const accounts = useAccounts((s) => s.accounts);
+  const spotifyApp = useSpotifyApp();
   return (
     <>
       <Card>
         {ACCOUNT_SERVICES.map((service) => {
           const account = accounts.find((a) => a.service === service) ?? { service, connected: false, state: "idle" as const, playlists: [] };
-          return <AccountRow key={service} account={account} />;
+          return <AccountRow key={service} account={account} spotifyApp={service === "spotify" ? spotifyApp : undefined} />;
         })}
       </Card>
       <div className="mt-2.5 space-y-1.5 px-4 text-[12px] leading-relaxed text-ink-3">
@@ -195,8 +262,10 @@ export function AccountSettings() {
           YouTube Music, with no Premium needed. Nothing changes until you connect an account.
         </p>
         <p>
-          You sign in on Spotify's, Google's or Apple's own page, so your password goes only to them; YouTube Music signs in with the Google account already in your browser. Vyse Music only reads your playlists, liked songs and the artists you follow; it never
-          changes anything there. These services don't officially offer this to apps like Vyse Music, so a change on their side can stop a connection working until Vyse Music is updated.
+          You sign in on Spotify's, Google's or Apple's own page, so your password goes only to them; Spotify and YouTube Music sign in through your own browser, where you may be
+          signed in already. Vyse Music only reads your playlists, liked songs and the artists you follow; it never changes anything there. Spotify connects through its official
+          route, which needs a Spotify app whose owner has Premium. Google and Apple don't offer this to apps like Vyse Music, so a change on their side can stop a connection
+          working until Vyse Music is updated.
         </p>
       </div>
     </>

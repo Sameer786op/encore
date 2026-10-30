@@ -196,6 +196,16 @@ export interface AccountStatus {
   playlists: SyncedPlaylistInfo[];
 }
 
+/** the Spotify app that Spotify sign-ins go through */
+export interface SpotifyAppInfo {
+  /** this copy of Vyse Music has one built in */
+  builtIn: boolean;
+  /** the Client ID of the person's own Spotify app, used instead of the built-in one */
+  own: string | null;
+  /** what to register as the redirect URI in a Spotify app */
+  redirectUri: string;
+}
+
 export interface HistoryEntry {
   track: Track;
   playedAt: string;
@@ -596,7 +606,7 @@ export interface EncoreApi {
   accounts: {
     list(): Promise<AccountStatus[]>;
     onChange(listener: (accounts: AccountStatus[]) => void): () => void;
-    /** opens the service's own sign-in page (a window, or Google's page in the browser for YouTube Music); true once signed in */
+    /** opens the service's own sign-in page (in the browser for Spotify and YouTube Music, a window for Apple Music); true once signed in */
     connect(service: AccountService): Promise<boolean>;
     /** stops waiting for a sign-in under way */
     cancelConnect(service: AccountService): Promise<void>;
@@ -606,6 +616,10 @@ export interface EncoreApi {
     disconnect(service: AccountService, keepPlaylists: boolean): Promise<void>;
     sync(service: AccountService): Promise<void>;
     setPlaylistEnabled(service: AccountService, remoteId: string, enabled: boolean): Promise<void>;
+    /** the Spotify app Spotify sign-ins go through */
+    spotifyApp(): Promise<SpotifyAppInfo>;
+    /** use your own Spotify app from the next sign-in on, or null to go back to the built-in one */
+    setSpotifyApp(clientId: string | null): Promise<SpotifyAppInfo>;
   };
   scrobble: {
     status(): Promise<ScrobbleStatus>;

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, session, shell, type IpcMainInvokeEvent } from "electron";
 import type {
   AlbumSummary,
   ArtistSummary,
@@ -16,7 +16,7 @@ import type {
   Track,
   WindowState,
 } from "@shared/types";
-import { ACCOUNT_SERVICES, MINI_CORNERS, type AccountService, type MiniConfig, type MiniCorner } from "@shared/types";
+import { ACCOUNT_SERVICES, MINI_CORNERS, type AccountService, type MiniConfig, type MiniCorner, type SpotifyAppInfo } from "@shared/types";
 import { IPC } from "@shared/ipc";
 import { isMoodId } from "@shared/moods";
 import { shouldScrobble } from "@shared/scrobbleRules";
@@ -24,6 +24,7 @@ import { AppleProvider } from "./accounts/apple";
 import { GoogleSignIn } from "./accounts/google";
 import type { AccountAuth, AccountProvider } from "./accounts/provider";
 import { SpotifyProvider } from "./accounts/spotify";
+import { isClientId, SPOTIFY_REDIRECT, SpotifySignIn } from "./accounts/spotifyAuth";
 import { standinAccounts } from "./accounts/standin";
 import { AccountSync } from "./accounts/sync";
 import { AccountWeb } from "./accounts/web";
@@ -310,11 +311,54 @@ function serviceArg(value: unknown): AccountService {
   return value as AccountService;
 }
 
+// Vyse Music's own Spotify app, built into releases from .env.local (never committed); someone can use their own app instead
+const BUILT_IN_SPOTIFY = (import.meta.env.MAIN_VITE_SPOTIFY_CLIENT_ID ?? "").trim();
+const SPOTIFY_APP_KEY = "accounts.spotify.clientId";
+
+function spotifyApp(): SpotifyAppInfo {
+  // stand-in accounts for tests sign in without one
+  const builtIn = isClientId(BUILT_IN_SPOTIFY) || !!process.env.ENCORE_ACCOUNTS_STANDIN;
+  return { builtIn, own: getSetting(db, SPOTIFY_APP_KEY), redirectUri: SPOTIFY_REDIRECT };
+}
+
+function setSpotifyApp(value: unknown): SpotifyAppInfo {
+  const clientId = typeof value === "string" ? value.trim() : null;
+  if (clientId !== null && !isClientId(clientId)) throw new Error("A Spotify Client ID is 32 letters and numbers");
+  setSetting(db, SPOTIFY_APP_KEY, clientId ? clientId.toLowerCase() : null);
+  return spotifyApp();
+}
+
 /** the real sign-ins and readers, or the stand-ins automated tests use */
 function accountConnections(): { providers: Record<AccountService, AccountProvider>; auth: Record<AccountService, AccountAuth> } {
   if (process.env.ENCORE_ACCOUNTS_STANDIN) return standinAccounts(process.env.ENCORE_ACCOUNTS_STANDIN);
   const web = new AccountWeb({ parent: () => mainWindow, icon });
   accountWeb = web;
+  // Spotify used to sign in inside a window of Vyse Music's own; nothing from that sign-in is kept
+  if (!getSetting(db, "accounts.spotify.windowCleared")) {
+    void session
+      .fromPartition("persist:account-spotify")
+      .clearStorageData()
+      .then(() => setSetting(db, "accounts.spotify.windowCleared", "1"))
+      .catch(() => undefined);
+  }
+  const spotify = new SpotifySignIn({
+    store: {
+      get: () => {
+        const saved = getSetting(db, "accounts.spotify.signIn");
+        return saved ? electronVault.decrypt(saved) : null;
+      },
+      set: (value) => setSetting(db, "accounts.spotify.signIn", value === null ? null : electronVault.encrypt(value)),
+    },
+    clientId: () => {
+      const chosen = spotifyApp();
+      return chosen.own ?? (chosen.builtIn ? BUILT_IN_SPOTIFY : null);
+    },
+    // Spotify's page opens in the person's own browser, where they may be signed in to Spotify already
+    openPage: (url) => {
+      if (!process.env.ENCORE_NO_BROWSER) void shell.openExternal(url);
+    },
+    accountsUrl: process.env.ENCORE_SPOTIFY_ACCOUNTS_URL,
+  });
   const google = new GoogleSignIn({
     // kept encrypted, like the scrobbling keys
     store: {
@@ -336,11 +380,11 @@ function accountConnections(): { providers: Record<AccountService, AccountProvid
   usePremiumAccount(google.client);
   return {
     providers: {
-      spotify: new SpotifyProvider(web.apiAuth("spotify"), (id) => readSpotify({ service: "spotify", kind: "playlist", id })),
+      spotify: new SpotifyProvider(spotify.api, (id) => readSpotify({ service: "spotify", kind: "playlist", id }), fetch, process.env.ENCORE_SPOTIFY_API_URL),
       youtube: new YouTubeProvider(google.client),
       apple: new AppleProvider(web.apiAuth("apple")),
     },
-    auth: { spotify: web.auth("spotify"), youtube: google, apple: web.auth("apple") },
+    auth: { spotify, youtube: google, apple: web.auth("apple") },
   };
 }
 
@@ -436,6 +480,8 @@ function registerIpc(): void {
   handle(IPC.accountsSetPlaylistEnabled, (service: unknown, remoteId: unknown, enabled: unknown) =>
     accounts.setPlaylistEnabled(serviceArg(service), stringArg(remoteId, "playlist id"), enabled === true),
   );
+  handle(IPC.accountsSpotifyApp, () => spotifyApp());
+  handle(IPC.accountsSetSpotifyApp, (clientId: unknown) => setSpotifyApp(clientId));
 
   handle(IPC.importFromLink, (url: unknown) => importService.fromLink(stringArg(url, "link").slice(0, 2000)));
   handle(IPC.importPickFile, async () => {

@@ -54,6 +54,13 @@ if (exists) {
   process.exit(1);
 }
 
+// a copy can come with a Spotify app built in; its Client ID lives in .env.local (never committed)
+const envLocal = join(root, ".env.local");
+const spotifyId = /^MAIN_VITE_SPOTIFY_CLIENT_ID=\s*([0-9a-f]{32})\s*$/im.exec(existsSync(envLocal) ? readFileSync(envLocal, "utf8") : "")?.[1];
+if (!spotifyId) {
+  console.warn("No Spotify Client ID in .env.local (MAIN_VITE_SPOTIFY_CLIENT_ID=...): this build can only connect Spotify through someone's own Spotify app.");
+}
+
 console.log(`Building Vyse Music ${version}…`);
 npx("electron-vite build");
 npx("electron-builder --win --publish never");

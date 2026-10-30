@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AppleProvider } from "./apple";
 import type { ApiAuth, Fetch } from "./http";
-import { SignedOutError } from "./provider";
+import { AccountRefusedError, SignedOutError } from "./provider";
 import { SpotifyProvider } from "./spotify";
 
 /** answers by URL; a function can answer differently each time */
@@ -82,6 +82,15 @@ describe("SpotifyProvider", () => {
 
     const refused = fakeFetch({ [`${API}/me`]: 401 });
     await expect(new SpotifyProvider(tokens(), noEmbed, refused).whoAmI()).rejects.toBeInstanceOf(SignedOutError);
+  });
+
+  it("says why when Spotify turns the account away", async () => {
+    const answer = (message: string) => (async () => new Response(JSON.stringify({ error: { status: 403, message } }), { status: 403 })) as unknown as Fetch;
+    const notListed = new SpotifyProvider(tokens(), noEmbed, answer("Check settings on developer.spotify.com/dashboard, the user may not be registered."));
+    await expect(notListed.whoAmI()).rejects.toThrow(/added by email in its Spotify developer dashboard/);
+    await expect(notListed.whoAmI()).rejects.toBeInstanceOf(AccountRefusedError);
+    const noPremium = new SpotifyProvider(tokens(), noEmbed, answer("Active premium subscription required for the owner of the app."));
+    await expect(noPremium.whoAmI()).rejects.toThrow(/owner needs Spotify Premium/);
   });
 
   it("lists followed artists across cursor pages", async () => {

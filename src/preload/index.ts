@@ -128,6 +128,8 @@ const api: EncoreApi = {
     disconnect: (service, keepPlaylists) => ipcRenderer.invoke(IPC.accountsDisconnect, service, keepPlaylists),
     sync: (service) => ipcRenderer.invoke(IPC.accountsSync, service),
     setPlaylistEnabled: (service, remoteId, enabled) => ipcRenderer.invoke(IPC.accountsSetPlaylistEnabled, service, remoteId, enabled),
+    spotifyApp: () => ipcRenderer.invoke(IPC.accountsSpotifyApp),
+    setSpotifyApp: (clientId) => ipcRenderer.invoke(IPC.accountsSetSpotifyApp, clientId),
   },
   scrobble: {
     status: () => ipcRenderer.invoke(IPC.scrobbleStatus),

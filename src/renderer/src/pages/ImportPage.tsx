@@ -475,7 +475,7 @@ export function ImportPage() {
     <div className="@container px-8 pb-16 pt-[68px]">
       <PageTitle eyebrow="Import" title="Bring your music" />
       <p className="mt-2 max-w-2xl text-[15px] text-ink-2">
-        Import playlists from a link, or everything you've listened to from your data export. To keep your playlists up to date by themselves,{" "}
+        Import playlists from a link, or everything you've listened to from your data export. To keep YouTube Music or Apple Music playlists up to date by themselves,{" "}
         {/* Connected accounts is the first thing in Settings */}
         <button onClick={() => navigate({ name: "settings" })} className="font-semibold text-accent-ink hover:underline">
           connect your account

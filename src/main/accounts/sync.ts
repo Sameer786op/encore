@@ -6,7 +6,7 @@ import type { Library, MirroredSong } from "../library/library";
 import { classify } from "../matching/score";
 import { fold } from "../matching/text";
 import { getSetting, mapLimit, setSetting } from "../settings";
-import { SignedOutError, sleep, type AccountAuth, type AccountProvider, type RemoteArtist, type RemotePlaylist, type RemoteSong } from "./provider";
+import { AccountRefusedError, SignedOutError, sleep, type AccountAuth, type AccountProvider, type RemoteArtist, type RemotePlaylist, type RemoteSong } from "./provider";
 
 // Keeps playlists from connected accounts in Your Library. Every playlist is
 // mirrored unless switched off, including ones made later; songs are matched to
@@ -165,7 +165,12 @@ export class AccountSync {
     } catch (error) {
       this.setLive(service, {
         state: "error",
-        error: error instanceof SignedOutError ? `Vyse Music couldn't read your ${name} account. Try connecting again.` : `Couldn't reach ${name}. Check your connection and try again.`,
+        error:
+          error instanceof AccountRefusedError
+            ? error.message
+            : error instanceof SignedOutError
+              ? `Vyse Music couldn't read your ${name} account. Try connecting again.`
+              : `Couldn't reach ${name}. Check your connection and try again.`,
       });
       return false;
     }
@@ -313,9 +318,11 @@ export class AccountSync {
       const signedOut = error instanceof SignedOutError;
       const message = signedOut
         ? `Your ${name} sign-in has ended. Connect again to keep your playlists up to date.`
-        : error instanceof MatchError
-          ? "Couldn't reach YouTube Music to find the songs. Vyse Music tries again in a few minutes."
-          : `Couldn't reach ${name}. Vyse Music tries again in a few minutes.`;
+        : error instanceof AccountRefusedError
+          ? error.message
+          : error instanceof MatchError
+            ? "Couldn't reach YouTube Music to find the songs. Vyse Music tries again in a few minutes."
+            : `Couldn't reach ${name}. Vyse Music tries again in a few minutes.`;
       this.db.prepare("UPDATE accounts SET last_error = ?, signed_out = ? WHERE service = ?").run(message, signedOut ? 1 : 0, service);
       this.setLive(service, undefined);
     }
