@@ -381,6 +381,8 @@ export interface NowPlaying {
   at: number;
   /** playback speed; 1 when missing */
   rate?: number;
+  /** listening together in a Jam, hosting or as a guest */
+  jam?: boolean;
 }
 
 export type PlayerCommand = { kind: "toggle" } | { kind: "next" } | { kind: "previous" } | { kind: "seek"; seconds: number } | { kind: "like" };

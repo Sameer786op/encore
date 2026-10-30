@@ -123,6 +123,17 @@ export function addToQueue(state: QueueState, tracks: Track[], by?: string): Que
   };
 }
 
+/** in a Jam, songs people add wait their turn behind the ones added before them, ahead of the rest of the queue */
+export function addToJam(state: QueueState, tracks: Track[], by: string): QueueState {
+  if (state.index < 0) return addToQueue(state, tracks, by);
+  let at = state.index + 1;
+  while (at < state.items.length && state.items[at].by) at++;
+  const added = makeItems(tracks, by);
+  const items = [...state.items];
+  items.splice(at, 0, ...added);
+  return { ...state, items, unshuffled: insertIntoUnshuffled(state, items[at - 1].uid, added.map((a) => a.uid)) };
+}
+
 /** removing the current song leaves `index` on the song that took its place */
 export function removeItem(state: QueueState, uid: string): { state: QueueState; removedCurrent: boolean } {
   const at = state.items.findIndex((i) => i.uid === uid);
@@ -136,15 +147,22 @@ export function removeItem(state: QueueState, uid: string): { state: QueueState;
   return { state: { ...state, items, index, unshuffled }, removedCurrent };
 }
 
-/** set a new order for everything after the current song */
+/**
+ * put the songs after `index` that `uids` lists in that order, in the places
+ * they already take; anything it doesn't list (like a song added meanwhile)
+ * stays where it is
+ */
+export function arrangeAfter(items: QueueItem[], index: number, uids: string[]): QueueItem[] {
+  const listed = new Set(uids);
+  const byUid = new Map(items.slice(index + 1).filter((i) => listed.has(i.uid)).map((i) => [i.uid, i]));
+  const order = [...listed].filter((u) => byUid.has(u));
+  let next = 0;
+  return items.map((item, at) => (at > index && byUid.has(item.uid) ? byUid.get(order[next++])! : item));
+}
+
+/** set a new order for songs after the current one */
 export function reorderUpcoming(state: QueueState, uids: string[]): QueueState {
-  const head = state.items.slice(0, state.index + 1);
-  const tail = state.items.slice(state.index + 1);
-  const byUid = new Map(tail.map((i) => [i.uid, i]));
-  const reordered = uids.map((u) => byUid.get(u)).filter((i): i is QueueItem => !!i);
-  // keep anything the caller did not mention, in its old order
-  const missing = tail.filter((i) => !uids.includes(i.uid));
-  return { ...state, items: [...head, ...reordered, ...missing] };
+  return { ...state, items: arrangeAfter(state.items, state.index, uids) };
 }
 
 export function clearUpcoming(state: QueueState): QueueState {

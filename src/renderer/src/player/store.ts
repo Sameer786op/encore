@@ -4,10 +4,12 @@ import type { Track } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { useSettings } from "@/settings/store";
 import { toast } from "@/ui/toast";
+import type { Command } from "@/jam/protocol";
 import { correction } from "@/jam/timing";
 import { AudioEngine } from "./engine";
 import { fadeLength, levellingDb, shouldCrossfade, shouldPreload } from "./transitions";
 import {
+  addToJam,
   addToQueue,
   clearUpcoming,
   currentItem,
@@ -80,8 +82,10 @@ let radioAskedFor = "";
 export interface JamGuestHooks {
   /** songs for the host's queue */
   add(tracks: Track[], next: boolean): void;
-  /** pause or carry on, for this guest only */
+  /** pause or carry on: for everyone when the host lets guests change what plays, otherwise for this guest only */
   togglePlay(): void;
+  /** a press that changes what plays for everyone: sent to the host if it lets guests, refused if not */
+  control(command: Command): void;
   /** a press only the host can make */
   refuse(): void;
 }
@@ -503,10 +507,10 @@ export const usePlayer = create<PlayerStore>((set, get) => {
       else e.play();
     },
 
-    next: () => (jamGuest ? jamGuest.refuse() : void advance(false)),
+    next: () => (jamGuest ? jamGuest.control({ do: "next" }) : void advance(false)),
 
     previous() {
-      if (jamGuest) return jamGuest.refuse();
+      if (jamGuest) return jamGuest.control({ do: "previous" });
       const { position, queue } = get();
       if (position > 3 || (queue.index <= 0 && queue.repeat === "off")) {
         get().seek(0);
@@ -517,7 +521,7 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     },
 
     seek(seconds) {
-      if (jamGuest) return jamGuest.refuse();
+      if (jamGuest) return jamGuest.control({ do: "seek", uid: currentItem(get().queue)?.uid ?? "", to: Math.max(0, seconds) });
       const e = getEngine();
       const target = Math.max(0, Math.min(seconds, get().duration || seconds));
       if (!e.currentTrack && get().queue.index >= 0) {
@@ -567,19 +571,20 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     addToQueue(tracks) {
       if (jamGuest) return jamGuest.add(tracks, false);
       const wasEmpty = get().queue.index < 0;
-      set({ queue: addToQueue(get().queue, tracks, jamAddedBy ?? undefined) });
+      // while hosting a Jam, added songs take their turn ahead of the rest of the queue
+      set({ queue: jamAddedBy ? addToJam(get().queue, tracks, jamAddedBy) : addToQueue(get().queue, tracks) });
       if (wasEmpty) loadCurrent(true);
       scheduleSave();
     },
 
     jumpTo(uid) {
-      if (jamGuest) return jamGuest.refuse();
+      if (jamGuest) return jamGuest.control({ do: "jump", uid });
       set({ queue: jumpTo(get().queue, uid) });
       loadCurrent(true);
     },
 
     removeFromQueue(uid) {
-      if (jamGuest) return jamGuest.refuse();
+      if (jamGuest) return jamGuest.control({ do: "remove", uid });
       const { state, removedCurrent } = removeItem(get().queue, uid);
       set({ queue: state });
       if (removedCurrent) loadCurrent(get().status === "playing" || get().status === "loading");
@@ -587,7 +592,7 @@ export const usePlayer = create<PlayerStore>((set, get) => {
     },
 
     reorderUpcoming(uids) {
-      if (jamGuest) return jamGuest.refuse();
+      if (jamGuest) return jamGuest.control({ do: "move", uids });
       set({ queue: reorderUpcoming(get().queue, uids) });
       scheduleSave();
     },

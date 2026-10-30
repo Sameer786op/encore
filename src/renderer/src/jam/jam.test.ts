@@ -2,7 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { Track } from "@shared/types";
 import { addToQueue, emptyQueue, playNext } from "@/player/queue";
 import { findCode, makeCode } from "./code";
-import { cleanAdd, cleanClock, cleanHello, cleanName, cleanQueue, cleanTrack, shareQueue, shareTrack } from "./protocol";
+import {
+  cleanAdd,
+  cleanClock,
+  cleanCommand,
+  cleanGoodbye,
+  cleanHello,
+  cleanName,
+  cleanPeople,
+  cleanQueue,
+  cleanRules,
+  cleanTrack,
+  MAX_PEOPLE,
+  shareQueue,
+  shareTrack,
+} from "./protocol";
 import { correction, HostClock, MAX_NUDGE, positionAt } from "./timing";
 
 const song = (n: number): Track => ({
@@ -96,6 +110,29 @@ describe("Jam messages", () => {
     expect(cleanAdd({ tracks: [song(1), file], next: true })).toEqual({ tracks: [song(1)], next: true });
     expect(cleanAdd({ tracks: [file] })).toBeNull();
     expect(cleanAdd({ tracks: Array.from({ length: 80 }, (_, i) => song(i)) })?.tracks).toHaveLength(50);
+  });
+
+  it("checks a guest's presses", () => {
+    expect(cleanCommand({ do: "pause", extra: 1 })).toEqual({ do: "pause" });
+    expect(cleanCommand({ do: "seek", uid: "q12", to: 61.5 })).toEqual({ do: "seek", uid: "q12", to: 61.5 });
+    expect(cleanCommand({ do: "seek", uid: "q12", to: -3 })).toBeNull();
+    expect(cleanCommand({ do: "seek", uid: "", to: 3 })).toBeNull();
+    expect(cleanCommand({ do: "jump", uid: "q3" })).toEqual({ do: "jump", uid: "q3" });
+    expect(cleanCommand({ do: "remove", uid: "<b>" })).toBeNull();
+    expect(cleanCommand({ do: "move", uids: ["q2", "q1", "q2", 7, "bad uid"] })).toEqual({ do: "move", uids: ["q2", "q1"] });
+    expect(cleanCommand({ do: "move", uids: ["q2"] })).toBeNull();
+    // only the host shuffles, repeats or clears
+    expect(cleanCommand({ do: "shuffle" })).toBeNull();
+    expect(cleanCommand("next")).toBeNull();
+  });
+
+  it("checks the host's rules and goodbyes", () => {
+    expect(cleanRules({ control: true })).toEqual({ control: true });
+    expect(cleanRules({ control: "yes" })).toEqual({ control: false });
+    expect(cleanRules(null)).toBeNull();
+    expect(cleanGoodbye({ reason: "full" })).toBe("full");
+    expect(cleanGoodbye({ reason: "banned" })).toBeNull();
+    expect(cleanPeople(Array.from({ length: 50 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, host: i === 0 })))).toHaveLength(MAX_PEOPLE);
   });
 });
 

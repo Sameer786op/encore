@@ -62,8 +62,10 @@ export function QueuePanel() {
   const people = useJam((s) => s.people);
   const hostName = useJam((s) => s.hostName);
   const jam = jamOn ? { people, hostName } : null;
-  // a guest sees the host's queue, but the host arranges it
+  // a guest sees the host's queue, and arranges it only if the host lets them
   const guest = useJamGuest();
+  const control = useJam((s) => s.control);
+  const fixed = guest && !control;
 
   const current = currentItem(queue);
   const upcoming = upcomingItems(queue);
@@ -112,7 +114,11 @@ export function QueuePanel() {
                 </div>
                 <div className="min-w-0 flex-1 leading-tight">
                   <div className="truncate text-[13px] font-semibold">{guest ? `${jam.hostName}'s Jam` : "Your Jam"}</div>
-                  <div className="text-[11.5px] leading-snug text-ink-3">{guest ? `${jam.hostName} chooses what plays. You can add songs.` : `${jam.people.length} listening. Anyone can add songs.`}</div>
+                  <div className="text-[11.5px] leading-snug text-ink-3">{guest
+                      ? control
+                        ? "Everyone can change what plays."
+                        : `${jam.hostName} chooses what plays. You can add songs.`
+                      : `${jam.people.length} listening. ${control ? "Everyone can change what plays." : "Anyone can add songs."}`}</div>
                 </div>
               </div>
             )}
@@ -140,7 +146,7 @@ export function QueuePanel() {
                       </button>
                     )}
                   </div>
-                  {guest ? (
+                  {fixed ? (
                     <div className="flex flex-col">
                       {shown.map((item) => (
                         <QueueRow key={item.uid} item={item} fixed />

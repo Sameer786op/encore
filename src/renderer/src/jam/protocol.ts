@@ -5,7 +5,10 @@ import type { QueueItem } from "@/player/queue";
 // Anything from another computer is taken apart and rebuilt from the fields
 // Vyse Music knows, so a bad message can't reach the player or the screen.
 
-export const JAM_VERSION = 1;
+/** 2: the host lets guests in with its rules, and can turn them away */
+export const JAM_VERSION = 2;
+/** people in one Jam, the host included */
+export const MAX_PEOPLE = 32;
 /** songs one message can add */
 export const MAX_ADD = 50;
 /** songs the host shares from before and after the current one */
@@ -49,6 +52,23 @@ export interface Add {
   tracks: Track[];
   next: boolean;
 }
+
+/** what the host lets guests do; the first thing a guest it lets in hears */
+export interface Rules {
+  /** guests can play, pause, skip, seek and arrange the queue, not just add songs */
+  control: boolean;
+}
+
+/** why the host turned a guest away */
+export type Goodbye = "removed" | "locked" | "full";
+const GOODBYES: Goodbye[] = ["removed", "locked", "full"];
+
+/** a guest changing what plays, when the host lets them */
+export type Command =
+  | { do: "play" | "pause" | "next" | "previous" }
+  | { do: "seek"; uid: string; to: number }
+  | { do: "jump" | "remove"; uid: string }
+  | { do: "move"; uids: string[] };
 
 export interface Ping {
   t: number;
@@ -151,7 +171,7 @@ export function cleanHello(value: unknown): Hello | null {
 export function cleanPeople(value: unknown): Person[] {
   if (!Array.isArray(value)) return [];
   return value
-    .slice(0, 64)
+    .slice(0, MAX_PEOPLE)
     .map((p) => (isObject(p) && id(p.id) ? { id: p.id as string, name: cleanName(p.name), host: p.host === true } : null))
     .filter((p): p is Person => !!p);
 }
@@ -200,6 +220,31 @@ export function cleanAdd(value: unknown): Add | null {
     .map(cleanTrack)
     .filter((t): t is Track => !!t && t.source === "youtube");
   return tracks.length ? { tracks, next: value.next === true } : null;
+}
+
+export function cleanRules(value: unknown): Rules | null {
+  return isObject(value) ? { control: value.control === true } : null;
+}
+
+export function cleanGoodbye(value: unknown): Goodbye | null {
+  return isObject(value) && GOODBYES.includes(value.reason as Goodbye) ? (value.reason as Goodbye) : null;
+}
+
+export function cleanCommand(value: unknown): Command | null {
+  if (!isObject(value)) return null;
+  const what = value.do;
+  if (what === "play" || what === "pause" || what === "next" || what === "previous") return { do: what };
+  const uid = id(value.uid);
+  if (what === "seek") {
+    const to = finite(value.to, 0, 24 * 3600);
+    return uid && to !== null ? { do: what, uid, to } : null;
+  }
+  if (what === "jump" || what === "remove") return uid ? { do: what, uid } : null;
+  if (what === "move" && Array.isArray(value.uids)) {
+    const uids = [...new Set(value.uids.slice(0, SHARE_AHEAD).map(id).filter((u): u is string => !!u))];
+    return uids.length > 1 ? { do: what, uids } : null;
+  }
+  return null;
 }
 
 export function cleanPing(value: unknown): Ping | null {

@@ -66,5 +66,13 @@ describe("Discord presence", () => {
     // a seek far ahead
     expect(presenceKey({ ...base, position: 120, at: 1_002_000 }, 1_002_000)).not.toBe(key);
     expect(presenceKey({ ...base, playing: false }, 1_000_000)).not.toBe(key);
+    expect(presenceKey({ ...base, jam: true }, 1_000_000)).not.toBe(key);
+  });
+
+  it("says when you're in a Jam, without saying whose", () => {
+    expect(buildActivity(playing({ jam: true }), { showWhenPaused: false })?.state).toBe("The Weeknd · in a Jam");
+    const long = buildActivity(playing({ jam: true, track: { ...track, artists: [{ name: "A".repeat(200) }] } }), { showWhenPaused: false });
+    expect(long?.state).toHaveLength(128);
+    expect(long?.state).toMatch(/ · in a Jam$/);
   });
 });

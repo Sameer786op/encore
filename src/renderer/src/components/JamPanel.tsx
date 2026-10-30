@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Copy, LoaderCircle } from "lucide-react";
+import { Copy, LoaderCircle, UserMinus } from "lucide-react";
 import { myJamId, useJam } from "@/jam/store";
-import type { Person } from "@/jam/protocol";
+import { MAX_PEOPLE, type Person } from "@/jam/protocol";
 import { cn } from "@/lib/cn";
 import { toast } from "@/ui/toast";
+import { Toggle } from "./common";
 
 // Start a Jam, join one with a code, and see who's in it; from the Jam button in the player bar.
 
@@ -36,26 +37,62 @@ const accentButton =
   "pressable inline-flex h-10 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[13.5px] font-semibold text-on-accent hover:brightness-110 disabled:opacity-50";
 const plainButton = "glass-control pressable inline-flex h-10 items-center justify-center gap-2 rounded-full px-5 text-[13.5px] font-medium hover:brightness-125 disabled:opacity-50";
 
-function People({ people }: { people: Person[] }) {
+/** everyone in the Jam; the host can remove guests */
+function People({ people, hosting }: { people: Person[]; hosting?: boolean }) {
   return (
-    <ul aria-label="People in the Jam" className="max-h-[200px] space-y-1 overflow-y-auto">
-      {people.map((p, i) => (
-        <motion.li
-          key={p.id}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 500, damping: 36, delay: Math.min(i, 6) * 0.03 }}
-          className="flex items-center gap-2.5 rounded-[12px] px-1.5 py-1"
-        >
-          <JamAvatar name={p.name} className="size-7 text-[12px]" />
-          <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
-            {p.name}
-            {p.id === myJamId && <span className="font-normal text-ink-3"> (you)</span>}
-          </span>
-          {p.host && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent-ink">Host</span>}
-        </motion.li>
-      ))}
-    </ul>
+    <div>
+      <div className="mb-1 flex items-center justify-between px-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+        <span>In this Jam</span>
+        <span className="normal-case tabular-nums tracking-normal">
+          {people.length} of {MAX_PEOPLE}
+        </span>
+      </div>
+      <ul aria-label="People in the Jam" className="max-h-[200px] space-y-1 overflow-y-auto">
+        <AnimatePresence initial={false}>
+          {people.map((p, i) => (
+            <motion.li
+              key={p.id}
+              layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: 12, transition: { duration: 0.16, ease: [0.32, 0.72, 0, 1] } }}
+              transition={{ type: "spring", stiffness: 500, damping: 36, delay: Math.min(i, 6) * 0.03 }}
+              className="group flex items-center gap-2.5 rounded-[12px] px-1.5 py-1"
+            >
+              <JamAvatar name={p.name} className="size-7 text-[12px]" />
+              <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+                {p.name}
+                {p.id === myJamId && <span className="font-normal text-ink-3"> (you)</span>}
+              </span>
+              {p.host && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent-ink">Host</span>}
+              {hosting && !p.host && (
+                <button
+                  onClick={() => useJam.getState().remove(p.id)}
+                  aria-label={`Remove ${p.name} from the Jam`}
+                  title="Remove from the Jam"
+                  className="pressable grid size-7 shrink-0 place-items-center rounded-full text-ink-3 opacity-0 transition-opacity hover:bg-white/10 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100"
+                >
+                  <UserMinus className="size-3.5" />
+                </button>
+              )}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+    </div>
+  );
+}
+
+/** one of the host's choices for the Jam */
+function Setting({ title, body, checked, onChange }: { title: string; body: string; checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium">{title}</div>
+        <div className="mt-0.5 text-[11.5px] leading-snug text-ink-3">{body}</div>
+      </div>
+      <Toggle checked={checked} onChange={onChange} label={title} />
+    </div>
   );
 }
 
@@ -116,6 +153,8 @@ function Start() {
 function Hosting() {
   const code = useJam((s) => s.code) ?? "";
   const people = useJam((s) => s.people);
+  const control = useJam((s) => s.control);
+  const open = useJam((s) => s.open);
   const copy = () =>
     void navigator.clipboard.writeText(code).then(
       () => toast("Jam code copied"),
@@ -142,8 +181,22 @@ function Hosting() {
         </div>
         <p className="mt-2 text-[12px] leading-relaxed text-ink-3">Send it to friends. They join from the Jam button in their player.</p>
       </div>
-      <People people={people} />
-      {people.length === 1 && <p className="text-[12.5px] text-ink-3">Waiting for friends to join…</p>}
+      <People people={people} hosting />
+      {people.length === 1 && <p className="px-1.5 text-[12.5px] text-ink-3">Waiting for friends to join…</p>}
+      <div className="space-y-3.5 rounded-[16px] bg-white/[0.05] px-3.5 py-3">
+        <Setting
+          title="Let others change what's playing"
+          body={control ? "Friends can play, pause, skip and arrange the queue." : "Friends can only add songs. You choose what plays."}
+          checked={control}
+          onChange={(on) => useJam.getState().setControl(on)}
+        />
+        <Setting
+          title="Let new people join"
+          body={open ? `Anyone with the code can join, up to ${MAX_PEOPLE} people.` : "Locked. People already in can still come back if they drop out."}
+          checked={open}
+          onChange={(on) => useJam.getState().setOpen(on)}
+        />
+      </div>
       <button onClick={() => useJam.getState().leave()} className={cn(plainButton, "w-full text-bad")}>
         End Jam
       </button>
@@ -155,6 +208,7 @@ function Joined() {
   const status = useJam((s) => s.status);
   const people = useJam((s) => s.people);
   const hostName = useJam((s) => s.hostName) ?? "The host";
+  const control = useJam((s) => s.control);
   return (
     <div className="space-y-4">
       <h2 className="font-display text-[17px] font-bold tracking-[-0.02em]">{hostName}'s Jam</h2>
@@ -165,7 +219,9 @@ function Joined() {
       )}
       <People people={people} />
       <p className="text-[12.5px] leading-relaxed text-ink-2">
-        {hostName} chooses what plays. Add songs from anywhere with Add to queue or Play next, and they go into the Jam. Pausing only pauses it for you.
+        {control
+          ? "Everyone can play, pause, skip and arrange the queue, and pausing pauses it for everyone. Add songs from anywhere with Add to queue or Play next."
+          : `${hostName} chooses what plays. Add songs from anywhere with Add to queue or Play next, and they go into the Jam. Pausing only pauses it for you.`}
       </p>
       <button onClick={() => useJam.getState().leave()} className={cn(plainButton, "w-full")}>
         Leave Jam

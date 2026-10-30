@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Track } from "@shared/types";
 import {
+  addToJam,
   addToQueue,
   clearUpcoming,
   currentItem,
@@ -95,6 +96,35 @@ describe("queue", () => {
     const r = reorderUpcoming(s, [d.uid, c.uid]);
     expect(titles(r)).toEqual(["T1", "T2", "T4", "T3"]);
     expect(currentItem(r)?.track.title).toBe("T2");
+  });
+
+  it("reordering leaves songs it wasn't told about where they are", () => {
+    // someone added T9 to play next while T3 and T4 were being dragged
+    let s = loadQueue(emptyQueue, [t(1), t(2), t(3), t(4)], 0, null);
+    const [, b, c, d] = s.items;
+    s = playNext(s, [t(9)]);
+    expect(titles(reorderUpcoming(s, [d.uid, b.uid, c.uid]))).toEqual(["T1", "T9", "T4", "T2", "T3"]);
+    // the current song and history never move, and unknown or repeated uids are ignored
+    expect(titles(reorderUpcoming(s, [s.items[0].uid, "nope", d.uid, d.uid]))).toEqual(titles(s));
+  });
+
+  it("in a Jam, added songs take turns ahead of the rest of the queue", () => {
+    let s = loadQueue(emptyQueue, [t(1), t(2), t(3)], 0, null);
+    s = addToJam(s, [t(7)], "Alex");
+    s = addToJam(s, [t(8)], "Sam");
+    s = addToJam(s, [t(9)], "Alex");
+    expect(titles(s)).toEqual(["T1", "T7", "T8", "T9", "T2", "T3"]);
+    expect(s.items.slice(1, 4).map((i) => i.by)).toEqual(["Alex", "Sam", "Alex"]);
+    // once one plays, the next one added still waits behind the others
+    s = addToJam(jumpTo(s, s.items[1].uid), [t(6)], "Sam");
+    expect(titles(s)).toEqual(["T1", "T7", "T8", "T9", "T6", "T2", "T3"]);
+    expect(addToJam(emptyQueue, [t(1)], "Sam").index).toBe(0);
+  });
+
+  it("in a shuffled Jam, added songs come back in turn when shuffle is turned off", () => {
+    let s = setShuffle(loadQueue(emptyQueue, [t(1), t(2), t(3)], 0, null), true, firstPick);
+    s = addToJam(addToJam(s, [t(7)], "Alex"), [t(8)], "Sam");
+    expect(titles(setShuffle(s, false))).toEqual(["T1", "T7", "T8", "T2", "T3"]);
   });
 
   it("clears only what is still to come", () => {

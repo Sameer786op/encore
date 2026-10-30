@@ -47,16 +47,19 @@ export function Transport() {
   const loading = status === "loading";
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
   const hint = useHints();
-  // in someone else's Jam, the host chooses what plays
+  // in someone else's Jam, the host chooses what plays, unless it lets everyone skip;
+  // shuffle and repeat are always the host's
   const guest = useJamGuest();
-  const hostOnly = guest ? "The host chooses what plays in this Jam" : undefined;
+  const control = useJam((s) => s.control);
+  const hostOnly = guest ? (control ? "Only the host can change this in a Jam" : "The host chooses what plays in this Jam") : undefined;
+  const skipLocked = guest && !control;
 
   return (
     <div className="flex items-center gap-0.5 @max-[820px]:self-center">
       <Glyph onClick={toggleShuffle} disabled={guest} active={shuffle} aria-label={shuffle ? "Turn shuffle off" : "Turn shuffle on"} aria-pressed={shuffle} title={hostOnly ?? hint("shuffle", "Shuffle")} className="size-8">
         <Shuffle className="size-[15px]" strokeWidth={2.3} />
       </Glyph>
-      <Glyph onClick={previous} disabled={!hasTrack || guest} aria-label="Previous" title={hostOnly ?? hint("previous", "Previous")}>
+      <Glyph onClick={previous} disabled={!hasTrack || skipLocked} aria-label="Previous" title={skipLocked ? hostOnly : hint("previous", "Previous")}>
         <SkipBack className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
       <motion.button
@@ -87,7 +90,7 @@ export function Transport() {
           </motion.span>
         </AnimatePresence>
       </motion.button>
-      <Glyph onClick={next} disabled={!hasTrack || guest} aria-label="Next" title={hostOnly ?? hint("next", "Next")}>
+      <Glyph onClick={next} disabled={!hasTrack || skipLocked} aria-label="Next" title={skipLocked ? hostOnly : hint("next", "Next")}>
         <SkipForward className="size-[19px]" fill="currentColor" strokeWidth={1.5} />
       </Glyph>
       <Glyph onClick={cycleRepeat} disabled={guest} active={repeat !== "off"} aria-label={`Repeat: ${repeat}`} title={hostOnly ?? hint("repeat", "Repeat")} className="size-8">

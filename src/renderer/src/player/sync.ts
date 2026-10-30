@@ -1,4 +1,5 @@
 import type { NowPlaying, PlayerCommand } from "@shared/types";
+import { useJam } from "@/jam/store";
 import { useLibrary } from "@/library/store";
 import { useSettings } from "@/settings/store";
 import { currentItem } from "./queue";
@@ -20,8 +21,14 @@ function snapshot(): NowPlaying {
     liked: track ? useLibrary.getState().likedIds.has(track.id) : false,
     at: Date.now(),
     rate: useSettings.getState().sound.speed,
+    jam: inJam(),
   };
 }
+
+const inJam = () => {
+  const { status } = useJam.getState();
+  return status === "hosting" || status === "joined" || status === "reconnecting";
+};
 
 function run(command: PlayerCommand): void {
   const player = usePlayer.getState();
@@ -52,6 +59,7 @@ export function connectPlayerSync(): () => void {
       next.playing !== last.playing ||
       next.liked !== last.liked ||
       next.rate !== last.rate ||
+      next.jam !== last.jam ||
       Math.abs(next.duration - last.duration) > 1 ||
       Math.abs(next.position - expected) > 2
     ) {
@@ -61,6 +69,7 @@ export function connectPlayerSync(): () => void {
 
   const stopPlayer = usePlayer.subscribe(changed);
   const stopLibrary = useLibrary.subscribe(changed);
+  const stopJam = useJam.subscribe((s, before) => s.status !== before.status && changed());
   const heartbeat = setInterval(() => usePlayer.getState().status === "playing" && publish(), HEARTBEAT_MS);
   const stopCommands = window.encore.nowPlaying.onCommand(run);
 
@@ -81,6 +90,7 @@ export function connectPlayerSync(): () => void {
   return () => {
     stopPlayer();
     stopLibrary();
+    stopJam();
     stopCommands();
     stopSettings();
     clearInterval(heartbeat);

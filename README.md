@@ -68,7 +68,10 @@ Imported history is saved straight away and powers **Your listening**: total pla
 ### Listen together: Jam
 
 - **Jam** (the people button in the player bar): start a Jam and send friends its code, like `K7QM-P3XR-9TWD`. They paste it into their Jam panel (a whole message with the code in it works too) and hear the same song at the same moment, each on their own computer. Friends need Vyse Music too.
-- **The host chooses what plays.** Play, pause, skipping and seeking carry over to everyone. Guests can add songs from anywhere with Add to queue or Play next, and the queue shows who added each one. A guest's pause only pauses it for them, and pressing play catches up with the host.
+- **Everyone can change what plays**, as in Spotify: anyone in the Jam can play, pause, skip, seek, and arrange or remove songs in the queue, for everyone. The host can switch off **Let others change what's playing**; then guests can only add songs, and a guest's pause only pauses it for them. Shuffle, repeat and radio are always the host's.
+- **Songs people add take turns.** Add to queue in a Jam puts a song after the ones added before it, ahead of the rest of the queue, and the queue shows who added each one.
+- **The host can remove someone**, or switch off **Let new people join** to lock the Jam; people already in it can still come back if they drop out. A Jam holds up to 32 people.
+- **Discord** shows "in a Jam" after the artist, without anyone's name or the code.
 - **No sound is sent.** Everyone plays the songs from YouTube Music themselves; only the queue and the timing go between computers. A song file on the host's computer plays for guests when the same song is on YouTube Music.
 - **No account and no server of ours.** You connect straight to each other, so people in a Jam can see each other's IP address. Some strict networks (like some office or school Wi-Fi) block direct connections, and then joining can fail.
 
@@ -208,7 +211,7 @@ src/
 - **Local files**: the UI can only play files Vyse Music indexed from folders you chose; it never gets to ask for arbitrary paths.
 - **Feed**: built once a day in the main process from the plays in the database. Artist names are matched to YouTube Music artists once and remembered, so later builds are quick. The only thing asked of YouTube Music is what any search would ask: artist pages and similar songs.
 - **Scrobbling**: Vyse Music talks to Last.fm and ListenBrainz directly from your computer with your own keys. Nothing goes through a server of ours, because there isn't one.
-- **Jam**: computers in a Jam find each other through public Nostr relays and then talk directly over WebRTC ([Trystero](https://github.com/dmotz/trystero), `jam/store.ts`), with the code as the password, so the relays only ever see encrypted messages. The host's computer keeps time: guests measure how far their clock is from the host's, then nudge the playback speed by up to 3% to stay in step, or seek when they're more than 0.6 seconds out. Everything that arrives from another computer is checked and rebuilt before it's used (`jam/protocol.ts`), and only YouTube Music songs can be added.
+- **Jam**: computers in a Jam find each other through public Nostr relays and then talk directly over WebRTC ([Trystero](https://github.com/dmotz/trystero), `jam/store.ts`), with the code as the password, so the relays only ever see encrypted messages. The host's computer keeps time: guests measure how far their clock is from the host's, then nudge the playback speed by up to 3% to stay in step, or seek when they're more than 0.6 seconds out. A guest's presses are sent to the host's computer, which carries them out as if they were its own; the guest shows its own pause, play or seek straight away instead of waiting for the round trip. The host only sends to the people it let in. Everything that arrives from another computer is checked and rebuilt before it's used (`jam/protocol.ts`), and only YouTube Music songs can be added.
 - **Security**: the UI runs sandboxed with context isolation, only our own window can call the main process, every call is validated, and YouTube's player code runs in an isolated VM context.
 
 ## Roadmap
@@ -217,7 +220,7 @@ src/
 2. **Bring your music**: playlist links, data exports with a review screen, Your listening, local music files. *(done)*
 3. **Make it beautiful**: synced lyrics, a full-screen player, equalizer, crossfade, gapless playback, volume levelling, a mini player, Discord status. *(done)*
 4. **Your feed**: a home page built from your history, daily mixes, new-release alerts, Last.fm and ListenBrainz scrobbling. *(done)*
-5. **Listen together**: Jam with friends, each on their own computer. *(first part done)*
+5. **Listen together**: Jam with friends, each on their own computer, with Spotify's host settings. *(two of three parts done)*
 
 ## A note on YouTube
 
