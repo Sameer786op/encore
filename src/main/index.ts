@@ -653,8 +653,11 @@ app.on("before-quit", () => {
 app.on("will-quit", () => globalKeys.dispose());
 
 app.whenReady().then(() => {
-  // a Store copy already has its package's ID, which its taskbar pin and notifications use
-  if (!process.windowsStore) app.setAppUserModelId("app.encore.player");
+  // a Store copy already has its package's ID, which its taskbar pin and notifications use.
+  // A copy run from source gets an ID of its own: showing a notification makes Electron write a
+  // Start menu shortcut for the ID it has ("Electron", from source), and one with the installed
+  // app's ID hides the real Vyse Music from Start, so it can't be found or pinned
+  if (!process.windowsStore) app.setAppUserModelId(app.isPackaged ? "app.encore.player" : "app.encore.player.dev");
   const userData = app.getPath("userData");
   configureYouTube({ cacheDir: join(userData, "youtube-cache") });
   db = openDatabase(join(userData, "library.db"));
