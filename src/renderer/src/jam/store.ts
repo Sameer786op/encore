@@ -1,10 +1,11 @@
 import { create } from "zustand";
-import { joinRoom, selfId, type JsonValue, type Room } from "trystero";
+import { selfId } from "trystero";
 import type { Track } from "@shared/types";
 import { addFromJam, followHost, playbackClock, setJamAddedBy, setJamGuest, usePlayer, type JamGuestHooks } from "@/player/store";
 import { arrangeAfter, currentItem, type QueueItem } from "@/player/queue";
 import { toast } from "@/ui/toast";
 import { findCode, makeCode } from "./code";
+import { openLink } from "./link";
 import {
   cleanAdd,
   cleanClock,
@@ -34,7 +35,8 @@ import { HostClock, positionAt } from "./timing";
 // A Jam: friends listening together, each on their own computer. The host's
 // Vyse Music leads; each guest's plays the same songs from YouTube Music
 // itself and keeps to the same spot. Players find each other through public
-// Nostr relays with the Jam's code, then talk directly over WebRTC, encrypted
+// Nostr relays with the Jam's code, then talk directly over WebRTC, or through
+// the relays where the network doesn't allow that (see link.ts), encrypted
 // with a key made from the code. Only song details and timings are sent,
 // never audio.
 
@@ -130,34 +132,21 @@ function rememberControl(on: boolean): void {
   }
 }
 
-/** one kind of message: send it to everyone, some players or one, and hear it */
-function channel(room: Room, name: string) {
-  const action = room.makeAction<JsonValue>(name);
-  return {
-    send: (data: unknown, to?: string | string[]): Promise<void> =>
-      Array.isArray(to) && to.length === 0 ? Promise.resolve() : action.send(data as JsonValue, to ? { target: to } : undefined).catch(() => undefined),
-    on(handler: (data: unknown, from: string) => void): void {
-      action.onMessage = (data, { peerId }) => handler(data, peerId);
-    },
-  };
-}
-
 function openRoom(code: string) {
-  // the code is both where to meet and the secret the meeting is encrypted with
-  const room = joinRoom({ appId: APP_ID, password: code, maxReceiveBytes: 4 * 1024 * 1024 }, code.replace(/-/g, ""));
+  const link = openLink(APP_ID, code);
   return {
-    room,
-    hello: channel(room, "hello"),
-    people: channel(room, "people"),
-    queue: channel(room, "queue"),
-    clock: channel(room, "clock"),
-    ping: channel(room, "ping"),
-    pong: channel(room, "pong"),
-    add: channel(room, "add"),
-    end: channel(room, "end"),
-    rules: channel(room, "rules"),
-    command: channel(room, "do"),
-    bye: channel(room, "bye"),
+    link,
+    hello: link.channel("hello"),
+    people: link.channel("people"),
+    queue: link.channel("queue"),
+    clock: link.channel("clock"),
+    ping: link.channel("ping"),
+    pong: link.channel("pong"),
+    add: link.channel("add"),
+    end: link.channel("end"),
+    rules: link.channel("rules"),
+    command: link.channel("do"),
+    bye: link.channel("bye"),
   };
 }
 
@@ -240,8 +229,8 @@ function host(code: string, name: string, control: boolean): Session {
     }
   };
 
-  ch.room.onPeerJoin = (peer) => void ch.hello.send({ v: JAM_VERSION, name, host: true }, peer);
-  ch.room.onPeerLeave = (peer) => {
+  ch.link.onPeerJoin = (peer) => void ch.hello.send({ v: JAM_VERSION, name, host: true }, peer);
+  ch.link.onPeerLeave = (peer) => {
     if (guests.delete(peer)) publishPeople();
   };
   ch.hello.on((raw, peer) => {
@@ -298,7 +287,7 @@ function host(code: string, name: string, control: boolean): Session {
       clearTimeout(flushTimer);
       window.removeEventListener("beforeunload", onUnload);
       setJamAddedBy(null);
-      void ch.end.send({}, everyone()).finally(() => void ch.room.leave());
+      void ch.end.send({}, everyone()).finally(() => void ch.link.leave());
     },
     setControl(on) {
       rules = { control: on };
@@ -349,7 +338,16 @@ function guest(code: string, name: string): Session {
     }, ms);
     timers.add(timer);
   };
-  const findTimer = setTimeout(() => stop("Couldn't find that Jam. Check the code, and that the host still has Vyse Music open.", true), FIND_HOST_MS);
+  const findTimer = setTimeout(
+    () =>
+      stop(
+        ch.link.reachable()
+          ? "Couldn't find that Jam. Check the code, and that the host still has Vyse Music open."
+          : "Couldn't reach the services Jams use to connect. Check your internet connection, or try another network.",
+        true,
+      ),
+    FIND_HOST_MS,
+  );
 
   const hooks: JamGuestHooks = {
     add(tracks, next) {
@@ -387,9 +385,16 @@ function guest(code: string, name: string): Session {
       // a pause, play or seek shows straight away, not after the round trip
       if (anchor && clock.ready && (command.do === "play" || command.do === "pause" || command.do === "seek")) {
         const now = clock.now();
-        const position = command.do === "seek" ? command.to : positionAt(anchor, now);
-        anchor = { ...anchor, position, playing: command.do === "seek" ? anchor.playing : command.do === "play", at: now };
-        trustFrom = now + (clock.roundTrip ?? 0) / 2;
+        const delay = (clock.roundTrip ?? 0) / 2;
+        // the host does it once the press gets there, a moment from now (a fifth of a second through the
+        // relays): start that much earlier in the song, or stop that much later, to be where the host will be
+        const lag = (delay / 1000) * anchor.rate;
+        let position = positionAt(anchor, now);
+        if (command.do === "seek") position = anchor.playing ? command.to - lag : command.to;
+        else if (command.do === "play" && !anchor.playing) position -= lag;
+        else if (command.do === "pause" && anchor.playing) position += lag;
+        anchor = { ...anchor, position: Math.max(0, position), playing: command.do === "seek" ? anchor.playing : command.do === "play", at: now };
+        trustFrom = now + delay;
         apply();
       }
     },
@@ -469,14 +474,14 @@ function guest(code: string, name: string): Session {
     timers.forEach(clearTimeout);
     setJamGuest(null);
     if (followTimer) followHost(null);
-    void ch.room.leave();
+    void ch.link.leave();
     if (session === me) session = null;
     useJam.setState({ status: "off", role: null, code: null, people: [], hostName: null, control: false, error: failed ? message : null });
     if (!failed) toast(message);
   }
 
-  ch.room.onPeerJoin = (peer) => void ch.hello.send({ v: JAM_VERSION, name, host: false }, peer);
-  ch.room.onPeerLeave = (peer) => {
+  ch.link.onPeerJoin = (peer) => void ch.hello.send({ v: JAM_VERSION, name, host: false }, peer);
+  ch.link.onPeerLeave = (peer) => {
     if (peer !== hostId || useJam.getState().status !== "joined") return;
     useJam.setState({ status: "reconnecting" });
     lostTimer = setTimeout(() => stop(`Lost the connection to ${hostName}'s Jam.`), RECONNECT_MS);
