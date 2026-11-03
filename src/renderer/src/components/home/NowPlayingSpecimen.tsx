@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, LoaderCircle, Play, RadioTower } from "lucide-react";
 import type { Track } from "@shared/types";
 import { Artwork } from "@/components/Artwork";
@@ -22,12 +22,53 @@ const PAD = 30;
 /** the room kept on the right for a callout */
 const CALLOUT_W = 150;
 const GAUGE = 92;
+/** the least room the words need beside the gauge; in a narrower tile the gauge stays out (Now Playing still has it) */
+const MIN_TEXT = 220;
 
-/** the biggest size up to 62px at which the title's longest word, and the whole title in two lines, fit */
-function titleSize(title: string, width: number): number {
-  const longest = Math.max(1, ...title.split(/\s+/).map((w) => w.length));
-  // Sora bold runs at about 0.6em a letter
-  return Math.round(Math.max(28, Math.min(62, width / (longest * 0.6), (width * 2) / (title.length * 0.58))));
+/** the room the pill, the artist line and the chips take in the words column, with a gap above the title */
+const WORDS_OTHER_H = 120;
+
+let ink: CanvasRenderingContext2D | null | undefined;
+/** how wide text is set in the title's own type, Sora bold drawn tight; a rough guess until the font has loaded */
+function inkWidth(text: string, size: number): number {
+  if (ink === undefined) ink = document.createElement("canvas").getContext("2d");
+  if (!ink || !document.fonts.check(`700 ${size}px "Sora Variable"`)) return text.length * 0.62 * size;
+  ink.font = `700 ${size}px "Sora Variable", sans-serif`;
+  ink.letterSpacing = `${-0.045 * size}px`;
+  return ink.measureText(text).width;
+}
+
+/** the biggest size from 62px down at which every word fits on a line and the lines it wraps to (three at most) fit the room */
+function titleSize(title: string, width: number, room: number): number {
+  const words = title.split(/\s+/).filter(Boolean);
+  for (let size = 62; size > 28; size -= 2) {
+    // each word carries its space, as the title sets them
+    let lines = 1;
+    let line = "";
+    let fits = true;
+    for (const word of words) {
+      if (inkWidth(`${word} `, size) > width) {
+        fits = false;
+        break;
+      }
+      const next = line ? `${line} ${word}` : word;
+      if (line && inkWidth(`${next} `, size) > width) {
+        lines++;
+        line = word;
+      } else line = next;
+    }
+    if (fits && lines <= 3 && lines * 0.95 * size <= room) return size;
+  }
+  return 28;
+}
+
+/** true once the app's fonts have loaded, so text can be measured in them */
+function useFontsReady(): boolean {
+  const [ready, setReady] = useState(() => document.fonts.status === "loaded");
+  useEffect(() => {
+    if (!ready) void document.fonts.ready.then(() => setReady(true));
+  }, [ready]);
+  return ready;
 }
 
 export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }: { track: Track; live: boolean; onResume: () => void; height: number; index?: number }) {
@@ -57,7 +98,8 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
   const coverX = Math.round(details ? Math.min(width - 22 - CALLOUT_W - 14 - size, width * 0.58) : Math.min(width - 56 - size, width * 0.66));
   const coverY = Math.round((height - size) / 2);
   const gaugeX = coverX - GAUGE - 22;
-  const textWidth = Math.max(150, details ? gaugeX - PAD - 14 : coverX - PAD - 40);
+  const gauge = details && gaugeX - PAD - 14 >= MIN_TEXT;
+  const textWidth = Math.max(150, gauge ? gaugeX - PAD - 14 : coverX - PAD - 40);
   const dots = [
     { x: coverX + size * 0.8, y: coverY + size * 0.2 },
     { x: coverX + size * 0.72, y: coverY + size * 0.82 },
@@ -75,7 +117,9 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
   }, [width, height, live, details, qualityKey, coverX, coverY]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const words = track.title.split(/\s+/);
-  const fontSize = titleSize(track.title, textWidth);
+  const room = height - 52 - WORDS_OTHER_H;
+  const fontsReady = useFontsReady();
+  const fontSize = useMemo(() => titleSize(track.title, textWidth, room), [track.title, textWidth, room, fontsReady]); // eslint-disable-line react-hooks/exhaustive-deps
   const kHz = quality && quality !== "local" && quality.sampleRate > 0 ? Number((quality.sampleRate / 1000).toFixed(1)) : null;
   const openCover = () => (live ? useView.getState().openFullscreen() : onResume());
 
@@ -99,7 +143,7 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
               <span className="truncate">{!live ? "Pick it back up" : status === "loading" ? "Loading…" : playing ? "Listening live" : "Paused"}</span>
               {live && (status === "loading" || playing) && <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-white/15 border-t-[var(--ramp-3)]" />}
             </span>
-            <h2 key={track.id} className="mt-auto line-clamp-3 font-display font-bold leading-[0.95] tracking-[-0.045em] [overflow-wrap:anywhere]" style={{ fontSize }}>
+            <h2 key={track.id} className="mt-auto line-clamp-3 shrink-0 font-display font-bold leading-[0.95] tracking-[-0.045em] [overflow-wrap:anywhere]" style={{ fontSize }}>
               {words.map((word, i) => (
                 <span key={i} className="inline-block animate-blur-in" style={{ animationDelay: `${0.08 + i * 0.12}s` }}>
                   {word}
@@ -107,11 +151,12 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
                 </span>
               ))}
             </h2>
-            <div className="mt-3 truncate text-[14.5px] font-semibold text-ink-2">
+            <div className="mt-3 shrink-0 truncate text-[14.5px] font-semibold text-ink-2">
               <ArtistLinks artists={track.artists} />
               {track.album?.title && track.album.title !== track.title && ` · ${track.album.title}`}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            {/* one row: what doesn't fit stays out of sight rather than pushing the title up */}
+            <div className="mt-4 flex h-7 shrink-0 flex-wrap gap-2 overflow-hidden">
               {!live && (
                 <button onClick={onResume} className="pressable inline-flex h-[28px] items-center gap-1.5 rounded-full bg-ink px-3.5 text-[12px] font-bold text-bg hover:brightness-110">
                   <Play className="size-3" fill="currentColor" strokeWidth={0} /> Play
@@ -142,7 +187,7 @@ export function NowPlayingSpecimen({ track, live, onResume, height, index = 0 }:
             </div>
           </div>
 
-          {details && <FinishGauge track={track} style={{ left: gaugeX, top: (height - GAUGE) / 2 }} />}
+          {gauge && <FinishGauge track={track} style={{ left: gaugeX, top: (height - GAUGE) / 2 }} />}
 
           {/* the specimen: rings, the floating cover, the scan line */}
           <Rings x={coverX + size / 2} y={coverY + size / 2} size={size} playing={playing} />

@@ -143,8 +143,8 @@ function Start() {
       </form>
       {error && <p className="text-[12.5px] leading-relaxed text-bad">{error}</p>}
       <p className="text-[11.5px] leading-relaxed text-ink-3">
-        Friends need Vyse Music too. You connect straight to each other, so people in a Jam can see each other's IP address. No sound is sent: everyone plays the songs
-        from YouTube Music.
+        Friends need Vyse Music too. You connect straight to each other where your networks allow it, so people in a Jam can see each other's IP address; otherwise
+        through public relays, encrypted with the code. No sound is sent: everyone plays the songs from YouTube Music.
       </p>
     </div>
   );

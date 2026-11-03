@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("./client", () => ({ getYouTube: () => Promise.reject(new Error("offline in tests")) }));
 
 const { homeRank, homeSections, moodChips, playlistByline, searchResults } = await import("./catalog");
-const { mapTrack } = await import("./mappers");
+const { bestArtwork, mapTrack } = await import("./mappers");
 // what YouTube Music's /next answered for Tum Hi Ho, trimmed to the radio's tuning chips
 const nextChips = (await import("./fixtures/next-chips.json")).default;
 
@@ -108,8 +108,22 @@ describe("mapTrack", () => {
   });
 });
 
+describe("bestArtwork", () => {
+  it("takes the largest picture, resized when the CDN allows it", () => {
+    const thumbs = [
+      { url: "https://lh3.googleusercontent.com/a=w60-h60", width: 60 },
+      { url: "https://lh3.googleusercontent.com/b=w226-h226", width: 226 },
+    ];
+    expect(bestArtwork(thumbs)).toBe("https://lh3.googleusercontent.com/b=w544-h544");
+  });
+
+  it("leaves out YouTube Music's stand-in for an artist with no photo", () => {
+    expect(bestArtwork([{ url: "https://www.gstatic.com/youtube/media/ytm/images/artist_avatar@1200.png", width: 1200 }])).toBeUndefined();
+  });
+});
+
 describe("searchResults", () => {
-  const row = (item_type: string, id: string, title: string, artist = "Someone") => ({ item_type, id, title, artists: [{ name: artist }] });
+  const row =(item_type: string, id: string, title: string, artist = "Someone") => ({ item_type, id, title, artists: [{ name: artist }] });
   const raw = (songs: object[], videos: object[], general: object = {}, suggestions: string[] = []) => ({
     general: { contents: [], ...general },
     songs: { songs: { contents: songs } },

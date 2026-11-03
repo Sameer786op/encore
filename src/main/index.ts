@@ -225,6 +225,15 @@ function createWindow(): BrowserWindow {
     if (url !== win.webContents.getURL()) event.preventDefault();
   });
 
+  // a page that crashed (out of memory, a graphics driver fault) comes back instead of leaving a blank
+  // window; the song and queue pick up as after a restart. Not again within a minute, so it can't loop
+  let lastCrash = 0;
+  win.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit" || win.isDestroyed() || Date.now() - lastCrash < 60_000) return;
+    lastCrash = Date.now();
+    loadRenderer(win);
+  });
+
   loadRenderer(win);
   return win;
 }

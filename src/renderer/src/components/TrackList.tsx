@@ -3,7 +3,7 @@ import { Reorder, motion } from "motion/react";
 import { Clock3, Ellipsis, GripVertical, Play } from "lucide-react";
 import type { Track } from "@shared/types";
 import { navigate } from "@/nav/store";
-import { usePlayer } from "@/player/store";
+import { isJamGuest, usePlayer } from "@/player/store";
 import { useSettings } from "@/settings/store";
 import { toast } from "@/ui/toast";
 import { currentItem, type PlayContext } from "@/player/queue";
@@ -172,7 +172,7 @@ export function TrackList({ tracks, context, keys, numbered, showAlbum = true, a
     const track = byKey.get(order[index]);
     if (!track) return;
     usePlayer.getState().addToQueue([track]);
-    toast(`Added "${track.title}" to the queue`);
+    if (!isJamGuest()) toast(`Added "${track.title}" to the queue`);
   };
   const onMenu = (event: React.MouseEvent, track: Track, index: number) => openMenu(event, trackMenu(track, menuExtras?.(track, index)));
 

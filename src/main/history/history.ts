@@ -156,9 +156,10 @@ export class ListeningHistory {
 
     const years = this.db
       .prepare(
+        // the year where you are: a play just after midnight on New Year's Day counts for the new year
         `SELECT CAST(year AS INTEGER) AS year, SUM(plays) AS plays, SUM(ms) AS ms FROM (
-           SELECT substr(played_at, 1, 4) AS year, play_count AS plays, played_ms AS ms FROM imported_plays
-           UNION ALL SELECT substr(played_at, 1, 4), 1, played_ms FROM plays)
+           SELECT strftime('%Y', played_at, 'localtime') AS year, play_count AS plays, played_ms AS ms FROM imported_plays
+           UNION ALL SELECT strftime('%Y', played_at, 'localtime'), 1, played_ms FROM plays)
          GROUP BY year ORDER BY year`,
       )
       .all() as unknown as { year: number; plays: number; ms: number }[];

@@ -10,28 +10,44 @@ interface ArtworkProps {
   fallback?: ReactNode;
 }
 
+/** YouTube lists thumbnail sizes some videos don't have; the small 16:9 one is always there */
+function backupFor(src: string): string | undefined {
+  const video = /^https:\/\/i\.ytimg\.com\/vi\/([\w-]+)\/(?!mqdefault\.jpg$)/.exec(src)?.[1];
+  return video ? `https://i.ytimg.com/vi/${video}/mqdefault.jpg` : undefined;
+}
+
+/** a size YouTube doesn't have still comes back as a picture: its grey 120×90 stand-in */
+function isStandIn(img: HTMLImageElement, src: string): boolean {
+  return img.naturalWidth === 120 && img.naturalHeight === 90 && /^https:\/\/i\.ytimg\.com\/vi\//.test(src) && !/\/default\.jpg/.test(src);
+}
+
 export function Artwork({ src, alt = "", className, fallback }: ArtworkProps) {
   // remember which URL finished, so a cached image that loads instantly still shows
   const [loadedSrc, setLoadedSrc] = useState<string>();
-  const [failedSrc, setFailedSrc] = useState<string>();
-  const loaded = !!src && loadedSrc === src;
-  const failed = !!src && failedSrc === src;
+  const [failedSrcs, setFailedSrcs] = useState<string[]>([]);
+  const backup = src && failedSrcs.includes(src) ? backupFor(src) : undefined;
+  const shown = src && !failedSrcs.includes(src) ? src : backup && !failedSrcs.includes(backup) ? backup : undefined;
+  const loaded = !!shown && loadedSrc === shown;
+  const failed = !!src && !shown;
 
   return (
     // a soft shimmer while the cover is on its way, then it settles in
     <div className={cn("relative shrink-0 overflow-hidden bg-surface-3", src && !loaded && !failed && "skeleton", className)}>
-      {src && !failed ? (
+      {shown ? (
         <img
-          src={src}
+          src={shown}
           alt={alt}
           loading="lazy"
           draggable={false}
           referrerPolicy="no-referrer"
           ref={(img) => {
-            if (img?.complete && img.naturalWidth > 0 && loadedSrc !== src) setLoadedSrc(src);
+            if (!img?.complete || img.naturalWidth === 0) return;
+            if (isStandIn(img, shown)) {
+              if (!failedSrcs.includes(shown)) setFailedSrcs((list) => [...list.slice(-7), shown]);
+            } else if (loadedSrc !== shown) setLoadedSrc(shown);
           }}
-          onLoad={() => setLoadedSrc(src)}
-          onError={() => setFailedSrc(src)}
+          onLoad={(e) => (isStandIn(e.currentTarget, shown) ? setFailedSrcs((list) => [...list.slice(-7), shown]) : setLoadedSrc(shown))}
+          onError={() => setFailedSrcs((list) => [...list.slice(-7), shown])}
           className={cn(
             "size-full object-cover transition-[opacity,scale] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
             loaded ? "scale-100 opacity-100" : "scale-[1.04] opacity-0",

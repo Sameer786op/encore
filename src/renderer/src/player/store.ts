@@ -113,6 +113,11 @@ export function setJamGuest(hooks: JamGuestHooks | null): void {
   jamGuest = hooks;
 }
 
+/** in someone else's Jam, songs you queue go to the host, who says so itself */
+export function isJamGuest(): boolean {
+  return !!jamGuest;
+}
+
 export function setJamAddedBy(name: string | null): void {
   jamAddedBy = name;
 }

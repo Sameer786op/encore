@@ -18,6 +18,9 @@ import { toast } from "@/ui/toast";
 
 const hours = (ms: number) => ms / 3_600_000;
 
+/** the label under a big number, singular when the number shows as 1 */
+const one = (value: number, single: string, many: string) => (Math.round(value) === 1 ? single : many);
+
 function Stat({ label, value, format, index, lit }: { label: string; value: number; format?: (n: number) => string; index: number; lit?: boolean }) {
   return (
     <Tile index={index} className="px-5 pb-[18px] pt-5">
@@ -49,7 +52,7 @@ function YearDots({ years }: { years: ListeningInsights["years"] }) {
         {years.map((y, i) => {
           const lit = y.plays > 0 ? Math.max(1, Math.round((y.plays / max) * dots)) : 0;
           return (
-            <div key={y.year} className="group flex min-w-0 flex-1 flex-col items-center" title={`${y.year}: ${plural(y.plays, "play")}${y.ms ? `, ${Math.round(hours(y.ms))} hours` : ""}`}>
+            <div key={y.year} className="group flex min-w-0 flex-1 flex-col items-center" title={`${y.year}: ${plural(y.plays, "play")}${y.ms ? `, ${plural(Math.round(hours(y.ms)), "hour")}` : ""}`}>
               <span className="mb-2 font-display text-[11px] tabular-nums text-ink-2 opacity-0 transition-opacity group-hover:opacity-100">{y.plays.toLocaleString()}</span>
               <div className="grid grid-cols-2 gap-[5px]">
                 {Array.from({ length: dots }, (_, k) => {
@@ -219,14 +222,14 @@ export function ListeningPage() {
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3 @3xl:grid-cols-5">
-        <Stat label="plays" value={totals.plays} index={0} lit />
+        <Stat label={one(totals.plays, "play", "plays")} value={totals.plays} index={0} lit />
         {totals.ms < 3_600_000 ? (
-          <Stat label="minutes listened" value={totals.ms / 60_000} index={1} />
+          <Stat label={one(totals.ms / 60_000, "minute listened", "minutes listened")} value={totals.ms / 60_000} index={1} />
         ) : (
           <Stat label="hours listened" value={hours(totals.ms)} format={(n) => (n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString())} index={1} />
         )}
-        <Stat label="different songs" value={totals.songs} index={2} />
-        <Stat label="artists" value={totals.artists} index={3} />
+        <Stat label={one(totals.songs, "song", "different songs")} value={totals.songs} index={2} />
+        <Stat label={one(totals.artists, "artist", "artists")} value={totals.artists} index={3} />
         <Stat label="listening since" value={since} format={(n) => String(Math.round(n))} index={4} />
       </div>
 

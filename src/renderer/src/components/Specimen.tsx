@@ -25,7 +25,7 @@ export function FinishGauge({ track, size = 92, style }: { track: Track; size?: 
     <div
       className="absolute grid place-items-center text-center"
       style={{ ...style, width: size, height: size }}
-      title={rate ? `Heard to the end ${rate.finished} of the ${rate.plays} times you played it` : rate === null ? "You haven't played this song before" : undefined}
+      title={rate ? (rate.plays === 1 ? `${rate.finished ? "Heard" : "Not heard"} to the end the one time you played it` : `Heard to the end ${rate.finished} of the ${rate.plays} times you played it`) : rate === null ? "You haven't played this song before" : undefined}
     >
       <svg viewBox="0 0 92 92" className="absolute inset-0 size-full -rotate-90" aria-hidden>
         <defs>

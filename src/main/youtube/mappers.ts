@@ -38,6 +38,8 @@ export function bestArtwork(value: unknown, size: number | null = 544): string |
   if (thumbs.length === 0) return undefined;
   const largest = thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a));
   const url = largest.url.startsWith("//") ? `https:${largest.url}` : largest.url;
+  // YouTube Music's stand-in for an artist with no photo isn't their artwork; the app draws its own
+  if (/^https:\/\/www\.gstatic\.com\/youtube\/media\/ytm\/images\//.test(url)) return undefined;
   if (size !== null && /googleusercontent\.com/.test(url)) {
     if (/=w\d+-h\d+/.test(url)) return url.replace(/=w\d+-h\d+/, `=w${size}-h${size}`);
     if (/=s\d+/.test(url)) return url.replace(/=s\d+/, `=s${size}`);

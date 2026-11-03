@@ -36,8 +36,11 @@ export function greeting(date = new Date()): string {
 }
 
 export function relativeDate(iso: string, now = Date.now()): string {
-  const then = new Date(iso).getTime();
-  const days = Math.floor((now - then) / 86_400_000);
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  // calendar days where you are, not 24-hour spans: last night at 11 PM is "Yesterday" this morning
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(new Date(now)) - midnight(then)) / 86_400_000);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;

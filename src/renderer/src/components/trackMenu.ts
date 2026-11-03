@@ -2,7 +2,7 @@ import { Disc3, FolderOpen, Heart, HeartOff, Link, ListEnd, ListPlus, ListStart,
 import type { Track } from "@shared/types";
 import { useLibrary } from "@/library/store";
 import { navigate } from "@/nav/store";
-import { usePlayer } from "@/player/store";
+import { isJamGuest, usePlayer } from "@/player/store";
 import { youtubeMusicLink } from "@/lib/format";
 import type { MenuEntry } from "@/ui/menu";
 import { openModal } from "@/ui/modal";
@@ -26,7 +26,7 @@ export function queueEntries(tracks: Track[], label: string): MenuEntry[] {
       icon: ListStart,
       onSelect: () => {
         player.playNext(tracks);
-        toast(tracks.length === 1 ? `"${label}" will play next` : `${label} will play next`);
+        if (!isJamGuest()) toast(tracks.length === 1 ? `"${label}" will play next` : `${label} will play next`);
       },
     },
     {
@@ -34,7 +34,7 @@ export function queueEntries(tracks: Track[], label: string): MenuEntry[] {
       icon: ListEnd,
       onSelect: () => {
         player.addToQueue(tracks);
-        toast(tracks.length === 1 ? `Added "${label}" to the queue` : `Added ${label} to the queue`);
+        if (!isJamGuest()) toast(tracks.length === 1 ? `Added "${label}" to the queue` : `Added ${label} to the queue`);
       },
     },
   ];
