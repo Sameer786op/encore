@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Vyse Music mark (two shards making a V, and a lime spark), as on the desktop app. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.95"
+        android:scaleY="0.95"
+        android:translateX="23.6"
+        android:translateY="21.7">
+        <path
+            android:pathData="M10,14 L26,14 L34,40 L28,54 Z"
+            android:strokeWidth="7"
+            android:strokeLineJoin="round">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="10" android:startY="14" android:endX="34" android:endY="54">
+                    <item android:offset="0" android:color="#FFFFB35C" />
+                    <item android:offset="0.5" android:color="#FFFF7F38" />
+                    <item android:offset="1" android:color="#FFFF4D14" />
+                </gradient>
+            </aapt:attr>
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="10" android:startY="14" android:endX="34" android:endY="54">
+                    <item android:offset="0" android:color="#FFFFB35C" />
+                    <item android:offset="0.5" android:color="#FFFF7F38" />
+                    <item android:offset="1" android:color="#FFFF4D14" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:pathData="M38,14 L54,14 L40,46 Z"
+            android:fillAlpha="0.85"
+            android:strokeAlpha="0.85"
+            android:strokeWidth="7"
+            android:strokeLineJoin="round">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="38" android:startY="14" android:endX="54" android:endY="46">
+                    <item android:offset="0" android:color="#FFFFB35C" />
+                    <item android:offset="0.5" android:color="#FFFF7F38" />
+                    <item android:offset="1" android:color="#FFFF4D14" />
+                </gradient>
+            </aapt:attr>
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="38" android:startY="14" android:endX="54" android:endY="46">
+                    <item android:offset="0" android:color="#FFFFB35C" />
+                    <item android:offset="0.5" android:color="#FFFF7F38" />
+                    <item android:offset="1" android:color="#FFFF4D14" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M10,14 L26,14 L34,40 L28,54 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="17.2" android:centerY="22" android:gradientRadius="28">
+                    <item android:offset="0" android:color="#99FFFFFF" />
+                    <item android:offset="1" android:color="#00FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M41,50 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="41" android:startY="44" android:endX="53" android:endY="56">
+                    <item android:offset="0" android:color="#FFE4FF8A" />
+                    <item android:offset="1" android:color="#FF93D920" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

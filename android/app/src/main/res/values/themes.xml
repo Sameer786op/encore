@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vyse Music</string>
+
+    <!-- Only what shows before Compose draws: a near-black window, edge to edge. -->
+    <style name="Theme.Vyse" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <color name="window">#FF030303</color>
+</resources>
