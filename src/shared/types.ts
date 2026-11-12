@@ -509,6 +509,8 @@ export interface EncoreApi {
     quality(trackId: string): Promise<StreamQuality | null>;
     /** resolves and caches the stream ahead of time so the next track starts instantly */
     prefetch(trackId: string): Promise<void>;
+    /** why a YouTube song couldn't play, in plain words, or null when there's nothing to say */
+    problem(trackId: string): Promise<string | null>;
   };
   library: {
     get(): Promise<LibrarySnapshot>;

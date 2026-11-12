@@ -21,6 +21,18 @@ function isStandIn(img: HTMLImageElement, src: string): boolean {
   return img.naturalWidth === 120 && img.naturalHeight === 90 && /^https:\/\/i\.ytimg\.com\/vi\//.test(src) && !/\/default\.jpg/.test(src);
 }
 
+// One watcher for every cover still on its way: a shimmer out of sight is marked away and pauses (styles.css).
+let watcher: IntersectionObserver | undefined;
+function watchShimmer(el: HTMLDivElement | null): (() => void) | undefined {
+  if (!el || typeof IntersectionObserver === "undefined") return undefined;
+  watcher ??= new IntersectionObserver((entries) => entries.forEach((e) => e.target.toggleAttribute("data-away", !e.isIntersecting)), { rootMargin: "120px" });
+  watcher.observe(el);
+  return () => {
+    watcher?.unobserve(el);
+    el.removeAttribute("data-away");
+  };
+}
+
 export function Artwork({ src, alt = "", className, fallback }: ArtworkProps) {
   // remember which URL finished, so a cached image that loads instantly still shows
   const [loadedSrc, setLoadedSrc] = useState<string>();
@@ -29,10 +41,11 @@ export function Artwork({ src, alt = "", className, fallback }: ArtworkProps) {
   const shown = src && !failedSrcs.includes(src) ? src : backup && !failedSrcs.includes(backup) ? backup : undefined;
   const loaded = !!shown && loadedSrc === shown;
   const failed = !!src && !shown;
+  const waiting = !!src && !loaded && !failed;
 
   return (
     // a soft shimmer while the cover is on its way, then it settles in
-    <div className={cn("relative shrink-0 overflow-hidden bg-surface-3", src && !loaded && !failed && "skeleton", className)}>
+    <div ref={waiting ? watchShimmer : undefined} className={cn("relative shrink-0 overflow-hidden bg-surface-3", waiting && "skeleton", className)}>
       {shown ? (
         <img
           src={shown}

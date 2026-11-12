@@ -37,6 +37,7 @@ const api: EncoreApi = {
     prefetch: (trackId) => ipcRenderer.invoke(IPC.prefetch, trackId),
     loudness: (trackId) => ipcRenderer.invoke(IPC.loudness, trackId),
     quality: (trackId) => ipcRenderer.invoke(IPC.quality, trackId),
+    problem: (trackId) => ipcRenderer.invoke(IPC.problem, trackId),
   },
   library: {
     get: () => ipcRenderer.invoke(IPC.libraryGet),

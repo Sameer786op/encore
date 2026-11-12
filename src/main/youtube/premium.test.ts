@@ -85,6 +85,44 @@ describe("PremiumAudio", () => {
     expect(songs[2].spent).toBe(false);
   });
 
+  it("fails when the audio stops arriving for too long, so the song can be played the usual way", async () => {
+    const { source, push } = feed();
+    const audio = new PremiumAudio(6, () => source, new Pool(), 30);
+    const all = readAll(audio.read(0, 5));
+    push(1, 2);
+    await expect(all).rejects.toThrow(/stopped arriving/);
+    expect(audio.failed).toBe(true);
+    expect(source.aborted).toBe(true);
+  });
+
+  it("keeps only the two newest songs downloading, so skipping through songs doesn't pile up downloads", async () => {
+    const pool = new Pool(1000, 2, 2);
+    const feeds = [feed(), feed(), feed()];
+    const songs = feeds.map((f) => new PremiumAudio(6, () => f.source, pool));
+    const first = readAll(songs[0].read(0, 5));
+    songs[1].read(0, 0);
+    songs[2].read(0, 0);
+    expect(songs[0].spent).toBe(true);
+    expect(feeds[0].source.aborted).toBe(true);
+    await expect(first).rejects.toThrow();
+    expect(songs[1].fetching).toBe(true);
+    expect(songs[2].fetching).toBe(true);
+  });
+
+  it("leaves a song that has finished downloading alone when newer ones start", async () => {
+    const pool = new Pool(1000, 2, 2);
+    const feeds = [feed(), feed(), feed()];
+    const songs = feeds.map((f) => new PremiumAudio(3, () => f.source, pool));
+    const whole = readAll(songs[0].read(0, 2));
+    feeds[0].push(1, 2, 3);
+    feeds[0].end();
+    expect(await whole).toEqual([1, 2, 3]);
+    songs[1].read(0, 0);
+    songs[2].read(0, 0);
+    expect(songs[0].spent).toBe(false);
+    expect(songs[0].fetching).toBe(false);
+  });
+
   it("counts a song read again as the most recent", () => {
     const pool = new Pool(10, 2);
     const feeds = [feed(), feed(), feed()];

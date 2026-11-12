@@ -23,6 +23,10 @@ const MAX_RETRIES = 3;
 /** memory kept for songs already fetched; the two most recent stay whatever their size */
 const KEEP_BYTES = 192 * 1024 * 1024;
 const KEEP_SONGS = 2;
+/** songs downloading at once: the one playing and the next; skipping through songs mustn't pile up downloads behind them */
+const KEEP_FETCHING = 2;
+/** how long a song's audio may stop arriving before it's given up on and played the usual way */
+const STALL_MS = 20_000;
 
 const TV_CLIENT = { clientName: Number(Constants.CLIENT_NAME_IDS.TVHTML5), clientVersion: Constants.CLIENTS.TV.VERSION };
 
@@ -38,6 +42,7 @@ export class Pool {
   constructor(
     private readonly keepBytes = KEEP_BYTES,
     private readonly keepSongs = KEEP_SONGS,
+    private readonly keepFetching = KEEP_FETCHING,
   ) {}
 
   use(song: PremiumAudio): void {
@@ -50,6 +55,14 @@ export class Pool {
       this.songs.delete(oldest);
       total -= oldest.contentLength;
       oldest.drop();
+    }
+    // only the newest songs keep downloading; the connection stays free for the one playing
+    let fetching = 0;
+    for (const s of [...this.songs].reverse()) {
+      if (!s.fetching) continue;
+      if (++fetching <= this.keepFetching) continue;
+      this.songs.delete(s);
+      s.drop();
     }
   }
 
@@ -73,11 +86,17 @@ export class PremiumAudio {
     readonly contentLength: number,
     private readonly open: () => Source,
     private readonly pool: Pool = shared,
+    private readonly stallMs = STALL_MS,
   ) {}
 
   /** the fetch broke off, so this song should be played the usual way */
   get failed(): boolean {
     return this.state === "failed";
+  }
+
+  /** its audio is still coming in */
+  get fetching(): boolean {
+    return this.state === "fetching";
   }
 
   /** the memory was given back or the fetch broke off; fetch the song again to play it */
@@ -92,7 +111,9 @@ export class PremiumAudio {
     let at = start;
     return new ReadableStream<Uint8Array>({
       pull: async (controller) => {
-        while (at >= this.received && this.state === "fetching") await new Promise<void>((wake) => this.waiting.push(wake));
+        while (at >= this.received && this.state === "fetching") {
+          if (!(await this.waitForMore())) this.giveUp(new Error(`The audio stopped arriving for ${this.stallMs / 1000} s`));
+        }
         if (!this.bytes || at >= this.received) {
           controller.error(this.failure ?? new Error("The song's audio was let go"));
           return;
@@ -119,6 +140,28 @@ export class PremiumAudio {
     this.state = "fetching";
     this.bytes = new Uint8Array(this.contentLength);
     void this.fetchAll();
+  }
+
+  /** true once more bytes have arrived (or the fetch ended); false when nothing came for `stallMs` */
+  private waitForMore(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), this.stallMs);
+      this.waiting.push(() => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    });
+  }
+
+  /** the fetch is going nowhere: fail it, so the player asks for the song the usual way */
+  private giveUp(error: Error): void {
+    if (this.state !== "fetching") return;
+    this.state = "failed";
+    this.failure = error;
+    console.warn(`[premium] ${error.message}`);
+    this.source?.abort();
+    this.source = null;
+    this.wake();
   }
 
   private async fetchAll(): Promise<void> {
@@ -163,6 +206,8 @@ export interface PremiumStream {
   codec: string;
   bitrate: number;
   sampleRate: number;
+  /** one of Premium's 256 kbps formats, rather than the usual audio streamed through the account */
+  premiumQuality: boolean;
 }
 
 type Session = () => Promise<Innertube>;
@@ -176,6 +221,11 @@ let retryAt = 0;
 /** where the signed-in YouTube Music session comes from */
 export function usePremiumAccount(session: Session): void {
   signedIn = session;
+}
+
+/** whether a YouTube Music account is connected at all */
+export function hasSignedInAccount(): boolean {
+  return signedIn !== null;
 }
 
 /** what the TV app is told about a song: its formats and where to stream them from */
@@ -194,7 +244,20 @@ async function playerInfo(yt: Innertube, videoId: string) {
 }
 
 /** Premium audio for a song through the person's own sign-in, or null when there's none to be had */
-export async function resolvePremium(videoId: string): Promise<PremiumStream | null> {
+export function resolvePremium(videoId: string): Promise<PremiumStream | null> {
+  return resolveSignedIn(videoId, false);
+}
+
+/**
+ * Whatever audio the person's own sign-in gets for a song, Premium or not: for
+ * songs the usual clients are refused, such as age-restricted ones, which
+ * YouTube only plays to a signed-in account.
+ */
+export function resolveThroughAccount(videoId: string): Promise<PremiumStream | null> {
+  return resolveSignedIn(videoId, true);
+}
+
+async function resolveSignedIn(videoId: string, anyFormat: boolean): Promise<PremiumStream | null> {
   if (!signedIn || Date.now() < retryAt) return null;
   let yt: Innertube;
   try {
@@ -209,19 +272,26 @@ export async function resolvePremium(videoId: string): Promise<PremiumStream | n
     misses = 0;
     hasPremium = false;
   }
-  if (!hasPremium && misses >= MISSES_BEFORE_GIVING_UP) return null;
+  if (!anyFormat && !hasPremium && misses >= MISSES_BEFORE_GIVING_UP) return null;
 
   const player = await playerInfo(yt, videoId);
   if (!player) return null;
   const formats = player.data.adaptive_formats;
-  const format = PREMIUM_ITAGS.map((itag) => formats.find((f) => f.itag === itag && !f.is_drc)).find((f) => f?.content_length && f.mime_type);
-  if (!format) {
+  const usable = (f: (typeof formats)[number]) => Boolean(f.content_length && f.mime_type && f.has_audio && !f.has_video && !f.is_drc);
+  let format = PREMIUM_ITAGS.map((itag) => formats.find((f) => f.itag === itag && usable(f))).find(Boolean);
+  const premiumQuality = Boolean(format);
+  if (format) {
+    hasPremium = true;
+    misses = 0;
+  } else {
     if (!hasPremium) misses++;
-    return null;
+    if (!anyFormat) return null;
+    // the best of the usual formats, streamed the way the TV app streams them
+    format = formats.filter(usable).sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0) || (b.audio_sample_rate ?? 0) - (a.audio_sample_rate ?? 0))[0];
+    if (!format) return null;
   }
-  hasPremium = true;
-  misses = 0;
 
+  const chosen = format;
   const open = (): Source => {
     const stream = new SabrStream({
       videoId,
@@ -240,19 +310,20 @@ export async function resolvePremium(videoId: string): Promise<PremiumStream | n
     });
     // failures reach the audio stream too, where they're handled
     stream.on("error", () => undefined);
-    const { audioStream } = stream.start({ audioFormat: format.itag, enabledTrackTypes: EnabledTrackTypes.AUDIO_ONLY, isPostLiveDvr: false, maxRetries: MAX_RETRIES });
+    const { audioStream } = stream.start({ audioFormat: chosen.itag, enabledTrackTypes: EnabledTrackTypes.AUDIO_ONLY, isPostLiveDvr: false, maxRetries: MAX_RETRIES });
     return { stream: audioStream, abort: () => void stream.abort().catch(() => undefined) };
   };
 
-  const mime = format.mime_type!;
+  const mime = chosen.mime_type!;
   return {
-    audio: new PremiumAudio(format.content_length!, open),
+    audio: new PremiumAudio(chosen.content_length!, open),
     mimeType: mime.split(";")[0],
-    contentLength: format.content_length!,
+    contentLength: chosen.content_length!,
     expiresAt: player.data.expires?.getTime?.() ?? Date.now() + 5 * 60 * 60_000,
-    loudnessDb: format.loudness_db ?? player.info.player_config?.audio_config?.loudness_db,
+    loudnessDb: chosen.loudness_db ?? player.info.player_config?.audio_config?.loudness_db,
     codec: /codecs="([^"]+)"/.exec(mime)?.[1] ?? mime.split(";")[0],
-    bitrate: format.average_bitrate ?? format.bitrate ?? 0,
-    sampleRate: Number(format.audio_sample_rate ?? 0),
+    bitrate: chosen.average_bitrate ?? chosen.bitrate ?? 0,
+    sampleRate: Number(chosen.audio_sample_rate ?? 0),
+    premiumQuality,
   };
 }

@@ -2,7 +2,25 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./client", () => ({ getYouTube: () => Promise.reject(new Error("offline in tests")), resetYouTube: () => undefined }));
 
-const { pickAudioFormat } = await import("./streams");
+const { explainProblem, pickAudioFormat } = await import("./streams");
+
+describe("explainProblem", () => {
+  it("puts YouTube's refusals into plain words", () => {
+    expect(explainProblem("LOGIN_REQUIRED: This video is private", false)).toBe("it's private on YouTube");
+    expect(explainProblem("UNPLAYABLE: This video is not available", true)).toBe("it isn't available on YouTube any more");
+    expect(explainProblem("VISIONOS: This video is unavailable", true)).toBe("it isn't available on YouTube any more");
+    expect(explainProblem("Asking YouTube (IOS) about the song took more than 10 s", true)).toBe("YouTube didn't answer in time");
+  });
+
+  it("tells someone without a connected account how an age-restricted song could play", () => {
+    expect(explainProblem("LOGIN_REQUIRED: Sign in to confirm your age", false)).toMatch(/age-restricted; connect your YouTube Music account/);
+    expect(explainProblem("LOGIN_REQUIRED: Sign in to confirm your age", true)).toBe("it's age-restricted on YouTube");
+  });
+
+  it("has nothing to add for an unknown failure", () => {
+    expect(explainProblem("VISIONOS: no usable audio", true)).toBeNull();
+  });
+});
 
 const format = (itag: number, mime: string, kbps: number, rate: number, extra: object = {}) => ({
   itag,

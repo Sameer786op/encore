@@ -171,6 +171,11 @@ export class AudioEngine {
 
     this.decks = [new Deck(ctx, input), new Deck(ctx, input)];
     this.decks.forEach((deck) => this.listen(deck));
+    // Windows can suspend the context behind our back (a device change, a call, a lid closed):
+    // the song would seem to play on while nothing is heard, so wake it as soon as it happens
+    ctx.addEventListener("statechange", () => {
+      if (ctx.state === "suspended" && !this.activeDeck.audio.paused) void ctx.resume();
+    });
   }
 
   /** swap the built-in compressor for the look-ahead limiter once its script has loaded on the audio thread */

@@ -30,7 +30,9 @@ function HoverPlay({ onClick, label }: { onClick: () => void; label: string }) {
       initial={false}
       whileTap={{ scale: 0.88 }}
       transition={{ type: "spring", stiffness: 520, damping: 30 }}
-      className="glass-clear absolute bottom-2.5 left-2.5 grid size-9 scale-75 place-items-center rounded-full text-snow opacity-0 transition-[opacity,scale,background-color,color] hover:text-on-accent duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"
+      // invisible, not just transparent, until the card is hovered: a transparent pane of glass still
+      // costs a blur pass every frame, and a page of cards has a hundred and more of these
+      className="glass-clear invisible absolute bottom-2.5 left-2.5 grid size-9 scale-75 place-items-center rounded-full text-snow opacity-0 transition-[opacity,scale,background-color,color,visibility] hover:text-on-accent duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent group-hover:visible group-hover:scale-100 group-hover:opacity-100 group-focus-visible:visible group-focus-visible:scale-100 group-focus-visible:opacity-100"
     >
       <Play className="ml-px size-4" fill="currentColor" strokeWidth={0} />
     </motion.button>

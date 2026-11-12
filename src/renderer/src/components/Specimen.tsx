@@ -105,10 +105,14 @@ export function Rings({ x, y, size, playing }: { x: number; y: number; size: num
 /** the lime line that sweeps down the cover while it plays; sits inside the cover */
 export function ScanLine({ height = 30 }: { height?: number }) {
   return (
-    <span
-      className="pointer-events-none absolute -left-[16%] -right-[16%] animate-scan rounded-[50%] bg-[linear-gradient(180deg,transparent,rgb(205_243_90/0.5)_45%,rgb(240_255_190/0.9)_50%,rgb(205_243_90/0.5)_55%,transparent)] mix-blend-screen blur-[1.5px] shadow-[0_0_40px_rgb(205_243_90/0.35)] moss:mix-blend-normal"
-      style={{ height }}
-    />
+    // the sweep is a slide of this cover-sized layer (translateY in % of the cover), which the GPU does alone;
+    // moving the line by `top` repainted the cover under it every frame
+    <span aria-hidden className="pointer-events-none absolute inset-0 animate-scan mix-blend-screen moss:mix-blend-normal">
+      <span
+        className="absolute -left-[16%] -right-[16%] top-0 rounded-[50%] bg-[linear-gradient(180deg,transparent,rgb(205_243_90/0.5)_45%,rgb(240_255_190/0.9)_50%,rgb(205_243_90/0.5)_55%,transparent)] blur-[1.5px] shadow-[0_0_40px_rgb(205_243_90/0.35)]"
+        style={{ height }}
+      />
+    </span>
   );
 }
 

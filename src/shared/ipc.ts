@@ -12,6 +12,7 @@ export const IPC = {
   prefetch: "catalog:prefetch",
   loudness: "catalog:loudness",
   quality: "catalog:quality",
+  problem: "catalog:problem",
 
   libraryGet: "library:get",
   libraryChanged: "library:changed",

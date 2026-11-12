@@ -39,7 +39,10 @@ function MoodCover({ mood, className, live }: { mood: Mood; className?: string; 
       className={cn("@container relative isolate shrink-0 overflow-hidden bg-[#0b0a0c]", className)}
       style={{ backgroundImage: `radial-gradient(80% 70% at 82% 22%, ${mid}b3, transparent 70%), radial-gradient(70% 60% at 0% 100%, ${deep}cc, transparent 72%), radial-gradient(50% 40% at 100% 100%, ${light}40, transparent 70%)` }}
     >
-      <MoodShard mood={mood} className={cn("absolute right-[2cqw] top-[10cqw] size-[60cqw]", live && "animate-float")} />
+      {/* floated on a <div>: a rotating <svg> repaints every frame */}
+      <div className={cn("absolute right-[2cqw] top-[10cqw] size-[60cqw]", live && "animate-float")}>
+        <MoodShard mood={mood} className="block size-full" />
+      </div>
       <div className="absolute inset-0 bg-[linear-gradient(to_top,rgb(0_0_0/0.62),transparent_52%)]" />
       <span aria-hidden className="grain absolute inset-0" style={{ opacity: 0.35 }} />
       <CoverLabel color={light}>Mood mix</CoverLabel>

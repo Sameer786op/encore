@@ -78,6 +78,7 @@ export default function App() {
   const route = useNav((s) => s.route);
   const index = useNav((s) => s.index);
   const queueOpen = usePlayer((s) => s.queueOpen);
+  const covered = useView((s) => s.covered);
   const scroller = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
 
@@ -124,31 +125,36 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="relative h-full overflow-hidden text-ink">
-        <Backdrop />
-        {/* Pages scroll in one column right of the sidebar. The toolbar and the
-            player float over it as glass, so the page shows through them. */}
-        <main className="absolute inset-0">
-          <div
-            ref={scroller}
-            onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
-            className="absolute inset-y-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
-            style={{ left: "calc(var(--sidebar-w) + 8px)", right: queueOpen ? QUEUE_SPACE : 0 }}
-          >
-            <motion.div
-              key={`${index}:${JSON.stringify(route)}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ opacity: { duration: 0.24, ease: "easeOut" }, y: { type: "spring", stiffness: 260, damping: 32, mass: 0.8 } }}
-              className="relative min-h-full pb-32"
+        {/* Under a full-screen player that has slid all the way up, the app is hidden: its glass, glows
+            and moving parts cost every frame although nobody could see them. Menus, dialogs and
+            messages stay outside this, as they show over the full-screen player. */}
+        <div className={covered ? "invisible contents" : "contents"}>
+          <Backdrop />
+          {/* Pages scroll in one column right of the sidebar. The toolbar and the
+              player float over it as glass, so the page shows through them. */}
+          <main className="absolute inset-0">
+            <div
+              ref={scroller}
+              onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
+              className="absolute inset-y-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
+              style={{ left: "calc(var(--sidebar-w) + 8px)", right: queueOpen ? QUEUE_SPACE : 0 }}
             >
-              <Page route={route} />
-            </motion.div>
-          </div>
-        </main>
-        <Sidebar />
-        <TopBar scrolled={scrolled} right={queueOpen ? QUEUE_SPACE : 0} />
-        <QueuePanel />
-        <PlayerBar right={queueOpen ? QUEUE_SPACE : 0} />
+              <motion.div
+                key={`${index}:${JSON.stringify(route)}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ opacity: { duration: 0.24, ease: "easeOut" }, y: { type: "spring", stiffness: 260, damping: 32, mass: 0.8 } }}
+                className="relative min-h-full pb-32"
+              >
+                <Page route={route} />
+              </motion.div>
+            </div>
+          </main>
+          <Sidebar />
+          <TopBar scrolled={scrolled} right={queueOpen ? QUEUE_SPACE : 0} />
+          <QueuePanel />
+          <PlayerBar right={queueOpen ? QUEUE_SPACE : 0} />
+        </div>
         <FullscreenPlayer />
         <ContextMenu />
         <Modals />

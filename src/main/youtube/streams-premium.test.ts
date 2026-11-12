@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 const audios: Record<string, { failed: boolean; spent: boolean }> = {};
 
 vi.mock("./premium", () => ({
+  hasSignedInAccount: () => true,
+  resolveThroughAccount: async () => null,
   resolvePremium: async (videoId: string) => ({
     audio: (audios[videoId] ??= { failed: false, spent: false }),
     mimeType: "audio/webm",
@@ -12,6 +14,7 @@ vi.mock("./premium", () => ({
     codec: "opus",
     bitrate: 261_000,
     sampleRate: 48_000,
+    premiumQuality: true,
   }),
 }));
 

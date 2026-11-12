@@ -19,6 +19,10 @@ import { forgetAudio, resolveAudio, StreamUnavailableError, type AudioStream } f
 // encore-media://art/<hash>.jpg serves cover art cut out of those files.
 
 const CHUNK_BYTES = 4 * 1024 * 1024;
+/** how long YouTube gets to start answering a request for a piece */
+const ANSWER_MS = 15_000;
+/** how long a piece may go without a byte arriving before the song is given up on and asked for again */
+const STALL_MS = 20_000;
 
 export function registerMediaScheme(): void {
   protocol.registerSchemesAsPrivileged([
@@ -45,8 +49,31 @@ function parseRange(header: string | null, total: number): { start: number; end:
   return { start, end };
 }
 
-function fetchRange(url: string, start: number, end: number, signal: AbortSignal): Promise<Response> {
-  return fetch(url, { headers: { range: `bytes=${start}-${end}` }, signal });
+/**
+ * A range from YouTube. The time limit covers the answer's headers only: the
+ * bytes themselves may take as long as the connection needs, and [piecewise]
+ * notices when they stop coming.
+ */
+export async function fetchRange(url: string, start: number, end: number, signal: AbortSignal, answerMs = ANSWER_MS): Promise<Response> {
+  const control = new AbortController();
+  const onAbort = () => control.abort(signal.reason);
+  if (signal.aborted) onAbort();
+  else signal.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => control.abort(new Error(`YouTube didn't answer within ${answerMs / 1000} s`)), answerMs);
+  try {
+    return await fetch(url, { headers: { range: `bytes=${start}-${end}` }, signal: control.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** the next read, or "stalled" when nothing came for `ms` */
+function readOrStall<T>(reader: ReadableStreamDefaultReader<T>, ms: number): Promise<Awaited<ReturnType<ReadableStreamDefaultReader<T>["read"]>> | "stalled"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<"stalled">((resolve) => {
+    timer = setTimeout(() => resolve("stalled"), ms);
+  });
+  return Promise.race([reader.read(), late]).finally(() => clearTimeout(timer));
 }
 
 /** the first piece's bytes, then the rest of the range up to end, fetched a piece at a time as they're read */
@@ -57,13 +84,21 @@ export function piecewise(
   end: number,
   signal: AbortSignal,
   pieceBytes = CHUNK_BYTES,
+  stallMs = STALL_MS,
 ): ReadableStream<Uint8Array> {
   let reader = first.getReader();
   let at = from;
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       for (;;) {
-        const { done, value } = await reader.read();
+        const next = await readOrStall(reader, stallMs);
+        if (next === "stalled") {
+          // the connection went quiet; the audio element sees an error and asks again
+          void reader.cancel().catch(() => undefined);
+          controller.error(new Error(`YouTube stopped sending for ${stallMs / 1000} s part-way through`));
+          return;
+        }
+        const { done, value } = next;
         if (!done) {
           at += value.byteLength;
           controller.enqueue(value);
@@ -73,7 +108,7 @@ export function piecewise(
           controller.close();
           return;
         }
-        const upstream = await fetchRange(url, at, Math.min(end, at + pieceBytes - 1), signal);
+        const upstream = await fetchRange(url, at, Math.min(end, at + pieceBytes - 1), signal, Math.min(ANSWER_MS, stallMs));
         if (upstream.status !== 206 || !upstream.body) {
           await upstream.body?.cancel();
           // the audio element sees an error and asks again with a fresh URL

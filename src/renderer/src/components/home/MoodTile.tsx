@@ -62,7 +62,10 @@ export function MoodTile({ height, index = 0 }: { height: number; index?: number
         </div>
       </div>
 
-      <MoodShard mood={mood} className="pointer-events-none absolute left-1/2 top-[50%] size-[132px] -translate-x-1/2 -translate-y-1/2 animate-float" />
+      {/* the float moves a <div> round the shard, not the <svg>: a rotating <svg> made the page repaint every frame */}
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-[50%] size-[132px] -translate-x-1/2 -translate-y-1/2 animate-float">
+        <MoodShard mood={mood} className="block size-full" />
+      </div>
 
       <div className="absolute bottom-4 left-5 right-4 flex items-end justify-between gap-2">
         <div className="min-w-0">

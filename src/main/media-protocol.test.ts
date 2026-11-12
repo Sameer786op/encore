@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./youtube/client", () => ({ getYouTube: () => Promise.reject(new Error("offline in tests")), resetYouTube: () => undefined }));
 
-const { piecewise } = await import("./media-protocol");
+const { fetchRange, piecewise } = await import("./media-protocol");
 
 const FILE = Uint8Array.from({ length: 20 }, (_, i) => i);
 const asked: string[] = [];
@@ -53,5 +53,34 @@ describe("piecewise", () => {
     serve(Infinity, 8);
     const stream = piecewise(body(FILE.slice(0, 4)), "https://example.test/a", 0, 15, new AbortController().signal, 4);
     await expect(readAll(stream)).rejects.toThrow(/403 part-way/);
+  });
+
+  it("gives up when the bytes stop coming part-way, so the player asks again", async () => {
+    // a piece that sends two bytes and then goes quiet for good
+    const quiet = new ReadableStream<Uint8Array>({ start: (c) => c.enqueue(FILE.slice(0, 2)) });
+    const stream = piecewise(quiet, "https://example.test/a", 0, 11, new AbortController().signal, 4, 30);
+    await expect(readAll(stream)).rejects.toThrow(/stopped sending/);
+  });
+});
+
+describe("fetchRange", () => {
+  it("gives up when YouTube doesn't start answering in time", async () => {
+    vi.stubGlobal("fetch", (_url: string, init: { signal: AbortSignal }) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason))));
+    await expect(fetchRange("https://example.test/a", 0, 1, new AbortController().signal, 20)).rejects.toThrow(/didn't answer/);
+  });
+
+  it("stops when the player no longer wants the piece", async () => {
+    vi.stubGlobal("fetch", (_url: string, init: { signal: AbortSignal }) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason))));
+    const control = new AbortController();
+    const pending = fetchRange("https://example.test/a", 0, 1, control.signal, 5000);
+    control.abort(new Error("seeked away"));
+    await expect(pending).rejects.toThrow("seeked away");
+  });
+
+  it("passes a timely answer through", async () => {
+    serve();
+    const response = await fetchRange("https://example.test/a", 2, 5, new AbortController().signal, 1000);
+    expect(response.status).toBe(206);
+    expect(asked).toEqual(["bytes=2-5"]);
   });
 });

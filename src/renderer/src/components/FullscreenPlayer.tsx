@@ -272,6 +272,7 @@ function Fullscreen() {
       animate={{ y: 0, borderRadius: 0 }}
       exit={{ y: "100%", borderRadius: 40, transition: { type: "spring", stiffness: 300, damping: 36 } }}
       transition={{ type: "spring", stiffness: 240, damping: 32, mass: 0.9 }}
+      onAnimationComplete={() => useView.getState().settled()}
       className="fixed inset-0 z-30 overflow-hidden bg-bg text-ink"
     >
       <Scenery track={track} palette={palette} />

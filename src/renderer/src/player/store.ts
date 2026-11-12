@@ -338,7 +338,9 @@ export const usePlayer = create<PlayerStore>((set, get) => {
           toast("Playback stopped: several songs in a row wouldn't load. Check your connection.", { kind: "error", durationMs: 6000 });
           return;
         }
-        toast(`Couldn't play "${track.title}", skipping`, { kind: "error" });
+        // the main process knows why, when YouTube gave a reason
+        const reason = track.source === "youtube" ? window.encore.catalog.problem(track.id).catch(() => null) : Promise.resolve(null);
+        void reason.then((why) => toast(why ? `Couldn't play "${track.title}": ${why}` : `Couldn't play "${track.title}", skipping`, { kind: "error", durationMs: why ? 7000 : undefined }));
         void advance(true);
       },
     });
